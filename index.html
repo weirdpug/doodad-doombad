@@ -1201,6 +1201,8 @@
     // (nor any focused button, like Start, when the Space was typed as part of the coin code)
     if (codeKeys.delete(e.code)) e.preventDefault();
     if (phase === 'paused' && (e.code === 'Space' || e.key === 'Enter') && !focusOutsideMenu()) e.preventDefault();
+    // (and the Space that picked Go to Main Menu must not press Start as it comes up on the main menu)
+    if (phase === 'title' && (e.code === 'Space' || e.key === 'Enter')) e.preventDefault();
     const k = keyMap[e.code];
     if (k) keys[k] = false;
     if (e.key === 'Meta' || e.key === 'Control' || e.key === 'Alt') releaseAll();
@@ -1398,7 +1400,7 @@
   ov.addEventListener('touchstart', ovPressed, { passive: true });
 
   // ---------- pause menu ----------
-  // Pausing opens a menu: Resume, Store or Restart. Click or tap a choice, or move with Up/Down (or
+  // Pausing opens a menu: Resume, Store, Restart or Go to Main Menu. Click or tap a choice, or move with Up/Down (or
   // Left/Right: arrows, W/S, a controller's stick or D-pad) and pick with Enter, Space or A. Esc or B
   // backs out: from the Store to the menu, and from the menu back into the game.
   //
@@ -1499,6 +1501,7 @@
       { label: 'Resume', act: () => resumeGame() },
       { label: 'Store', act: by => showPause('store', 0, null, by) },
       { label: 'Restart', act: () => restartGame() },
+      { label: 'Go to Main Menu', act: () => goToMainMenu() },
     ],
     store: () => [
       ...SHOP.flatMap(it => [
@@ -1715,6 +1718,19 @@
   function restartGame() {
     if (phase !== 'paused') return;
     releaseAll(); newGame();
+  }
+  // Go to Main Menu: back to the castle screen. The game so far is dropped (coins and the bag are kept),
+  // and Start there begins a new game from level 1.
+  function goToMainMenu() {
+    if (phase !== 'paused') return;
+    releaseAll(); closeCoinBar();
+    scores = [0, 0, 0, 0]; level = 1; lives = startLives(); brunoTaco = 0; brunoRolls = 0;
+    resetLevel(); phase = 'title';
+    ov.classList.remove('menu-mode'); ov.classList.add('title-mode');
+    ovTitle.innerHTML = 'Doodad<br>Doombad'; startBtn.textContent = 'Start'; startBtn.hidden = false;
+    menuEl.hidden = menuHint.hidden = coinList.hidden = storeShelf.hidden = true;
+    ov.hidden = false; startBtn.focus({ preventScroll: true });
+    updateHud(true);
   }
   function togglePause() { if (phase === 'play') pauseGame(); else if (phase === 'paused') resumeGame(); }
   document.addEventListener('visibilitychange', () => { if (document.hidden && phase === 'play') pauseGame(); }, sig);
