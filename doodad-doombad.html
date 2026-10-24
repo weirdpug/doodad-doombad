@@ -1010,11 +1010,18 @@
   //   C0!NS     opens the coin bar (openCoinBar), on any screen
   //   B0O/\/\   makes Bruno say "an explosion explodes" and blow up the screen (codeBoom), during a round
   //   |_!FE     nothing can knock the pugs out, not even the explosion, until it is typed again (toggleSafe)
-  // A code's first key still does its usual job (B barks), but once a code has begun, its next keys only
-  // type the code: the coin code's S doesn't also climb down or pick a menu choice. A key that doesn't
-  // fit, or nothing typed for 25 seconds, ends it.
+  //   /\/EXT    skips straight to the next level (skipLevel), during a round
+  // A code's first key still does its usual job if it is a game key (B barks), but once a code has begun,
+  // its next keys only type the code: the coin code's S doesn't also climb down or pick a menu choice, the
+  // skip code's X makes no tacos. A key that doesn't fit, or nothing typed for 25 seconds, ends it.
   const CODES = [{ code: 'C0!NS', at: 0, run: () => openCoinBar() }, { code: 'B0O/\\/\\', at: 0, run: () => codeBoom() },
-    { code: '|_!FE', at: 0, run: () => toggleSafe() }];
+    { code: '|_!FE', at: 0, run: () => toggleSafe() }, { code: '/\\/EXT', at: 0, run: () => skipLevel() }];
+  // The skip code: straight on to the next level (no level-clear banner, bonus or extra heart), every time
+  function skipLevel() {
+    if (phase !== 'play') return;
+    level++; resetLevel(); updateHud(true);
+    toast(`On to level ${level}!`, '#ffcc3d'); sfx.oneUp();
+  }
   // The safe code: while it is on, no pug can be knocked out (die does nothing), through every level and
   // new game, until the code is typed again or the page is reloaded
   let invincible = false;
@@ -1033,9 +1040,13 @@
     if (now - codeTime > 25000) for (const c of CODES) c.at = 0;
     codeTime = now;
     let took = false, done = null;
+    // (a key the game uses for something: the code's first key still does that)
+    const gameKey = !!keyMap[e.code] || 'BMPXY'.includes(ch);
     for (const c of CODES) {
       c.at = ch === c.code[c.at] ? c.at + 1 : ch === c.code[0] ? 1 : 0;
-      if (c.at > 1) took = true;   // (a code's second key onward)
+      // a code's second key onward, and a first key the game doesn't use (so a browser never takes it:
+      // Firefox opens its find bar on /)
+      if (c.at > 1 || (c.at === 1 && !gameKey)) took = true;
       if (c.at === c.code.length) done = c;
     }
     if (took) { e.preventDefault(); codeKeys.add(e.code); }
