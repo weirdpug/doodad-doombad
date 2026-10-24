@@ -165,6 +165,8 @@
     display: flex; flex-direction: column; align-items: center; gap: clamp(5px, 2cqw, 10px);
     padding: clamp(6px, 2.4cqw, 12px) clamp(8px, 3cqw, 16px); background: rgba(7, 8, 26, .78); border: 2px solid rgba(255, 62, 108, .55); box-shadow: 3px 3px 0 rgba(0, 0, 0, .5);
   }
+  /* (no story text on the main menu, just the controls and Start: the user asked to get rid of the description) */
+  #overlay.title-mode #ovText { display: none; }
   #overlay.title-mode p { font-size: clamp(7px, 1.9cqw, 9px); }
   #overlay.title-mode .keys { font-size: clamp(6px, 1.55cqw, 8px); line-height: 2; }
   /* (on a phone the words need most of the screen: the box lets the castle show through, the words get a shadow) */
