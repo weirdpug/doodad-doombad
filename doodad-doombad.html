@@ -153,6 +153,20 @@
   }
   #start:hover { background: #ff5a82; }
   #start:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #5a0f2a; }
+  /* The main menu's two choices, Start and Store, stacked at the bottom. The chosen one is filled in and the
+     other is outlined, as in the pause menu (Start is chosen until Store is). Everywhere else Store is gone
+     and the box adds nothing to the layout, so Game Over's Start is just as it was. */
+  .titlebtns { display: contents; }
+  #titleStore { display: none; }
+  #overlay.title-mode .titlebtns { display: flex; flex-direction: column; align-items: stretch; gap: clamp(8px, 2.5cqw, 12px); }
+  #overlay.title-mode #titleStore {
+    display: block; font-family: var(--font-display); font-size: 13px; letter-spacing: .06em; text-transform: uppercase;
+    background: var(--bg); color: var(--ink); border: 0; padding: 12px 20px; cursor: pointer;
+    box-shadow: inset 0 0 0 2px var(--girder), 4px 4px 0 #5a0f2a;
+  }
+  #overlay.title-mode.pick-store #titleStore { background: var(--girder); color: #fff; box-shadow: 4px 4px 0 #5a0f2a; }
+  #overlay.title-mode.pick-store #start { background: var(--bg); color: var(--ink); box-shadow: inset 0 0 0 2px var(--girder), 4px 4px 0 #5a0f2a; }
+  #overlay.title-mode #titleStore:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #5a0f2a; }
   /* Pause menu (Resume, Store, Restart): the chosen button is filled in, the others are outlined */
   #overlay.menu-mode { cursor: default; }
   /* the main menu (the start screen): the outdoor castle scene shows through. The title sits in the sky at the
@@ -301,7 +315,10 @@
       <div class="menu" id="menu" hidden></div>
       <div class="keys" id="menuHint" hidden><b>Up</b>/<b>Down</b> choose &nbsp; <b>Enter</b> or <b>A</b> pick<br><b>Esc</b> or <b>B</b> back</div>
       <div class="keys" id="ovKeys"><b>Arrows</b> walk and climb<br><b>Space</b> or <b>Up</b> jump &nbsp; <b>B</b> bark &nbsp; <b>P</b> pause &nbsp; <b>M</b> mute<br><b>Xbox controller</b> stick or D-pad, <b>A</b> jump, <b>B</b> bark, <b>Menu</b> start<br><b>2-4 players</b> press A on another controller to join<br>a knocked-out pug waits for the next level · a heart is lost only when everyone is out</div>
-      <button id="start" type="button">Start</button>
+      <div class="titlebtns">
+        <button id="start" type="button">Start</button>
+        <button id="titleStore" type="button">Store</button>
+      </div>
       </div>
     </div>
   </div>
@@ -719,6 +736,9 @@
   // keyboard (and touch buttons) or a controller, whichever is used first; Players 2-4 (black, silver and orange pugs)
   // each join at any time by pressing A on another controller (or Space on the keyboard, when a controller has Player 1).
   let phase = 'title', frame = 0, hi = 0, level = 1, lives = 3;
+  // the main menu's chosen button (0 Start, 1 Store), and whether the Store is open from the main menu
+  // (phase is 'paused' then, as in the pause menu's Store, but the castle scene stays behind it)
+  let titleSel = 0, titleStore = false;
   let bonus = 5000, bonusTick = 0, bonusLeft = 0, winT = 0, winner = 0;
   let apeTimer = 90, apeAnim = 0, drumFlare = 0, fireTimer = 0;
   // Big Bruno's roll (clicked on the team's last heart): null while he is at home on his girder
@@ -832,7 +852,7 @@
     apeTimer = 80; apeAnim = 0; bruno = null; shakeT = 0; boom = null; boomPic.hidden = true; boomPicT = 0; brunoStun = 0; shots = [];
     discoFloors.clear(); discoLit.clear();
     snapCamera();
-    phase = 'play';
+    titleStore = false; phase = 'play';
   }
   const bonusEvery = () => Math.max(120, 20 * ROWS);   // frames per 100-point drop (2s on level 1)
   function newGame() {
@@ -855,7 +875,7 @@
   function joinSlot(id) {
     if (joined[id] && pById(id)) return;
     joined[id] = true; played[id] = true;
-    if ((phase === 'play' || phase === 'paused') && !pById(id)) {
+    if ((phase === 'play' || phase === 'paused') && !titleStore && !pById(id)) {
       const p = makePlayer(id); p.safe = 120; p.nameT = 150;
       players.push(p); players.sort((a, b) => a.id - b.id);
     }
@@ -881,6 +901,8 @@
     joined[id] = false;
     players = players.filter(p => p.id !== id);
     showControllerHelp(); updateHud(true);
+    // (in the Store opened from the main menu no game is running: it just shows the pugs still here)
+    if (titleStore) { showPause('store', menuSel); return; }
     if (phase === 'play' || phase === 'paused' || phase === 'win') {
       // if everyone left was sitting out, the team is out: that costs a heart and the level restarts
       // (or the game ends on the last heart)
@@ -1106,7 +1128,7 @@
   function placeCoinBar() {
     if (!coinBarOpen) return;
     const scr = coinBar.parentElement, W = scr.clientWidth, H = scr.clientHeight;
-    const P = pById(coinBarFor), shown = !!P && phase !== 'title' && P.state !== 'out';
+    const P = pById(coinBarFor), shown = !!P && phase !== 'title' && !titleStore && P.state !== 'out';
     coinBar.classList.toggle('notail', !shown);
     const bw = coinBar.offsetWidth, bh = coinBar.offsetHeight;
     if (!shown) { coinBar.style.left = W / 2 + 'px'; coinBar.style.top = H / 2 + 'px'; return; }
@@ -1143,14 +1165,18 @@
     if (coinBarOpen) return coinBarKey(e);
     if (secretCode(e)) return;
     const k = keyMap[e.code];
-    // On the start and Game Over screens a key press starts the game, without also making the pug
-    // jump; a key's auto-repeat never counts, so holding a key can't skip past the Game Over screen
-    // (starting from the keyboard puts the keyboard in the game: as Player 1, or as the next player
-    // when a controller already has Player 1)
+    // On the Game Over screen a key press starts the game, without also making the pug jump. On the main
+    // menu the arrows (or WASD) choose Start or Store and Enter or Space picks. A key's auto-repeat never
+    // counts, so holding a key can't skip past the Game Over screen (starting from the keyboard puts the
+    // keyboard in the game: as Player 1, or as the next player when a controller already has Player 1)
     if ((phase === 'title' || phase === 'over') && (e.key === 'Enter' || k)) {
       e.preventDefault();
       if (k) keys[k] = true;
-      if (!e.repeat) { claimKeyboard(true); startClicked(); }
+      if (!e.repeat) {
+        if (phase === 'title' && k && k !== 'jump') moveTitle(k === 'up' || k === 'left' ? -1 : 1);
+        else if (phase === 'title' && titleSel === 1) openTitleStore(kbBy());
+        else { claimKeyboard(true); startClicked(); }
+      }
       return;
     }
     // The pause menu: Up/Down choose, Enter or Space picks, Esc (or B) backs out, P resumes
@@ -1250,7 +1276,7 @@
       if (who > 0) leaveSlot(who);
       // Player 1's pug stays: the keyboard (if it isn't already another player's) or any controller can take
       // it over. During the level-clear banner, the pause waits for the next level to start.
-      else if (phase === 'play' || phase === 'paused') p1Lost();
+      else if ((phase === 'play' || phase === 'paused') && !titleStore) p1Lost();
       else if (phase === 'win') p1LostAtWin = true;
     }
     if (pads.length !== padCount) { padCount = pads.length; showControllerHelp(); }
@@ -1300,8 +1326,15 @@
       if (fresh('start')) {
         if (ph === 'title' || ph === 'over') startClicked(); else if (ph === 'play' && phase === 'play') togglePause();
       } else if (fresh('jump')) {
-        if (ph === 'title' || ph === 'over') startClicked();   // A on the start screen starts, without also jumping
+        // A on the main menu picks Start or Store, and on the Game Over screen starts, without also jumping
+        if (ph === 'title') pickTitle(owner);
+        else if (ph === 'over') startClicked();
         else if (ph === 'play' && p) p.jp.jump = true;
+      }
+      // on the main menu the stick or D-pad chooses Start or Store
+      if (ph === 'title' && phase === 'title') {
+        if (fresh('up') || fresh('left')) moveTitle(-1);
+        else if (fresh('down') || fresh('right')) moveTitle(1);
       }
       // On a controller only A jumps: up on the stick or D-pad just climbs ladders
       // (the keyboard's Up arrow still jumps away from ladders)
@@ -1362,6 +1395,7 @@
   // ---------- overlay ----------
   const ov = document.getElementById('overlay'), ovTitle = document.getElementById('ovTitle'),
     ovText = document.getElementById('ovText'), ovKeys = document.getElementById('ovKeys'), startBtn = document.getElementById('start'),
+    titleStoreBtn = document.getElementById('titleStore'),
     menuEl = document.getElementById('menu'), menuHint = document.getElementById('menuHint'), coinList = document.getElementById('coinList'),
     storeItems = document.getElementById('storeItems'), storeShelf = document.getElementById('storeShelf'),
     storeScroll = document.getElementById('storeScroll'), shelfL = document.getElementById('shelfL'), shelfR = document.getElementById('shelfR');
@@ -1388,12 +1422,40 @@
     try { initAudio(); } catch (e) {}
     newGame();
   }
-  // Press, tap or click anywhere on the start or game-over screen (button included). The pause
-  // screen is different: there only its menu buttons do anything.
-  const ovPressed = () => { if (phase !== 'paused') startClicked(); };
+  // Press, tap or click anywhere on the start or game-over screen (button included), except the main
+  // menu's Store button. The pause screen is different: there only its menu buttons do anything.
+  const ovPressed = e => { if (phase !== 'paused' && !e.target.closest('#titleStore')) startClicked(); };
   ov.addEventListener('pointerdown', ovPressed);
   ov.addEventListener('click', ovPressed);
   ov.addEventListener('touchstart', ovPressed, { passive: true });
+
+  // ----- the main menu: Start or Store -----
+  // Start is chosen at first. Up/Down or Left/Right (arrows, WASD, a controller's stick or D-pad) go
+  // between the two, the mouse chooses one by moving over it, and Enter, Space or A picks; Menu on a
+  // controller always starts. Store opens the Store, and its Back (or Esc, B, P or Menu) comes back here.
+  function markTitle(sel, focus) {
+    titleSel = sel; ov.classList.toggle('pick-store', sel === 1);
+    if (focus) (sel ? titleStoreBtn : startBtn).focus({ preventScroll: true });
+  }
+  function moveTitle(d) { markTitle((titleSel + d + 2) % 2, true); sfx.tick(); }
+  function pickTitle(by) { if (titleSel === 1) openTitleStore(by); else startClicked(); }
+  function openTitleStore(by) {
+    if (!live() || phase !== 'title' || !boomPic.hidden) return;
+    try { initAudio(); } catch (e) {}
+    releaseAll(); titleStore = true; phase = 'paused';
+    ov.classList.remove('title-mode', 'pick-store');
+    showPause('store', 0, null, by);
+  }
+  titleStoreBtn.addEventListener('click', () => openTitleStore(kbBy()));
+  // the main menu again (sel: the button to choose), from the pause menu or the Store
+  function showTitle(sel) {
+    titleStore = false; phase = 'title';
+    ov.classList.remove('menu-mode'); ov.classList.add('title-mode');
+    ovTitle.innerHTML = 'Doodad<br>Doombad'; startBtn.textContent = 'Start'; startBtn.hidden = false;
+    menuEl.hidden = menuHint.hidden = coinList.hidden = storeShelf.hidden = true;
+    ov.hidden = false; markTitle(sel || 0, true);
+    updateHud(true);
+  }
 
   // ---------- pause menu ----------
   // Pausing opens a menu: Resume, Store, Restart or Go to Main Menu. Click or tap a choice, or move with Up/Down (or
@@ -1504,7 +1566,7 @@
         { label: 'Buy', act: by => buyItem(it, by), btn: it.buyBtn, it, row: 0 },
         { label: bag[storeBy].on[it.key] ? 'Unequip' : 'Equip', act: by => toggleEquip(it, by), btn: it.eqBtn, it, row: 1 },
       ]),
-      { label: 'Back', act: () => showPause('pause', 1), row: 2 },
+      { label: 'Back', act: () => storeBack(), row: 2 },
     ],
   };
   // (storeCol: the card that Up or Down from Back goes to, the one chosen last)
@@ -1676,7 +1738,9 @@
     storeScroll.scrollLeft = x + e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? storeScroll.clientWidth : 1);
   }, { passive: false });
   function chooseSel(by) { if (phase === 'paused' && menuEntries[menuSel]) menuEntries[menuSel].act(by || 0); }
-  function menuBack() { if (pauseView === 'store') showPause('pause', 1); else resumeGame(); }
+  function menuBack() { if (pauseView === 'store') storeBack(); else resumeGame(); }
+  // the Store's Back: to the pause menu, or to the main menu when the Store was opened from there
+  function storeBack() { if (titleStore) showTitle(1); else showPause('pause', 1); }
   const menuButton = e => { const b = e.target.closest('button'); return b && menuBtns.includes(b) ? b : null; };
   ov.addEventListener('click', e => {
     const b = menuButton(e);
@@ -1689,11 +1753,17 @@
   // pick out whatever button happens to land under it (that could be Restart).
   ov.addEventListener('pointermove', e => {
     if (!e.movementX && !e.movementY) return;
+    if (phase === 'title') {
+      const t = e.target.closest('#start, #titleStore'), i = t === titleStoreBtn ? 1 : 0;
+      if (t && i !== titleSel) markTitle(i, false);
+      return;
+    }
     const b = menuButton(e);
     if (b && +b.dataset.i !== menuSel) { menuSel = +b.dataset.i; markSel(true, false); }
   });
   // Tab and Shift+Tab move the highlight along with the keyboard focus
   ov.addEventListener('focusin', e => {
+    if (phase === 'title') { if (e.target === startBtn || e.target === titleStoreBtn) markTitle(e.target === titleStoreBtn ? 1 : 0, false); return; }
     const b = menuButton(e);
     if (b && +b.dataset.i !== menuSel) { menuSel = +b.dataset.i; markSel(false); }
   });
@@ -1704,10 +1774,11 @@
 
   function pauseGame(note) {
     if (phase === 'play') { releaseAll(); phase = 'paused'; }
-    if (phase === 'paused') showPause('pause', 0, note);
+    if (phase === 'paused' && !titleStore) showPause('pause', 0, note);
   }
   function resumeGame() {
     if (phase !== 'paused') return;
+    if (titleStore) return showTitle(1);   // (the Store opened from the main menu goes back there)
     releaseAll(); phase = 'play'; hideOverlay();
   }
   // Restart starts the game over from level 1 with 3 hearts and fresh scores; coins are kept
@@ -1721,12 +1792,7 @@
     if (phase !== 'paused') return;
     releaseAll(); closeCoinBar();
     scores = [0, 0, 0, 0]; level = 1; lives = startLives(); brunoTaco = 0; brunoRolls = 0;
-    resetLevel(); phase = 'title';
-    ov.classList.remove('menu-mode'); ov.classList.add('title-mode');
-    ovTitle.innerHTML = 'Doodad<br>Doombad'; startBtn.textContent = 'Start'; startBtn.hidden = false;
-    menuEl.hidden = menuHint.hidden = coinList.hidden = storeShelf.hidden = true;
-    ov.hidden = false; startBtn.focus({ preventScroll: true });
-    updateHud(true);
+    resetLevel(); showTitle(0);
   }
   function togglePause() { if (phase === 'play') pauseGame(); else if (phase === 'paused') resumeGame(); }
   document.addEventListener('visibilitychange', () => { if (document.hidden && phase === 'play') pauseGame(); }, sig);
@@ -3066,8 +3132,8 @@
     }
   }
   function draw() {
-    // the main menu has its own scene
-    if (phase === 'title') { drawTitleScene(); updateHud(); updateCursor(); return; }
+    // the main menu has its own scene (it stays behind the Store opened from there)
+    if (phase === 'title' || titleStore) { drawTitleScene(); updateHud(); updateCursor(); return; }
     const cam = Math.round(camY / 2);
     ctx.save();
     // (the screen shakes for a moment when Bruno's ball thumps onto a floor or he lands back home)
@@ -3185,7 +3251,7 @@
     for (let i = 1; i < MAXP; i++) if (joined[i]) setText('score' + (i + 1), pad(scores[i], 6));
     for (let i = 0; i < MAXP; i++) if (joined[i]) setText('coins' + (i + 1), String(coins[i]));
     setText('hi', pad(hi, 6)); setText('level', pad(level, 2)); setText('bonus', pad(bonus, 4));
-    const lv = Math.max(0, lives - (phase === 'title' ? 0 : 1));
+    const lv = Math.max(0, lives - (phase === 'title' || titleStore ? 0 : 1));
     // up to 5 spare hearts show as pug faces; past that, one face and a count so the bar never overflows
     if (last.lives !== lv) { last.lives = lv; hud.lives.innerHTML = lv > 5 ? `<i></i><b class="count">×${lv}</b>` : '<i></i>'.repeat(lv); }
   }
