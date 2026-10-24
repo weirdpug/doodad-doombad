@@ -991,10 +991,20 @@
   // Secret codes, typed on the keyboard (letters in either case; they work every time):
   //   C0!NS     opens the coin bar (openCoinBar), on any screen
   //   B0O/\/\   makes Bruno say "an explosion explodes" and blow up the screen (codeBoom), during a round
+  //   |_!FE     nothing can knock the pugs out, not even the explosion, until it is typed again (toggleSafe)
   // A code's first key still does its usual job (B barks), but once a code has begun, its next keys only
   // type the code: the coin code's S doesn't also climb down or pick a menu choice. A key that doesn't
   // fit, or nothing typed for 25 seconds, ends it.
-  const CODES = [{ code: 'C0!NS', at: 0, run: () => openCoinBar() }, { code: 'B0O/\\/\\', at: 0, run: () => codeBoom() }];
+  const CODES = [{ code: 'C0!NS', at: 0, run: () => openCoinBar() }, { code: 'B0O/\\/\\', at: 0, run: () => codeBoom() },
+    { code: '|_!FE', at: 0, run: () => toggleSafe() }];
+  // The safe code: while it is on, no pug can be knocked out (die does nothing), through every level and
+  // new game, until the code is typed again or the page is reloaded
+  let invincible = false;
+  function toggleSafe() {
+    invincible = !invincible;
+    if (invincible) { toast('Nothing can knock you out!', '#ffcc3d'); sfx.oneUp(); }
+    else { toast('You can be knocked out again', '#ff3e6c'); sfx.tick(); }
+  }
   let codeTime = 0;
   const codeKeys = new Set();   // keys a code or the coin bar took, so letting go of one doesn't "click" a focused button
   // (returns true when a code took this key press)
@@ -1657,9 +1667,10 @@
   }
   // (the explosion picture covers the game screen for 5 seconds: step takes it down)
   // The explosion takes every heart the team has: once the pugs' knock-outs are over, it is Game Over.
+  // (With the safe code on, nobody is knocked out and no hearts go: the game carries on after the picture.)
   function explode() {
     sfx.boom(); boomPic.hidden = false; boomPicT = BOOM_PIC_FRAMES;
-    lives = 1; updateHud();   // (the last heart goes when the knock-outs end: finishDeath)
+    if (!invincible) { lives = 1; updateHud(); }   // (the last heart goes when the knock-outs end: finishDeath)
     for (const p of players) die(p);   // (die skips a pug that is already knocked out)
     for (const b of barrels) b.dead = true;
     fire = null;
@@ -1677,6 +1688,12 @@
   // ---------- game flow ----------
   function die(p) {
     if (phase !== 'play' || !isIn(p)) return;
+    // the safe code is on: nothing happens (a pug that has fallen off the bottom of the world is put back
+    // on the bottom floor)
+    if (invincible) {
+      if (p.y > worldH) { p.g = 0; p.x = clamp(p.x, 48, 474); p.y = footY(G[0], p.x); p.state = 'walk'; p.vx = p.vy = 0; p.top = p.y; }
+      return;
+    }
     // knocked off a ladder: the pug drops onto the nearer floor instead of lying inside a girder
     if (p.state === 'climb' && p.lad) {
       const l = p.lad, top = surf(G[l.hi], l.x), bot = surf(G[l.lo], l.x);
@@ -2318,10 +2335,12 @@
     }
     if (drumFlare > 0) drumFlare--;
     if (shakeT > 0) shakeT--;
-    // the explosion picture goes after 5 seconds, and the Game Over screen it held back shows
+    // the explosion picture goes after 5 seconds, and the Game Over screen it held back shows (or, if
+    // the safe code kept everyone going, the round carries on, and Bruno can blow up again)
     if (boomPicT > 0 && --boomPicT === 0) {
       boomPic.hidden = true;
       if (phase === 'over') { ov.hidden = false; startBtn.focus({ preventScroll: true }); }
+      else boom = null;
     }
     for (const p of pops) {
       p.t--;
