@@ -582,6 +582,11 @@
   // the Store's Shnaz: pixel sunglasses (from assets/pixel glasses.png), with a thin light outline so
   // they show on the dark Store
   SPRITES.shnaz = ["............................","............................","............................","............................","............................","............................",".GGGGGGGGGGGGGGGGGGGGGGGGGG.","GKKKKKKKKKKKKKKKKKKKKKKKKKKG","GKKWKWKKKKKKKGGKKWKWKKKKKKKG",".GKKWKWKKKKKKGGKKKWKWKKKKKG.","..GKKWKWKKKKG..GKKKWKWKKKG..","...GKKKKKKKG....GKKKKKKKG...","....GGGGGGG......GGGGGGG....","............................","............................","............................","............................","............................"];
+  // Shnaz equipped: the pug wears pixel sunglasses, a wide black band over its eyes with a white glint in
+  // each lens (a strip of fur keeps it clear of the black ear tips); drawn over the pose with the same anchor
+  // and flip. Climbing shows the pug from behind, so there are none for that.
+  Object.assign(SPRITES, { shades_stand: ["................","................","................","........KKKKKK..",".......KWKK.WKK.","................","................","................","................","................","................","................","................"], shades_walk1: ["................","................","................","........KKKKKK..",".......KWKK.WKK.","................","................","................","................","................","................","................","................"], shades_walk2: ["................","................","................","........KKKKKK..",".......KWKK.WKK.","................","................","................","................","................","................","................","................"], shades_jump: ["................","................","................","........KKKKKK..",".......KWKK.WKK.","................","................","................","................","................","................","................","................"],
+    shades_dead: ["................","................","................","..........KKKK..",".........KWK.WKK","................","................","................","................","................"] });
   /*TACO SUIT*/
   // The taco suit a pug wears with the Taco Pug equipped: one overlay per pose, the pose's own size, drawn
   // over the pug with the same feet anchor and flip ('.' lets the pug show through; the head is never covered)
@@ -2551,11 +2556,13 @@
     if (P.state === 'out') return;
     const sw = LOOK[P.id].swap, outfit = LOOK[P.id].outfit;
     // draw a pose, plus the pug's outfit (President Pug's top hat and tie) on top with the same anchor and flip
-    // with the Taco Pug equipped the pug wears a taco suit over its body (never its head), drawn the same way
-    const suit = bag[P.id].on.taco;
+    // with the Taco Pug equipped the pug wears a taco suit over its body (never its head), drawn the same way,
+    // and with Shnaz equipped it wears pixel sunglasses
+    const suit = bag[P.id].on.taco, shades = bag[P.id].on.shnaz;
     const pug = (pose, x, y, flip) => {
       blitFeet(pose, x, y, flip, sw);
       if (suit) blitFeet('suit_' + pose.replace('player_', ''), x, y, flip);
+      if (shades) blitFeet('shades_' + pose.replace('player_', ''), x, y, flip);
       if (outfit) blitFeet(outfit + pose.replace('player_', ''), x, y, flip);
     };
     const Y = Math.round(P.y / 2), left = P.face < 0;
