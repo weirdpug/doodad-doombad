@@ -308,7 +308,7 @@
       <button type="button" class="jump" data-k="jump">Jump</button>
     </div>
   </div>
-  <p class="help">Arrows or WASD to move · Space or Up (away from ladders) to jump · B to bark · Y throws a hammer · X makes tacos (Taco Pug) or a disco floor (Shnaz) · P pause · M mute</p>
+  <p class="help">Arrows or WASD to move · Space or Up (away from ladders) to jump · B to bark · Y throws a hammer · X makes tacos (Taco Pug) or a disco floor (Snazz) · P pause · M mute</p>
 </div>
 
 <script>
@@ -433,7 +433,7 @@
     barrel_roll2: ["...GGGI...",".GGTTATII.",".GATTAJJI.","GTATTAJJAI","GTATJAJJAI","GTAJJAJJAI","ITAJJAJJAI",".IAJJAJJI.",".IIJJAJII.","...IIII..."],
     barrel_roll3: ["...GGGI...",".GGTATTII.",".GTATTJAI.","GTATTJAAJI","GATTJAAJJI","GTTJAAJJJI","ITJAAJJJAI",".IAAJJJAI.",".IIJJJAII.","...IIII..."],
     barrel_upright: [".AAAAAA.","AJTJJJNA","HGHHHHHI","AJTJJJNA","AJTJJJNA","AJTJJJNA","AJTJJJNA","HGHHHHHI","AJTJJJNA",".AAAAAA."],
-    // a barrel on a disco floor (Shnaz) turns into a disco ball: mirror squares that slide along as it
+    // a barrel on a disco floor (Snazz) turns into a disco ball: mirror squares that slide along as it
     // turns, with pink, cyan and yellow party-light glints (four frames, like the rolling barrel)
     disco_roll0: ["...GGGH...",".GGVWWVHH.",".GWVWGHGH.","GVVVVHHHHI","GCCVGGHGVI","GCCHGGHVVI","HVHHHHHHHI",".HPHGVHCI.",".HHHVVHII.","...IIII..."],
     disco_roll1: ["...GGGH...",".GGWWVGHH.",".GVWWVGGH.","GVVVVHHHHI","GCVGGHGGHI","GCVGGHGVHI","HVHHHHHHHI",".HHGGHCCI.",".HHGVHCII.","...IIII..."],
@@ -575,10 +575,10 @@
   // the Store's Bouncy Pillow: a wide-awake hot-pink pillow on a steel spring (it also pops up under a
   // pug that bounces off it)
   SPRITES.bouncy = ["PP............QQ","PWPP........PPQD",".PWPPPPPPPPPPQD.",".PWPPPPPPPPPPPQ.",".PPPWKPPPPWKPPQ.",".PPPKKPPPPKKPPQ.",".PMMPKKKKKKPMMQ.",".PPPPKRMMRKPPQQ.",".PPPPPKKKKPPPQQ.",".QQPPPPPPPPPQQD.","QPQQQQQQQQQQQQQD","QQ..GWWWWWWG..DD","...G........B...","....GWWWWWWB....","...G........B...","....GWWWWWWB....","...G........B...","..QQQQQQQQQQQQ.."];
-  // the Store's Shnaz: pixel sunglasses (from assets/pixel glasses.png), with a thin light outline so
+  // the Store's Snazz: pixel sunglasses (from assets/pixel glasses.png), with a thin light outline so
   // they show on the dark Store
   SPRITES.shnaz = ["............................","............................","............................","............................","............................","............................",".GGGGGGGGGGGGGGGGGGGGGGGGGG.","GKKKKKKKKKKKKKKKKKKKKKKKKKKG","GKKWKWKKKKKKKGGKKWKWKKKKKKKG",".GKKWKWKKKKKKGGKKKWKWKKKKKG.","..GKKWKWKKKKG..GKKKWKWKKKG..","...GKKKKKKKG....GKKKKKKKG...","....GGGGGGG......GGGGGGG....","............................","............................","............................","............................","............................"];
-  // Shnaz equipped: the pug wears pixel sunglasses, a wide black band over its eyes with a white glint in
+  // Snazz equipped: the pug wears pixel sunglasses, a wide black band over its eyes with a white glint in
   // each lens (a strip of fur keeps it clear of the black ear tips); drawn over the pose with the same anchor
   // and flip. Climbing shows the pug from behind, so there are none for that.
   Object.assign(SPRITES, { shades_stand: ["................","................","................","........KKKKKK..",".......KWKK.WKK.","................","................","................","................","................","................","................","................"], shades_walk1: ["................","................","................","........KKKKKK..",".......KWKK.WKK.","................","................","................","................","................","................","................","................"], shades_walk2: ["................","................","................","........KKKKKK..",".......KWKK.WKK.","................","................","................","................","................","................","................","................"], shades_jump: ["................","................","................","........KKKKKK..",".......KWKK.WKK.","................","................","................","................","................","................","................","................"],
@@ -682,7 +682,7 @@
   // the level Bruno was turned into a taco on (by a Taco Pug's X while he rolled): he stays a taco for the
   // rest of that level, even if it restarts after a lost heart; 0 = not a taco
   let brunoTaco = 0;
-  // Shnaz: the floors (girder numbers) turned into disco floors this level, and when each of their squares
+  // Snazz: the floors (girder numbers) turned into disco floors this level, and when each of their squares
   // last lit up (key: floor * 1000 + square, value: the frame)
   const discoFloors = new Set(), discoLit = new Map();
   const brunoIsTaco = () => brunoTaco === level;
@@ -1233,7 +1233,7 @@
       // menu press just un-paused never barks, so it can't spend coins waking a pug)
       if (fresh('bark') && ph === 'play') doBark(p);
       if (fresh('toss') && ph === 'play') throwHammer(p);   // Y throws the hammer
-      if (fresh('taco') && ph === 'play') xPower(p);       // X: tacos (Taco Pug) and a disco floor (Shnaz)
+      if (fresh('taco') && ph === 'play') xPower(p);       // X: tacos (Taco Pug) and a disco floor (Snazz)
     }
     // the keyboard's pug also hears the keyboard and touch buttons
     for (const p of players) {
@@ -1374,10 +1374,11 @@
       },
       canOff: () => true,
       off() {} },
-    // Shnaz, 50 coins: equipped, that pug's X (keyboard X or the controller's X) turns the floor it is on
+    // Snazz, 50 coins: equipped, that pug's X (keyboard X or the controller's X) turns the floor it is on
     // into a disco party floor for the rest of the level (discoTime); the square under each pug on a disco
     // floor lights up, and barrels on it turn into disco balls. (With the Taco Pug equipped too, one X does both.)
-    { key: 'shnaz', name: 'Shnaz', what: 'the Shnaz glasses', does: 'X: disco!', price: 50, alt: 'Pixel sunglasses',
+    // (it was first called Shnaz: its bag key stays 'shnaz' so pugs keep the ones they already bought)
+    { key: 'shnaz', name: 'Snazz', what: 'the Snazz glasses', does: 'X: disco!', price: 50, alt: 'Pixel sunglasses',
       on(id) { toast(`${LOOK[id].name}: press X for a disco floor!`, LOOK[id].hex); sfx.disco(); },
       canOff: () => true,
       off() {} },
@@ -2107,10 +2108,10 @@
   // pugs. They still act just like barrels: touching one knocks a pug out (a barrel still dropping in from the floor above changes once it lands
   // and X is pressed again). It never wears off; barrels Bruno throws afterwards are barrels again until
   // X is pressed again.
-  // X: the Taco Pug's tacos and Shnaz's disco floor (a pug with both equipped gets both; disco goes first,
+  // X: the Taco Pug's tacos and Snazz's disco floor (a pug with both equipped gets both; disco goes first,
   // so on a disco floor the barrels become disco balls and the tacos are only made elsewhere)
   function xPower(p) { discoTime(p); tacoTime(p); }
-  // Disco time (X): a pug with Shnaz equipped turns the floor it is on into a disco party floor, for the
+  // Disco time (X): a pug with Snazz equipped turns the floor it is on into a disco party floor, for the
   // rest of the level. Its squares glow in party colours that keep changing, and the square under any pug
   // standing on it lights up bright, then fades (discoStep, drawDisco). Its barrels turn into disco balls.
   function discoTime(p) {
@@ -2359,7 +2360,7 @@
     c.fillRect(X - 4, t, 1, b - t); c.fillRect(X + 3, t, 1, b - t);
     for (let y = t + 3; y < b - 1; y += 4) c.fillRect(X - 3, y, 6, 1);
   }
-  // A disco floor (Shnaz), drawn over its girder every frame: square panels (the girder's 8-pixel sections,
+  // A disco floor (Snazz), drawn over its girder every frame: square panels (the girder's 8-pixel sections,
   // split by dark seams) in party colours that shift along three times a second. The square a pug stands on
   // lights up bright, with a white-hot top edge, then fades back over half a second.
   function drawDisco() {
@@ -2553,7 +2554,7 @@
     const sw = LOOK[P.id].swap, outfit = LOOK[P.id].outfit;
     // draw a pose, plus the pug's outfit (President Pug's top hat and tie) on top with the same anchor and flip
     // with the Taco Pug equipped the pug wears a taco suit over its body (never its head), drawn the same way,
-    // and with Shnaz equipped it wears pixel sunglasses
+    // and with Snazz equipped it wears pixel sunglasses
     const suit = bag[P.id].on.taco, shades = bag[P.id].on.shnaz;
     const pug = (pose, x, y, flip) => {
       blitFeet(pose, x, y, flip, sw);
