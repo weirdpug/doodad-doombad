@@ -2148,6 +2148,7 @@
   // Fireball: patrols girders, turns at the ends, and takes ladders, leaning toward the nearest pug
   function updateFire() {
     if (!fire) return;
+    if (fire.stun > 0) { fire.stun--; return; }   // (stunned by a Snifer Ripple shot: it stays where it is)
     // A little faster every level from level 2 (about 8% per level), topping out at level 15
     const f = fire, spd = Math.min(1.8, 0.9 + 0.07 * (level - 2));
     const targets = inGame();
@@ -2221,7 +2222,7 @@
   // ball or taco pug too) breaks, for the same 300 points and 3 coins as a hammer smash, or Bruno (at home
   // on his floor, or rolling along this one) is stunned for 3 seconds: he sees stars, stops where he is and
   // throws nothing. Then it takes about ¾ of a second to reload. (Not while climbing a ladder.)
-  const SNIPER_RELOAD = 45, STUN_TIME = 180;
+  const SNIPER_RELOAD = 45, STUN_TIME = 180, FIRE_STUN = 120;   // (Bruno is stunned 3 seconds, the fireball 2)
   function shoot(p) {
     if (phase !== 'play' || !p || !isIn(p) || !bag[p.id].on.sniper || p.state === 'climb' || p.reload > 0) return;
     p.reload = SNIPER_RELOAD; p.aimT = 14; sfx.shot();
@@ -2247,11 +2248,17 @@
     const bx = bruno ? bruno.x : BRUNO_HOME, bg = bruno ? bruno.g : APE;
     const brunoThere = !boom && bg === p.g && (!bruno || bruno.state === 'curl' || bruno.state === 'roll' || bruno.state === 'pop');
     if (brunoThere && (bx - p.x) * dir > 0 && (bx - p.x) * dir < dist) { dist = (bx - p.x) * dir; hit = 'bruno'; }
+    // the fireball, walking (or hopping a hole) along this floor: stunned for 2 seconds
+    if (fire && fire.state === 'walk' && fire.g === p.g && (fire.x - p.x) * dir > 0 && (fire.x - p.x) * dir < dist) { dist = (fire.x - p.x) * dir; hit = 'fire'; }
     let ex = dir > 0 ? Math.min(g.x2, 474) : Math.max(g.x1, 6), ey = my;
     if (hit === 'bruno') {
       ex = bx - dir * (bruno ? RB : 20); ey = bruno ? bruno.y - RB : surf(G[APE], BRUNO_HOME) - 40;
       brunoStun = STUN_TIME; sfx.stun();
       pops.push({ x: bx, y: ey - 40, text: 'STUNNED!', t: 60 });
+    } else if (hit === 'fire') {
+      ex = fire.x; ey = fire.y - 8;
+      fire.stun = FIRE_STUN; sfx.stun();
+      pops.push({ x: fire.x, y: fire.y - 34, text: 'STUNNED!', t: 60 });
     } else if (hit) {
       ex = hit.x; ey = hit.y;
       hit.dead = true; addScore(300, hit.x, hit.y - 10, p.id); giveCoins(3, hit.x, hit.y - 4, p.id); sfx.smash();
@@ -2892,7 +2899,10 @@
   // a stunned Bruno: three little stars circling over his head (at home, or over the giant ball)
   function drawStunStars() {
     const ball = bruno && bruno.state !== 'curl';
-    const cx = ball ? px(bruno.x) : px(BRUNO_HOME), cy = ball ? Math.round(bruno.y / 2) - 16 : Math.round(surf(G[APE], BRUNO_HOME) / 2) - 38;
+    drawStars(ball ? px(bruno.x) : px(BRUNO_HOME), ball ? Math.round(bruno.y / 2) - 16 : Math.round(surf(G[APE], BRUNO_HOME) / 2) - 38);
+  }
+  // three little stars circling round a point (over a stunned Bruno or fireball)
+  function drawStars(cx, cy) {
     for (let i = 0; i < 3; i++) {
       const a = frame * 0.15 + i * 2.09, x = Math.round(cx + Math.cos(a) * 9), y = Math.round(cy + Math.sin(a) * 3);
       ctx.fillStyle = PAL.Y; ctx.fillRect(x - 1, y, 3, 1); ctx.fillRect(x, y - 1, 1, 3);
@@ -2944,6 +2954,7 @@
     }
     drawBruno(false);
     if (brunoStun > 0) drawStunStars();
+    if (fire && fire.stun > 0) drawStars(px(fire.x), Math.round(fire.y / 2) - 12);
     drawFire();
     // a Bouncy Pillow pops up on the girder under a bouncing pug (behind it), blinking as it goes
     for (const p of pops) {
