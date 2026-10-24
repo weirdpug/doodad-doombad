@@ -1210,7 +1210,7 @@
       const ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
       const now = {
         left: b(14) || ax < -STICK, right: b(15) || ax > STICK, up: b(12) || ay < -STICK, down: b(13) || ay > STICK,
-        jump: b(0), bark: b(1), taco: b(2), toss: b(3), start: b(9), mute: b(8),
+        jump: b(0), bark: b(1), taco: b(5), toss: b(3), start: b(9), mute: b(8),
       };
       const prev = padPrev[gp.index] || {};
       padPrev[gp.index] = now;
@@ -1257,7 +1257,7 @@
       // menu press just un-paused never barks, so it can't spend coins waking a pug)
       if (fresh('bark') && ph === 'play') doBark(p);
       if (fresh('toss') && ph === 'play') throwHammer(p);   // Y throws the hammer
-      if (fresh('taco') && ph === 'play') xPower(p);       // X: tacos (Taco Pug), a disco floor (Snazz) and a shot (Sniper Rifle)
+      if (fresh('taco') && ph === 'play') xPower(p);       // RB (the keyboard's X): tacos (Taco Pug), a disco floor (Snazz) and a shot (Sniper Rifle)
     }
     // the keyboard's pug also hears the keyboard and touch buttons
     for (const p of players) {
@@ -1287,7 +1287,7 @@
     // with a controller connected and the keyboard driving a pug, show both sets of controls
     const both = padCount && kbSlot !== null ? ' · Keyboard: arrows or WASD to move, Space to jump, B to bark, Y to throw a hammer, X for tacos, disco or a shot, P pause' : '';
     helpEl.textContent = (padCount
-      ? 'Controller connected: stick or D-pad to move · A to jump · B to bark · Y to throw a hammer · X for tacos, disco or a shot · Menu to start or pause · View to mute'
+      ? 'Controller connected: stick or D-pad to move · A to jump · B to bark · Y to throw a hammer · RB for tacos, disco or a shot · Menu to start or pause · View to mute'
       : helpKeyboard) + both + who + room + clickFirst
       + (multi() ? ' · Bark (B) next to a knocked-out pug to wake it up for 20 coins' : '')
       + (padCount && silent ? ' · Click the game or press a key once to turn on sound' : '');
@@ -1366,10 +1366,10 @@
       on(id) { toast(`${LOOK[id].name} is spicy!`, LOOK[id].hex); sfx.spicy(); },
       canOff: () => true,
       off() {} },
-    // Taco Pug, 50 coins: equipped, that pug's X (keyboard X or the controller's X) turns the barrels on its own
+    // Taco Pug, 50 coins: equipped, that pug's X (keyboard X, or RB on a controller) turns the barrels on its own
     // floor into rolling taco pugs (they look different but still act like barrels), as often as it likes (tacoTime)
-    { key: 'taco', name: 'Taco Pug', what: 'a taco pug', does: 'X: tacos!', price: 50, alt: 'A pug snuggled in a taco',
-      on(id) { toast(`${LOOK[id].name}: press X for tacos!`, LOOK[id].hex); sfx.taco(); },
+    { key: 'taco', name: 'Taco Pug', what: 'a taco pug', does: 'X/RB: tacos!', price: 50, alt: 'A pug snuggled in a taco',
+      on(id) { toast(`${LOOK[id].name}: press X (RB) for tacos!`, LOOK[id].hex); sfx.taco(); },
       canOff: () => true,
       off() {} },
     // Pillow, 30 coins: equipped, a fall from too high lands softly instead of knocking the pug out, 10 times
@@ -1398,21 +1398,21 @@
       },
       canOff: () => true,
       off() {} },
-    // Snazz, 50 coins: equipped, that pug's X (keyboard X or the controller's X) turns the floor it is on
+    // Snazz, 50 coins: equipped, that pug's X (keyboard X, or RB on a controller) turns the floor it is on
     // into a disco party floor for the rest of the level (discoTime); the square under each pug on a disco
     // floor lights up, and barrels on it turn into disco balls. (With the Taco Pug equipped too, one X does both.)
     // (it was first called Shnaz: its bag key stays 'shnaz' so pugs keep the ones they already bought)
-    { key: 'shnaz', name: 'Snazz', what: 'the Snazz glasses', does: 'X: disco!', price: 50, alt: 'Pixel sunglasses',
-      on(id) { toast(`${LOOK[id].name}: press X for a disco floor!`, LOOK[id].hex); sfx.disco(); },
+    { key: 'shnaz', name: 'Snazz', what: 'the Snazz glasses', does: 'X/RB: disco!', price: 50, alt: 'Pixel sunglasses',
+      on(id) { toast(`${LOOK[id].name}: press X (RB) for a disco floor!`, LOOK[id].hex); sfx.disco(); },
       canOff: () => true,
       off() {} },
-    // Sniper Rifle, 60 coins: equipped, that pug's X (keyboard X or the controller's X) shoots straight along the
+    // Sniper Rifle, 60 coins: equipped, that pug's X (keyboard X, or RB on a controller) shoots straight along the
     // pug's floor the way it faces: the first barrel in the way breaks, or Bruno is stunned for 3 seconds (shoot).
     // 5 shots per rifle; when they run out the rifle is gone, and the next one the pug owns takes over
     { key: 'sniper', name: 'Sniper Rifle', what: 'a sniper rifle', does: SNIPER_SHOTS + ' shots', price: 60, alt: 'A sniper rifle',
       on(id) {
         if (!bag[id].sniperLeft) { bag[id].sniperLeft = SNIPER_SHOTS; saveBag(); }
-        toast(`${LOOK[id].name}: press X to shoot!`, LOOK[id].hex); sfx.shot();
+        toast(`${LOOK[id].name}: press X (RB) to shoot!`, LOOK[id].hex); sfx.shot();
       },
       canOff: () => true,
       off() {} },
