@@ -343,8 +343,8 @@
   let G = [], L = [], ROWS = 6, APE = 5, TOP = 6, worldH = H;
   const isBoss = () => level === BOSS_LEVEL;
   // From level 6 on (after the boss) every floor between the bottom one and Bruno's has a hole in it (g.hole,
-  // HOLE wide, about half a jump): pugs and barrels drop through to the floor below, pugs jump over it, the
-  // fireball turns back at it. A hole never sits at a ladder (so a ladder can always be stepped on and off),
+  // HOLE wide, about half a jump): pugs and barrels drop through to the floor below, pugs and the fireball hop
+  // over it. A hole never sits at a ladder (so a ladder can always be stepped on and off),
   // under a floating hammer or near a floor's ends, and its spot changes from level to level.
   const HOLES_FROM = 6, HOLE = 40;
   const holeAt = (g, x) => g.hole && x > g.hole.a && x < g.hole.b ? g.hole : null;
@@ -2153,15 +2153,27 @@
     const targets = inGame();
     const T = targets.length ? targets.reduce((a, q) => Math.abs(q.y - f.y) + Math.abs(q.x - f.x) / 4 < Math.abs(a.y - f.y) + Math.abs(a.x - f.x) / 4 ? q : a) : null;
     if (f.state === 'walk') {
+      // hopping over a hole: an arc from one edge to the other (still dangerous to touch)
+      if (f.hop) {
+        const h = f.hop, k = Math.min(1, ++h.t / h.T);
+        f.x = h.x0 + (h.x1 - h.x0) * k;
+        f.y = surf(G[f.g], f.x) - Math.sin(Math.PI * k) * 28;
+        if (k >= 1) f.hop = null;
+        return;
+      }
       const px = f.x;
       f.x += f.dir * spd;
       const g = G[f.g];
       const lo = f.g === 0 ? 44 : f.g === APE ? 112 : g.x1 + 8, hi = g.x2 - 8;
       if (f.x < lo) { f.x = lo; f.dir = 1; }
       if (f.x > hi) { f.x = hi; f.dir = -1; }
-      // (it turns back at the edge of a hole too)
+      // at the edge of a hole it hops across to the other side
       const fh = holeAt(g, f.x);
-      if (fh) { f.x = f.dir > 0 ? fh.a - 1 : fh.b + 1; f.dir = -f.dir; }
+      if (fh) {
+        const x0 = f.dir > 0 ? fh.a - 1 : fh.b + 1, x1 = f.dir > 0 ? fh.b + 4 : fh.a - 4;
+        f.x = x0; f.y = surf(g, x0); f.hop = { x0, x1, t: 0, T: Math.max(12, Math.round(Math.abs(x1 - x0) / spd * 0.8)) };
+        return;
+      }
       if (T && f.g === T.g && Math.random() < 0.01) f.dir = Math.sign(T.x - f.x) || f.dir;
       for (const l of L) {
         if (l === f.lastLad || (l.lo !== f.g && l.hi !== f.g) || (px - l.x) * (f.x - l.x) > 0) continue;
