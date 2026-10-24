@@ -1443,7 +1443,6 @@
     if (!live() || phase !== 'title' || !boomPic.hidden) return;
     try { initAudio(); } catch (e) {}
     releaseAll(); titleStore = true; phase = 'paused';
-    ov.classList.remove('title-mode', 'pick-store');
     showPause('store', 0, null, by);
   }
   titleStoreBtn.addEventListener('click', () => openTitleStore(kbBy()));
@@ -1594,7 +1593,8 @@
     for (const it of SHOP) it.card.classList.remove('bought');
     coinList.hidden = storeShelf.hidden = !store; ovKeys.hidden = store; startBtn.hidden = true;
     menuEl.hidden = false; menuHint.hidden = store;   // (the Store needs the room on small screens)
-    ov.classList.add('menu-mode'); ov.hidden = false;
+    // (a game started from the main menu leaves its look on the hidden screen: the menus never use it)
+    ov.classList.remove('title-mode', 'pick-store'); ov.classList.add('menu-mode'); ov.hidden = false;
     // (the Store opens at the start of its row of cards)
     if (opening) { storeCol = 0; storeScroll.scrollLeft = 0; }
     if (store) shelfArrows();
