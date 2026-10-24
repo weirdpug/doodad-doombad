@@ -474,7 +474,6 @@
     a: '#b4b8c8', b: '#7f8396', c: '#eef0f6',   // silver pug (Player 3)
     d: '#c8582e', e: '#8f3a1c', f: '#f2b48a',   // orange pug, President Pug (Player 4)
     g: '#5fd068',                               // Player 4's green tag colour
-    k: '#3b3b4c', m: '#7a7a92', n: '#1d2f8c',   // President Pug's top hat (charcoal + grey edge) and tie knot
     // the castle background: dark stone, night sky, moon/stars, wood and banner cloth
     x: '#0b0c1c', y: '#15172e', z: '#1d2040', q: '#282c52', s: '#0b1838', r: '#132a5a', t: '#f4e9a8',
     u: '#5a3c22', v: '#6e1c3a', w: '#9c2c55',
@@ -568,20 +567,6 @@
     pug_life: ["KKTTTTKK","KTTJJTTK","TWKTTWKT","TKKTTKKT","TTKKKKTT",".TKPPKT.","..EPPE.."],
   };
   /*END SPRITES*/
-  /*OUTFITS*/
-  // President Pug's top hat and tie: one overlay per pose, the pose's width and 6 rows taller (room for the
-  // hat's crown), drawn over the pug with the same feet anchor and the same left/right flip
-  const OUTFITS = {
-    hat_stand: ["................","........mkkkkk..","........mkkkkk..","........mkkkkk..","........mkkkkk..","........RRRRRR..","......kkkkkkkkkk","................","................","................","................","................","................",".......Wnn......","........VB......",".......VBBn.....",".......VBBn.....","........VB......","................"],
-    hat_walk1: ["................","........mkkkkk..","........mkkkkk..","........mkkkkk..","........mkkkkk..","........RRRRRR..","......kkkkkkkkkk","................","................","................","................","................","................",".......Wnn......","........VB......",".......VBBn.....",".......VBBn.....","........VB......","................"],
-    hat_walk2: ["................","........mkkkkk..","........mkkkkk..","........mkkkkk..","........mkkkkk..","........RRRRRR..","......kkkkkkkkkk","................","................","................","................","................","................",".......Wnn......","........VB......",".......VBBn.....",".......VBBn.....","........VB......","................"],
-    hat_jump: ["........mkkkkk..","........mkkkkk..","........mkkkkk..","........mkkkkk..","........RRRRRR..","......kkkkkkkkkk","................","................","................","................","................","................","................",".......Wnn......",".......VB.......","......VBBn......",".....VBBn.......",".....VB.........","................"],
-    hat_climb1: ["............","............","............","............","....mkkk....","....mkkk....","....mkkk....","....mkkk....","....RRRR....","...kkkkkk...","............","............","............","...nnnnnn...","............","............","............","............","............","............","............","............"],
-    hat_climb2: ["............","............","............","............","....kkkm....","....kkkm....","....kkkm....","....kkkm....","....RRRR....","...kkkkkk...","............","............","............","...nnnnnn...","............","............","............","............","............","............","............","............"],
-    hat_dead: [".............kk.",".........mmmmRk.","........kkkkRk..","........kkkkRk..","............kk..","................","................","................","................","...VV...........","..VBBVBnn.......","..BBBBBnn.......","...nn...........","................","................","................"],
-  };
-  /*END OUTFITS*/
-  Object.assign(SPRITES, OUTFITS);
   /*CASTLE*/
   // The castle background: a seamless stone brick tile, arched windows, torches, banners, battlements
   const CASTLE = {
@@ -887,7 +872,7 @@
     { name: 'Cinnamon', pug: 'brown', swap: null, tag: 'gold',  mark: 'Y', hex: '#ffcc3d', bark: 1 },
     { name: 'Pepper',  pug: 'black',  swap: 'p2', tag: 'cyan',  mark: 'C', hex: '#39d4e6', bark: 0.78 },
     { name: 'Smokey',  pug: 'silver', swap: 'p3', tag: 'pink',  mark: 'P', hex: '#ff7ab8', bark: 1.15 },
-    { name: 'President Pug', pug: 'orange', swap: 'p4', tag: 'green', mark: 'g', hex: '#5fd068', bark: 0.9, outfit: 'hat_', hatH: 6,
+    { name: 'President Pug', pug: 'orange', swap: 'p4', tag: 'green', mark: 'g', hex: '#5fd068', bark: 0.9,
       says: ['MERCA', 'DO MAGNETS', 'FAKE NEWS', 'DUM-B.'] },   // each bark says the next one, round and round
   ];
   const sayNext = [0, 0, 0, 0];   // which phrase each pug says next (kept across levels)
@@ -1085,7 +1070,7 @@
     for (const o of players) if (o !== p && o.state === 'down' && nextTo(p, o) && (!q || Math.abs(o.x - p.x) < Math.abs(q.x - p.x))) q = o;
     if (!q) return;
     // ("-20" / "NEED 20" float up from just above the barker's BARK bubble, so neither covers the other)
-    const msgY = p.y - 66 - 2 * (LOOK[p.id].hatH || 0);
+    const msgY = p.y - 66;
     if (coins[p.id] < WAKE_COST) { pops.push({ x: p.x, y: msgY, text: 'NEED ' + WAKE_COST, t: 50 }); sfx.nope(); return; }
     coins[p.id] -= WAKE_COST; saveCoins();
     pops.push({ x: p.x, y: msgY, text: '-' + WAKE_COST, t: 50 });
@@ -1199,7 +1184,7 @@
     coinBar.classList.toggle('notail', !shown);
     const bw = coinBar.offsetWidth, bh = coinBar.offsetHeight;
     if (!shown) { coinBar.style.left = W / 2 + 'px'; coinBar.style.top = H / 2 + 'px'; return; }
-    const x = px(P.x) / PW * W, y = (Math.round(P.y / 2) - Math.round(camY / 2) - 20 - (LOOK[P.id].hatH || 0)) / PH * H;
+    const x = px(P.x) / PW * W, y = (Math.round(P.y / 2) - Math.round(camY / 2) - 20) / PH * H;
     const left = clamp(x, bw / 2 + 4, W - bw / 2 - 4);
     coinBar.style.left = left + 'px'; coinBar.style.top = clamp(y, bh + 12, H - 4) + 'px';
     coinBar.style.setProperty('--tail', clamp(x - left + bw / 2, 12, bw - 12) + 'px');
@@ -2686,7 +2671,7 @@
     if (!looks[P.id].pet || P.state === 'out') return;
     const b = P.pet || (P.pet = { x: P.x - P.face * 24, y: P.y - 40, face: P.face });
     const tx = clamp(P.x - P.face * 22, 10, 470);
-    const ty = P.y - 36 - (LOOK[P.id].hatH || 0) * 2 + Math.sin(frame / 14 + P.id) * 4;
+    const ty = P.y - 36 + Math.sin(frame / 14 + P.id) * 4;
     b.x += (tx - b.x) * 0.07; b.y += (ty - b.y) * 0.07;
     b.face = Math.abs(tx - b.x) > 6 ? (tx > b.x ? 1 : -1) : P.face;
   }
@@ -2736,7 +2721,7 @@
             // (behind it when running or jumping; climbing, at its feet going up and above its head going down)
             const climb = p.state === 'climb';
             if (going && frame % 3 === 0) pops.push({ puff: true, x: p.x - p.face * 12 * !climb, y: climb ? (p.inp.down ? p.y - 32 : p.y) : p.y - 6, t: 15 });
-            else if (!going && frame % 24 === 0) pops.push({ puff: true, x: p.x + p.face * 4, y: p.y - 30 - (LOOK[p.id].hatH || 0) * 2, t: 15 });
+            else if (!going && frame % 24 === 0) pops.push({ puff: true, x: p.x + p.face * 4, y: p.y - 30, t: 15 });
           }
         }
       }
@@ -2995,17 +2980,16 @@
   // Players 2-4 are the same pug recoloured: black, silver and red (fawn coat, shading and cream swapped)
   function drawPlayer(P) {
     if (P.state === 'out') return;
-    const sw = LOOK[P.id].swap, outfit = LOOK[P.id].outfit;
-    // draw a pose, plus the pug's outfit (President Pug's top hat and tie) on top with the same anchor and flip
+    const sw = LOOK[P.id].swap;
+    // draw a pose, then anything the pug has on over it, with the same anchor and flip
     // with the Taco Pug equipped the pug wears a taco suit over its body (never its head), drawn the same way,
     // and with Snazz equipped it wears pixel sunglasses
-    // and a necklace chosen in Customize goes on last (over President Pug's tie)
+    // and a necklace chosen in Customize goes on last
     const suit = bag[P.id].on.taco, shades = bag[P.id].on.shnaz, neck = looks[P.id].necklace;
     const pug = (pose, x, y, flip) => {
       blitFeet(pose, x, y, flip, sw);
       if (suit) blitFeet('suit_' + pose.replace('player_', ''), x, y, flip);
       if (shades) blitFeet('shades_' + pose.replace('player_', ''), x, y, flip);
-      if (outfit) blitFeet(outfit + pose.replace('player_', ''), x, y, flip);
       if (neck) blitFeet(neck + '_' + pose.replace('player_', ''), x, y, flip);
     };
     const Y = Math.round(P.y / 2), left = P.face < 0;
@@ -3046,7 +3030,7 @@
     const w = text.length * 6 + 3, h = 11;                  // the 6px font plus a little padding, sized to the words
     const cx = clamp(px(P.x) + P.face * 8, Math.ceil(w / 2) + 1, PW - Math.ceil(w / 2) - 1);
     // a little pop when it appears; sits higher over a pug wearing a hat
-    const top = Math.round(P.y / 2) - 30 - (LOOK[P.id].hatH || 0) - (P.barkT > (P.barkMax || 45) - 7 ? 1 : 0);
+    const top = Math.round(P.y / 2) - 30 - (P.barkT > (P.barkMax || 45) - 7 ? 1 : 0);
     const x0 = Math.round(cx - w / 2);
     ctx.fillStyle = PAL.W; ctx.fillRect(x0, top, w, h);
     ctx.fillStyle = '#07081a'; ctx.fillRect(x0 + 1, top + 1, w - 2, h - 2);
@@ -3064,7 +3048,7 @@
     const w = text.length * 6 + 3, h = 11;
     const cx = clamp(px(P.x), Math.ceil(w / 2) + 1, PW - Math.ceil(w / 2) - 1);
     const x0 = Math.round(cx - w / 2);
-    let top = Math.round(P.y / 2) - 29 - (LOOK[P.id].hatH || 0) - (P.nameT > 140 ? 1 : 0);
+    let top = Math.round(P.y / 2) - 29 - (P.nameT > 140 ? 1 : 0);
     const hits = t => placed.some(r => x0 < r.x + r.w + 1 && r.x < x0 + w + 1 && t < r.y + r.h + 1 && r.y < t + h + 1);
     for (let i = 0; i < 6 && hits(top); i++) top -= h + 1;
     placed.push({ x: x0, y: top, w, h });
@@ -3354,7 +3338,7 @@
     // standing right next to it, it shows "B [coin] 20" instead: bark (B) to wake it up for 20 coins
     if (phase === 'play' || phase === 'paused') for (const p of players) {
       if (p.state !== 'down') continue;
-      const X = clamp(px(p.x), 13, PW - 14), Y = Math.round(p.y / 2) - 20 - (LOOK[p.id].hatH || 0);
+      const X = clamp(px(p.x), 13, PW - 14), Y = Math.round(p.y / 2) - 20;
       if (players.some(o => o !== p && isIn(o) && o.state === 'walk' && nextTo(o, p))) {
         drawText('B', X - 12, Y);
         blit('coin_0', X - 5, Y - 1);
