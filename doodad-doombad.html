@@ -833,7 +833,7 @@
   // Saved in the browser like the bag. Each necklace's key names its sprites: <key>_necklace for its
   // picture, <key>_stand and so on for the pug's poses.
   const LOOKS_KEY = 'doodad-doombad-looks';
-  const NECKLACES = [{ key: 'alpha', name: 'Alpha Necklace', does: 'Gold chain, gold $', alt: 'A gold chain with a gold dollar sign on it' }];
+  const NECKLACES = [{ key: 'alpha', name: 'Alpha Necklace', alt: 'A gold chain with a gold dollar sign on it' }];
   function loadLooks() {
     const l = [0, 1, 2, 3].map(() => ({ necklace: '' }));
     try {
@@ -1600,17 +1600,18 @@
     it.card = card; it.ownEl = own; it.buyBtn = buy; it.eqBtn = eq; it.doesEl = does;
   }
   // Customize > Necklaces: one card per necklace (like the Store's), with its picture, name and a
-  // Wear / Take off button, for the same pug the Store would show (storeBy)
+  // Wear / Take off button, for the same pug the Store would show (storeBy). No blue line saying what it
+  // does: the user asked for none on Customize cards.
   const lookShelf = document.getElementById('lookShelf'), lookItems = document.getElementById('lookItems');
   for (const n of NECKLACES) {
     const card = document.createElement('div'), pic = document.createElement('div'), img = document.createElement('img'),
-      name = document.createElement('span'), does = document.createElement('span'), wear = document.createElement('button');
+      name = document.createElement('span'), wear = document.createElement('button');
     card.className = 'item'; pic.className = 'pic'; img.alt = n.alt;
     try { const s = sprite(n.key + '_necklace'); if (s) { img.src = s.toDataURL(); img.style.setProperty('--w', s.width); } } catch (e) {}
     pic.append(img);
-    name.textContent = n.name; does.className = 'does'; does.textContent = n.does;
+    name.textContent = n.name;
     wear.type = 'button'; wear.className = 'equip wear';
-    card.append(pic, name, does, wear);
+    card.append(pic, name, wear);
     lookItems.append(card);
     n.card = card; n.wearBtn = wear;
   }
