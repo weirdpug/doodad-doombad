@@ -2936,7 +2936,9 @@
   // are drawn once into titleBg; drifting clouds, twinkling stars and waving flags go on top every frame.
   const titleBg = document.createElement('canvas');
   let titleBgReady = false;
-  const CASTLE_Y = 132;   // the castle's base, on top of the hill (between the title and the text box)
+  // the hilltop, and the castle's base sunk a little into it (the hill curves away at the sides, so the castle
+  // sits lower than the top: its towers stand in the grass, with no gap under them)
+  const HILL_Y = 128, CASTLE_Y = 144;
   function buildTitleBg() {
     titleBg.width = PW; titleBg.height = PH;
     const c = titleBg.getContext('2d');
@@ -2964,7 +2966,7 @@
     ridge([[0, 26, 34], [60, 20, 30], [196, 28, 36], [240, 22, 30]], '#36285a');
     // the green hill under the castle, and the meadow in front
     for (let x = 0; x < PW; x++) {
-      const t = (x - 120) / 96, top = Math.round(CASTLE_Y - 4 + Math.max(0, t * t) * 34);
+      const t = (x - 120) / 96, top = Math.round(HILL_Y + Math.max(0, t * t) * 34);
       rect('#2f8f66', x, Math.min(top, H0), 1, PH);
       rect('#5fc88f', x, Math.min(top, H0), 1, 1);   // (a lit edge along the top)
     }
