@@ -308,7 +308,7 @@
       <button type="button" class="jump" data-k="jump">Jump</button>
     </div>
   </div>
-  <p class="help">Arrows or WASD to move · Space or Up (away from ladders) to jump · B to bark · Y throws a hammer · X makes tacos (Taco Pug), a disco floor (Snazz) or a shot (Sniper Rifle) · P pause · M mute</p>
+  <p class="help">Arrows or WASD to move · Space or Up (away from ladders) to jump · B to bark · Y throws a hammer · X makes tacos (Taco Pug), a disco floor (Snazz) or a shot (Snifer Ripple) · P pause · M mute</p>
 </div>
 
 <script>
@@ -578,7 +578,7 @@
   // the Store's Snazz: pixel sunglasses (from assets/pixel glasses.png), with a thin light outline so
   // they show on the dark Store
   SPRITES.shnaz = ["............................","............................","............................","............................","............................","............................",".GGGGGGGGGGGGGGGGGGGGGGGGGG.","GKKKKKKKKKKKKKKKKKKKKKKKKKKG","GKKWKWKKKKKKKGGKKWKWKKKKKKKG",".GKKWKWKKKKKKGGKKKWKWKKKKKG.","..GKKWKWKKKKG..GKKKWKWKKKG..","...GKKKKKKKG....GKKKKKKKG...","....GGGGGGG......GGGGGGG....","............................","............................","............................","............................","............................"];
-  // the Store's Sniper Rifle: wooden stock, a scope with a blue lens, a long steel barrel and a bipod; and the
+  // the Store's Snifer Ripple: wooden stock, a scope with a blue lens, a long steel barrel and a bipod; and the
   // little one a pug holds up for a moment as it shoots (drawn facing right, flipped for left)
   SPRITES.sniper = ["............................","............................","............................","........HHHHHHHHH...........",".......BUGGGGGGUC...........","........HHHHHHHHH...........","..........H...H.............",".TTTTTTT....................","JJJJJJJJUUUUUUGGGGGGGGGGGGUU","AJJJJJJJHUUUUHHHHHHHHHHHHHHH","AAAJJJJ.HHHHHH.....H.....HH.","...AA.....H.K.HUH....H.H....","..AA.......HHH.HH...H...H...","..................H.....H...","............................","............................","............................","............................"];
   SPRITES.rifle_hold = [".....HHH....", "TJJJHUUGGGGG", "AA..H.H....."];
@@ -683,7 +683,7 @@
   // Bruno's rolls this game (sent by tapping him on the last life), and the explosion after the 20th
   // (boom.t counts its frames: Bruno talks, then it goes off)
   let brunoRolls = 0, boom = null;
-  // Sniper Rifle: frames Bruno has left being stunned (wherever he is), and the bullet streaks on screen
+  // Snifer Ripple: frames Bruno has left being stunned (wherever he is), and the bullet streaks on screen
   let brunoStun = 0, shots = [];
   // the level Bruno was turned into a taco on (by a Taco Pug's X while he rolled): he stays a taco for the
   // rest of that level, even if it restarts after a lost heart; 0 = not a taco
@@ -714,10 +714,10 @@
   const BAG_KEY = 'doodad-doombad-bag', BAG_ITEMS = ['succulent', 'spicy', 'taco', 'pillow', 'harpoon', 'bouncy', 'shnaz', 'sniper'];
   const PILLOW_FALLS = 10;   // soft landings in one pillow
   const BOUNCES = 5;         // bounces in one Bouncy Pillow
-  const SNIPER_SHOTS = 5;    // shots in one Sniper Rifle
+  const SNIPER_SHOTS = 5;    // shots in one Snifer Ripple
   function emptyBag() {
     // (pillowLeft: soft landings left in the pillow it is using; a fresh one has PILLOW_FALLS.
-    // bounceLeft: the same for the Bouncy Pillow, with BOUNCES; sniperLeft: shots left in the Sniper Rifle)
+    // bounceLeft: the same for the Bouncy Pillow, with BOUNCES; sniperLeft: shots left in the Snifer Ripple)
     const b = { own: {}, on: {}, pillowLeft: 0, bounceLeft: 0, sniperLeft: 0 };
     for (const k of BAG_ITEMS) { b.own[k] = 0; b.on[k] = false; }
     return b;
@@ -896,7 +896,7 @@
     boing: () => { tone(180, 0.18, 'triangle', 0.08, 260); tone(520, 0.1, 'sine', 0.05, 300, 0.08); },   // a soft landing on a pillow
     bounce: () => { tone(150, 0.3, 'triangle', 0.09, 650); tone(440, 0.18, 'sine', 0.05, 600, 0.06); },   // sproing! off a Bouncy Pillow
     disco: () => [523, 784, 659, 988, 784, 1175].forEach((f, i) => tone(f, 0.08, 'square', 0.035, 0, i * 0.08)),   // a floor turns into a disco floor
-    shot: () => { tone(900, 0.05, 'square', 0.06, -760); tone(130, 0.14, 'sawtooth', 0.07, -70); },   // the Sniper Rifle goes bang
+    shot: () => { tone(900, 0.05, 'square', 0.06, -760); tone(130, 0.14, 'sawtooth', 0.07, -70); },   // the Snifer Ripple goes bang
     stun: () => [988, 740, 988, 740].forEach((f, i) => tone(f, 0.07, 'triangle', 0.05, 0, i * 0.08)),   // Bruno sees stars
     taco: () => [659, 831, 988, 1319, 988, 1319].forEach((f, i) => tone(f, 0.07, 'square', 0.04, 0, i * 0.065)),   // a festive taco jingle
     clank: () => { tone(980, 0.05, 'square', 0.04); tone(640, 0.09, 'triangle', 0.05, 0, 0.04); },   // ...and lands on a girder
@@ -1253,7 +1253,7 @@
       // menu press just un-paused never barks, so it can't spend coins waking a pug)
       if (fresh('bark') && ph === 'play') doBark(p);
       if (fresh('toss') && ph === 'play') throwHammer(p);   // Y throws the hammer
-      if (fresh('taco') && ph === 'play') xPower(p);       // RB (the keyboard's X): tacos (Taco Pug), a disco floor (Snazz) and a shot (Sniper Rifle)
+      if (fresh('taco') && ph === 'play') xPower(p);       // RB (the keyboard's X): tacos (Taco Pug), a disco floor (Snazz) and a shot (Snifer Ripple)
     }
     // the keyboard's pug also hears the keyboard and touch buttons
     for (const p of players) {
@@ -1402,10 +1402,11 @@
       on(id) { toast(`${LOOK[id].name}: press X (RB) for a disco floor!`, LOOK[id].hex); sfx.disco(); },
       canOff: () => true,
       off() {} },
-    // Sniper Rifle, 60 coins: equipped, that pug's X (keyboard X, or RB on a controller) shoots straight along the
+    // Snifer Ripple, 60 coins: equipped, that pug's X (keyboard X, or RB on a controller) shoots straight along the
     // pug's floor the way it faces: the first barrel in the way breaks, or Bruno is stunned for 3 seconds (shoot).
     // 5 shots per rifle; when they run out the rifle is gone, and the next one the pug owns takes over
-    { key: 'sniper', name: 'Sniper Rifle', what: 'a sniper rifle', does: SNIPER_SHOTS + ' shots', price: 60, alt: 'A sniper rifle',
+    // (it was first called the Sniper Rifle: its bag key stays 'sniper' so pugs keep the ones they already bought)
+    { key: 'sniper', name: 'Snifer Ripple', what: 'a snifer ripple', does: SNIPER_SHOTS + ' shots', price: 60, alt: 'A sniper rifle',
       on(id) {
         if (!bag[id].sniperLeft) { bag[id].sniperLeft = SNIPER_SHOTS; saveBag(); }
         toast(`${LOOK[id].name}: press X (RB) to shoot!`, LOOK[id].hex); sfx.shot();
@@ -1944,7 +1945,7 @@
   }
 
   function updateApe() {
-    if (brunoStun > 0) return;   // (stunned by a Sniper Rifle shot: he throws nothing)
+    if (brunoStun > 0) return;   // (stunned by a Snifer Ripple shot: he throws nothing)
     apeTimer--;
     if (apeAnim > 0) {
       apeAnim--;
@@ -2148,7 +2149,7 @@
   // pugs. They still act just like barrels: touching one knocks a pug out (a barrel still dropping in from the floor above changes once it lands
   // and X is pressed again). It never wears off; barrels Bruno throws afterwards are barrels again until
   // X is pressed again.
-  // The Sniper Rifle (X, with the Taco Pug's and Snazz's powers): the pug holds the rifle up and shoots straight along
+  // The Snifer Ripple (X, with the Taco Pug's and Snazz's powers): the pug holds the rifle up and shoots straight along
   // its floor the way it faces, all the way across. The first thing in the way is hit: a barrel (a disco
   // ball or taco pug too) breaks, for the same 300 points and 3 coins as a hammer smash, or Bruno (at home
   // on his floor, or rolling along this one) is stunned for 3 seconds: he sees stars, stops where he is and
@@ -2164,7 +2165,7 @@
     if (kit.sniperLeft === 0) {
       kit.own.sniper = Math.max(0, kit.own.sniper - 1);
       if (kit.own.sniper > 0) kit.sniperLeft = SNIPER_SHOTS;
-      else { kit.on.sniper = false; toast(`${LOOK[p.id].name}'s sniper rifle is out of shots!`, LOOK[p.id].hex); }
+      else { kit.on.sniper = false; toast(`${LOOK[p.id].name}'s snifer ripple is out of shots!`, LOOK[p.id].hex); }
     }
     saveBag();
     pops.push({ x: p.x, y: p.y - 44, text: kit.on.sniper ? kit.sniperLeft + ' LEFT' : 'EMPTY', t: 45 });
@@ -2191,7 +2192,7 @@
     } else burst(ex, ey, 'Y', 3);   // (a miss sparks off the wall or the girder's end)
     shots.push({ x0: mx, y0: my, x1: ex, y1: ey, t: 8 });
   }
-  // X: Snazz's disco floor, the Taco Pug's tacos and the Sniper Rifle's shot (a pug with several of them
+  // X: Snazz's disco floor, the Taco Pug's tacos and the Snifer Ripple's shot (a pug with several of them
   // equipped gets them all at once; disco goes first, so on a disco floor the barrels become disco balls and
   // the tacos are only made elsewhere, then the shot)
   function xPower(p) { discoTime(p); tacoTime(p); shoot(p); }
@@ -2677,7 +2678,7 @@
     // standing on a slope, rest the feet on the highest girder pixel under them so they never sink in
     const FY = P.state === 'walk' ? Math.min(gTop(G[P.g], X - 4), gTop(G[P.g], X + 3)) : Y;
     pug(pose, X, FY, P.state !== 'climb' && left);
-    // (holding the Sniper Rifle up for a moment after a shot)
+    // (holding the Snifer Ripple up for a moment after a shot)
     if (P.aimT > 0 && P.state !== 'climb') blit('rifle_hold', left ? X - 13 : X + 1, FY - 9, left);
     if (P.hammer > 0 && (phase === 'play' || phase === 'paused') && P.state !== 'climb') {
       // matches hammerZone(): head overhead, then swung out in front (mirrored exactly when facing left)
@@ -2779,7 +2780,7 @@
       drawText('EXPLODES', cx, y0 + 13, 'black', 'center');
     }
   }
-  // Sniper Rifle shots: a white-hot bullet streak (yellow as it fades) from the muzzle to whatever it hit,
+  // Snifer Ripple shots: a white-hot bullet streak (yellow as it fades) from the muzzle to whatever it hit,
   // with a flash at the muzzle for the first few frames
   function drawShots() {
     for (const s of shots) {
