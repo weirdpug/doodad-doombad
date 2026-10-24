@@ -676,6 +676,14 @@
     alpha_dead: ["................", "........Y.......", ".....NYYF.......", ".....YFNY.......", ".....NYNF.......",
       ".....NFYY.......", ".....YYNF.......", "........Y.......", "................", "................"],
   });
+  // Turd the Bird (Customize > Pets): a small brown bird, facing right (flipped for left). Two flying
+  // frames, wings up and wings down, for following its pug about; perched, with its wings folded and
+  // orange legs, for the Pets card.
+  Object.assign(SPRITES, {
+    turd_fly1: ["...NN......", "...NAN.....", "....NAN.OO.", "NN..NAOOKOF", ".NAOOOOOOO.", "..NLLLLLON.", "...NNNNNN..", "..........."],
+    turd_fly2: ["...........", "...........", "........OO.", "NN...OOOKOF", ".NAOOOOOOO.", "..NLNAALON.", "....NAN....", ".....N....."],
+    turd_pet: ["...........", "........OO.", ".......OKOF", "NN.....OOO.", ".NAAAAOOOO.", "..NAAAOLLO.", "...NNOLLLN.", "......F.F..", ".....FF.FF."],
+  });
   /*TACO SUIT*/
   // The taco suit a pug wears with the Taco Pug equipped: one overlay per pose, the pose's own size, drawn
   // over the pug with the same feet anchor and flip ('.' lets the pug show through; the head is never covered)
@@ -833,18 +841,30 @@
   }
   function saveBag() { try { localStorage.setItem(BAG_KEY, JSON.stringify(bag)); } catch (e) {} }
   let bag = loadBag();
-  // What each pug wears, chosen in Customize (from the main menu): for now a necklace (one at a time, free).
-  // Saved in the browser like the bag. Each necklace's key names its sprites: <key>_necklace for its
-  // picture, <key>_stand and so on for the pug's poses.
+  // What each pug has, chosen in Customize (from the main menu): a necklace and a pet (one of each at a
+  // time, free). Saved in the browser like the bag. A necklace's key names its sprites: <key>_necklace for
+  // its picture, <key>_stand and so on for the pug's poses; a pet's: <key>_pet for its picture and
+  // <key>_fly1/<key>_fly2 for flying along with its pug (movePet).
   const LOOKS_KEY = 'doodad-doombad-looks';
   const NECKLACES = [{ key: 'alpha', name: 'Alpha Necklace', alt: 'A gold chain with a gold dollar sign on it' }];
+  const PETS = [{ key: 'turd', name: 'Turd the Bird', alt: 'A small brown bird' }];
+  // the Customize sections with things to choose: which of a pug's looks each sets, its things, the
+  // button's words while it isn't / is chosen, and what the screen says after
+  const LOOK_SECTIONS = {
+    necklaces: { slot: 'necklace', list: NECKLACES, pic: 'necklace', off: 'Wear', on: 'Take off',
+      put: (who, n) => `${who} is wearing the ${n.name}!`, took: (who, n) => `${who} took off the ${n.name}.` },
+    pets: { slot: 'pet', list: PETS, pic: 'pet', off: 'Bring', on: 'Send home',
+      put: (who, n) => `${n.name} is following ${who}!`, took: (who, n) => `${who} sent ${n.name} home.` },
+  };
   function loadLooks() {
-    const l = [0, 1, 2, 3].map(() => ({ necklace: '' }));
+    const l = [0, 1, 2, 3].map(() => ({ necklace: '', pet: '' }));
     try {
       const saved = JSON.parse(localStorage.getItem(LOOKS_KEY));
       if (Array.isArray(saved)) l.forEach((x, i) => {
-        const n = (saved[i] || {}).necklace;
-        if (NECKLACES.some(c => c.key === n)) x.necklace = n;
+        for (const s of Object.values(LOOK_SECTIONS)) {
+          const k = (saved[i] || {})[s.slot];
+          if (s.list.some(c => c.key === k)) x[s.slot] = k;
+        }
       });
     } catch (e) {}
     return l;
@@ -1603,37 +1623,43 @@
     storeItems.append(card);
     it.card = card; it.ownEl = own; it.buyBtn = buy; it.eqBtn = eq; it.doesEl = does;
   }
-  // Customize > Necklaces: one card per necklace (like the Store's), with its picture, name and a
-  // Wear / Take off button, for the same pug the Store would show (storeBy). No blue line saying what it
-  // does: the user asked for none on Customize cards.
+  // Customize > Necklaces and Pets: one card per thing (like the Store's), with its picture, name and a
+  // button (Wear / Take off, Bring / Send home), for the same pug the Store would show (storeBy). Only the
+  // open section's cards show. No blue line saying what it does: the user asked for none on Customize cards.
+  // (a pet's picture is its little flying sprite, shown twice as big as the others so it isn't tiny)
   const lookShelf = document.getElementById('lookShelf'), lookItems = document.getElementById('lookItems');
-  for (const n of NECKLACES) {
+  for (const [view, sec] of Object.entries(LOOK_SECTIONS)) for (const n of sec.list) {
     const card = document.createElement('div'), pic = document.createElement('div'), img = document.createElement('img'),
       name = document.createElement('span'), wear = document.createElement('button');
     card.className = 'item'; pic.className = 'pic'; img.alt = n.alt;
-    try { const s = sprite(n.key + '_necklace'); if (s) { img.src = s.toDataURL(); img.style.setProperty('--w', s.width); } } catch (e) {}
+    try {
+      const s = sprite(n.key + '_' + sec.pic);
+      if (s) { img.src = s.toDataURL(); img.style.setProperty('--w', s.width * (sec.slot === 'pet' ? 2 : 1)); }
+    } catch (e) {}
     pic.append(img);
     name.textContent = n.name;
     wear.type = 'button'; wear.className = 'equip wear';
     card.append(pic, name, wear);
     lookItems.append(card);
-    n.card = card; n.wearBtn = wear;
+    n.card = card; n.wearBtn = wear; n.view = view;
   }
   function renderLooks() {
-    for (const n of NECKLACES) {
-      const on = looks[storeBy].necklace === n.key;
-      n.wearBtn.textContent = on ? 'Take off' : 'Wear';
-      n.wearBtn.setAttribute('aria-label', `${on ? 'Take off' : 'Wear'} the ${n.name}`);
+    for (const sec of Object.values(LOOK_SECTIONS)) for (const n of sec.list) {
+      const on = looks[storeBy][sec.slot] === n.key;
+      n.wearBtn.textContent = on ? sec.on : sec.off;
+      n.wearBtn.setAttribute('aria-label', `${on ? sec.on : sec.off} ${n.name}`);
       n.wearBtn.classList.toggle('on', on);
+      n.card.hidden = n.view !== pauseView;
     }
   }
-  // Wear puts the necklace on (in place of any other), Take off takes it off
-  function wearNecklace(n, by) {
-    if (phase !== 'paused' || pauseView !== 'necklaces') return;
-    const id = joined[by] ? by : 0, name = LOOK[id].name, on = looks[id].necklace === n.key;
+  // Wear (or Bring) chooses the thing, in place of any other in its section; Take off (Send home) unchooses it
+  function wearLook(n, by) {
+    const sec = LOOK_SECTIONS[n.view];
+    if (phase !== 'paused' || pauseView !== n.view) return;
+    const id = joined[by] ? by : 0, name = LOOK[id].name, on = looks[id][sec.slot] === n.key;
     storeBy = id;
-    looks[id].necklace = on ? '' : n.key; saveLooks();
-    ovText.textContent = on ? `${name} took off the ${n.name}.` : `${name} is wearing the ${n.name}!`;
+    looks[id][sec.slot] = on ? '' : n.key; saveLooks();
+    ovText.textContent = on ? sec.took(name, n) : sec.put(name, n);
     if (on) sfx.tick(); else sfx.coin();
     renderLooks();
   }
@@ -1663,20 +1689,19 @@
       ...CUSTOM_PARTS.map(c => ({ label: c.name, act: by => showPause(c.view, 0, null, by) })),
       { label: 'Back', act: () => backToTitle() },
     ],
-    // each section's Back goes to Customize, with that section chosen
-    ...Object.fromEntries(CUSTOM_PARTS.map((c, i) => [c.view, () => [{ label: 'Back', act: () => showPause('custom', i) }]])),
-    // Necklaces: each necklace card's Wear / Take off, then Back
-    necklaces: () => [
-      ...NECKLACES.map(n => ({ label: 'Wear', btn: n.wearBtn, look: n, act: by => wearNecklace(n, by) })),
-      { label: 'Back', act: () => showPause('custom', 2) },
-    ],
+    // each section: its cards' buttons (Necklaces and Pets), then Back, which goes to Customize with that
+    // section chosen
+    ...Object.fromEntries(CUSTOM_PARTS.map((c, i) => [c.view, () => [
+      ...(LOOK_SECTIONS[c.view] ? LOOK_SECTIONS[c.view].list : []).map(n => ({ label: 'Wear', btn: n.wearBtn, look: n, act: by => wearLook(n, by) })),
+      { label: 'Back', act: () => showPause('custom', i) },
+    ]])),
   };
   // (storeCol: the card that Up or Down from Back goes to, the one chosen last)
   let pauseView = 'pause', menuSel = 0, storeBy = 0, storeCol = 0, menuEntries = [], menuBtns = [];
   function showPause(view, sel, note, by) {
     pauseView = view; menuSel = sel || 0;
     const store = view === 'store', part = customPart(view), custom = view === 'custom' || !!part,
-      neck = view === 'necklaces', opening = store && storeShelf.hidden;
+      neck = !!LOOK_SECTIONS[view], opening = store && storeShelf.hidden;   // (neck: Necklaces or Pets, with cards)
     // (the Store and Necklaces show the bag or look of the pug that opened them)
     if ((store || neck) && by !== undefined && joined[by]) storeBy = by;
     if (!joined[storeBy]) storeBy = kbBy();
@@ -1685,7 +1710,7 @@
     ovText.hidden = custom && !neck;
     ovText.textContent = note || (store
       ? (multi() ? `${LOOK[storeBy].name}'s bag. Each pug pays with its own coins!` : 'Buy things, then equip them!')
-      : neck ? (multi() ? `${LOOK[storeBy].name}'s necklace` : '')
+      : neck ? (multi() ? `${LOOK[storeBy].name}'s ${part.name.toLowerCase()}` : '')
       : 'Take a breather. Bruno will wait.');
     menuEntries = MENUS[view]();
     const list = [];
@@ -1776,7 +1801,7 @@
     // in the Store, the card of the item whose Buy or Equip button is chosen is framed too
     const cur = menuEntries[menuSel];
     SHOP.forEach(it => it.card.classList.toggle('sel', pauseView === 'store' && !!cur && cur.it === it));
-    NECKLACES.forEach(n => n.card.classList.toggle('sel', pauseView === 'necklaces' && !!cur && cur.look === n));
+    for (const sec of Object.values(LOOK_SECTIONS)) for (const n of sec.list) n.card.classList.toggle('sel', !!cur && cur.look === n);
     if (pauseView === 'store' && cur && cur.it) storeCol = SHOP.indexOf(cur.it);
     const b = menuBtns[menuSel];
     if (focus && b) {
@@ -2654,6 +2679,23 @@
 
   function clearPresses() { for (const p of players) p.jp.jump = p.jp.up = false; }
 
+  // A pet chosen in Customize (Turd the Bird) flies along with its pug all over the map: it heads for a
+  // spot just above and behind the pug's head, easing in so it trails a little, bobs as it flaps, and
+  // faces the way it is flying (or the pug's way once it has caught up). It is just company: nothing hits it.
+  function movePet(P) {
+    if (!looks[P.id].pet || P.state === 'out') return;
+    const b = P.pet || (P.pet = { x: P.x - P.face * 24, y: P.y - 40, face: P.face });
+    const tx = clamp(P.x - P.face * 22, 10, 470);
+    const ty = P.y - 36 - (LOOK[P.id].hatH || 0) * 2 + Math.sin(frame / 14 + P.id) * 4;
+    b.x += (tx - b.x) * 0.07; b.y += (ty - b.y) * 0.07;
+    b.face = Math.abs(tx - b.x) > 6 ? (tx > b.x ? 1 : -1) : P.face;
+  }
+  function drawPet(P) {
+    const b = P.pet, pet = looks[P.id].pet;
+    if (!b || !pet || P.state === 'out') return;
+    const s = sprite(pet + '_fly' + (Math.floor(frame / 6) % 2 + 1), b.face < 0);
+    if (s) ctx.drawImage(s, px(b.x) - (s.width >> 1), Math.round(b.y / 2) - (s.height >> 1));
+  }
   function step() {
     if (coinBarOpen) return;   // (everything waits while the coin bar is open)
     pollPads();
@@ -2709,6 +2751,8 @@
     } else if (phase === 'title') {
       updateApe(); updateBarrels(); barrels = barrels.filter(b => !b.dead);
     }
+    // pets fly along with their pugs while a level plays and during the level-clear banner
+    if (phase === 'play' || phase === 'win') for (const p of players) movePet(p);
     if (drumFlare > 0) drumFlare--;
     if (shakeT > 0) shakeT--;
     // the explosion picture goes after 5 seconds, and the Game Over screen it held back shows (or, if
@@ -3299,6 +3343,7 @@
       else { ctx.fillStyle = PAL.F; ctx.fillRect(X, Y, 1, 1); }
     }
     if (phase !== 'title') for (const p of players) drawPlayer(p);
+    if (phase !== 'title') for (const p of players) drawPet(p);   // (pets fly in front of every pug)
     if (phase === 'play' || phase === 'paused') for (const p of players) if (p.barkT > 0 && isIn(p)) drawWoof(p);
     // a pug that just joined (or every pug at the start of a game) shows its name above its head
     if (phase === 'play' || phase === 'paused') {
