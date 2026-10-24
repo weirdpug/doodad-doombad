@@ -718,10 +718,11 @@
   const BAG_KEY = 'doodad-doombad-bag', BAG_ITEMS = ['succulent', 'spicy', 'taco', 'pillow', 'harpoon', 'bouncy', 'shnaz', 'sniper'];
   const PILLOW_FALLS = 10;   // soft landings in one pillow
   const BOUNCES = 5;         // bounces in one Bouncy Pillow
+  const SNIPER_SHOTS = 5;    // shots in one Sniper Rifle
   function emptyBag() {
     // (pillowLeft: soft landings left in the pillow it is using; a fresh one has PILLOW_FALLS.
-    // bounceLeft: the same for the Bouncy Pillow, with BOUNCES)
-    const b = { own: {}, on: {}, pillowLeft: 0, bounceLeft: 0 };
+    // bounceLeft: the same for the Bouncy Pillow, with BOUNCES; sniperLeft: shots left in the Sniper Rifle)
+    const b = { own: {}, on: {}, pillowLeft: 0, bounceLeft: 0, sniperLeft: 0 };
     for (const k of BAG_ITEMS) { b.own[k] = 0; b.on[k] = false; }
     return b;
   }
@@ -737,6 +738,7 @@
         }
         b.pillowLeft = b.own.pillow > 0 ? clamp(Math.floor(+s.pillowLeft) || 0, 0, PILLOW_FALLS) : 0;
         b.bounceLeft = b.own.bouncy > 0 ? clamp(Math.floor(+s.bounceLeft) || 0, 0, BOUNCES) : 0;
+        b.sniperLeft = b.own.sniper > 0 ? clamp(Math.floor(+s.sniperLeft) || 0, 0, SNIPER_SHOTS) : 0;
       });
     } catch (e) {}
     return bags;
@@ -1407,9 +1409,13 @@
       canOff: () => true,
       off() {} },
     // Sniper Rifle, 60 coins: equipped, F on the keyboard (RT or RB on a controller) shoots straight along the
-    // pug's floor the way it faces: the first barrel in the way breaks, or Bruno is stunned for 3 seconds (shoot)
-    { key: 'sniper', name: 'Sniper Rifle', what: 'a sniper rifle', does: 'F: shoot!', price: 60, alt: 'A sniper rifle',
-      on(id) { toast(`${LOOK[id].name}: press F (or RT) to shoot!`, LOOK[id].hex); sfx.shot(); },
+    // pug's floor the way it faces: the first barrel in the way breaks, or Bruno is stunned for 3 seconds (shoot).
+    // 5 shots per rifle; when they run out the rifle is gone, and the next one the pug owns takes over
+    { key: 'sniper', name: 'Sniper Rifle', what: 'a sniper rifle', does: SNIPER_SHOTS + ' shots', price: 60, alt: 'A sniper rifle',
+      on(id) {
+        if (!bag[id].sniperLeft) { bag[id].sniperLeft = SNIPER_SHOTS; saveBag(); }
+        toast(`${LOOK[id].name}: press F (or RT) to shoot!`, LOOK[id].hex); sfx.shot();
+      },
       canOff: () => true,
       off() {} },
   ];
@@ -1494,10 +1500,11 @@
     const b = bag[storeBy];
     for (const it of SHOP) {
       it.ownEl.textContent = 'x' + b.own[it.key];
-      // (the pillows show how many soft landings or bounces are left in the one being used)
-      const n = it.key === 'pillow' ? b.pillowLeft || PILLOW_FALLS : b.bounceLeft || BOUNCES;
+      // (the pillows and the rifle show how many soft landings, bounces or shots are left in the one being used)
+      const n = it.key === 'pillow' ? b.pillowLeft || PILLOW_FALLS : it.key === 'bouncy' ? b.bounceLeft || BOUNCES : b.sniperLeft || SNIPER_SHOTS;
       if (it.key === 'pillow') it.doesEl.textContent = n + (n === 1 ? ' soft fall' : ' soft falls');
       if (it.key === 'bouncy') it.doesEl.textContent = n + (n === 1 ? ' bounce' : ' bounces');
+      if (it.key === 'sniper') it.doesEl.textContent = n + (n === 1 ? ' shot' : ' shots');
       it.eqBtn.textContent = b.on[it.key] ? 'Unequip' : 'Equip';
       it.eqBtn.setAttribute('aria-label', `${b.on[it.key] ? 'Unequip' : 'Equip'} ${it.name}`);
       it.eqBtn.classList.toggle('on', b.on[it.key]);
@@ -2156,6 +2163,17 @@
   function shoot(p) {
     if (phase !== 'play' || !p || !isIn(p) || !bag[p.id].on.sniper || p.state === 'climb' || p.reload > 0) return;
     p.reload = SNIPER_RELOAD; p.aimT = 14; sfx.shot();
+    // each shot uses one of the rifle's 5; when they run out it is gone, and the next one the pug owns takes over
+    const kit = bag[p.id];
+    if (!kit.sniperLeft) kit.sniperLeft = SNIPER_SHOTS;   // (one bought before rifles had a count)
+    kit.sniperLeft--;
+    if (kit.sniperLeft === 0) {
+      kit.own.sniper = Math.max(0, kit.own.sniper - 1);
+      if (kit.own.sniper > 0) kit.sniperLeft = SNIPER_SHOTS;
+      else { kit.on.sniper = false; toast(`${LOOK[p.id].name}'s sniper rifle is out of shots!`, LOOK[p.id].hex); }
+    }
+    saveBag();
+    pops.push({ x: p.x, y: p.y - 44, text: kit.on.sniper ? kit.sniperLeft + ' LEFT' : 'EMPTY', t: 45 });
     const dir = p.face, g = G[p.g], mx = p.x + dir * 22, my = p.y - 13;
     let dist = Infinity, hit = null;
     for (const b of barrels) {
