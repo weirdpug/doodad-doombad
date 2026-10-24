@@ -158,22 +158,11 @@
   /* the main menu (the start screen): the outdoor castle scene shows through. The title sits in the sky at the
      top and the rest at the bottom on a dark fade, so the castle shows between them. */
   #overlay.title-mode { justify-content: space-between; background: transparent; }
-  /* (the story, the controls and Start: one box on the main menu; everywhere else the box isn't there and they
-     sit in the overlay as before) */
+  /* (the story, the controls and Start sit together in .ovbody; it adds nothing to the layout anywhere) */
   .ovbody { display: contents; }
-  #overlay.title-mode .ovbody {
-    display: flex; flex-direction: column; align-items: center; gap: clamp(5px, 2cqw, 10px);
-    padding: clamp(6px, 2.4cqw, 12px) clamp(8px, 3cqw, 16px); background: rgba(7, 8, 26, .78); border: 2px solid rgba(255, 62, 108, .55); box-shadow: 3px 3px 0 rgba(0, 0, 0, .5);
-  }
-  /* (no story text on the main menu, just the controls and Start: the user asked to get rid of the description) */
-  #overlay.title-mode #ovText { display: none; }
-  #overlay.title-mode p { font-size: clamp(7px, 1.9cqw, 9px); }
-  #overlay.title-mode .keys { font-size: clamp(6px, 1.55cqw, 8px); line-height: 2; }
-  /* (on a phone the words need most of the screen: the box lets the castle show through, the words get a shadow) */
-  @container (max-width: 360px) {
-    #overlay.title-mode .ovbody { background: rgba(7, 8, 26, .5); }
-    #overlay.title-mode p, #overlay.title-mode .keys { text-shadow: 1px 1px 0 #000, -1px 0 0 #000; }
-  }
+  /* the main menu shows just the title, the castle and Start: no story text and no controls (the user asked
+     to get rid of both) */
+  #overlay.title-mode #ovText, #overlay.title-mode #ovKeys { display: none; }
   .menu { display: grid; gap: clamp(6px, 2cqw, 10px); min-width: 11em; font-size: clamp(9px, 2.7cqw, 13px); }
   .menu button {
     font-family: var(--font-display); font-size: inherit; letter-spacing: .06em; text-transform: uppercase;
