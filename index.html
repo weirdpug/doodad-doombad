@@ -342,6 +342,14 @@
   const BOSS_LEVEL = 5;
   let G = [], L = [], ROWS = 6, APE = 5, TOP = 6, worldH = H;
   const isBoss = () => level === BOSS_LEVEL;
+  // From level 6 on (after the boss) every floor between the bottom one and Bruno's has a hole in it (g.hole,
+  // HOLE wide, about half a jump): pugs and barrels drop through to the floor below, pugs jump over it, the
+  // fireball turns back at it. A hole never sits at a ladder (so a ladder can always be stepped on and off),
+  // under a floating hammer or near a floor's ends, and its spot changes from level to level.
+  const HOLES_FROM = 6, HOLE = 40;
+  const holeAt = (g, x) => g.hole && x > g.hole.a && x < g.hole.b ? g.hole : null;
+  // a spot on a floor moved out of its hole, to the nearer edge (for a pug put down on a floor)
+  const outOfHole = (g, x) => { const h = holeAt(g, x); return h ? (x - h.a < h.b - x ? h.a - 6 : h.b + 6) : x; };
   // the boss hammer, floating at the start of Bruno's floor (the end away from him), as high as the others
   const bossHammer = () => { const x = G[APE].x2 - 36; return { x, g: APE, taken: false, y: surf(G[APE], x) - 42, boss: true }; };
 
@@ -391,6 +399,23 @@
       hammers.push({ x, g: i, taken: false, y: surf(G[i], x) - 42 });
     }
     if (n === BOSS_LEVEL) hammers.push(bossHammer());
+    // the holes (from level 6): one per floor between the bottom one and Bruno's, at a spot clear of ladders,
+    // floating hammers and the floor's ends
+    if (n >= HOLES_FROM) for (let i = 1; i < APE; i++) {
+      const g = G[i], spots = [];
+      for (let x = g.x1 + 80; x <= g.x2 - 80; x += 8) {
+        if (L.some(l => (l.lo === i || l.hi === i) && Math.abs(l.x - x) < HOLE / 2 + 28)) continue;
+        if (hammers.some(h => h.g === i && Math.abs(h.x - x) < HOLE / 2 + 24)) continue;
+        spots.push(x);
+      }
+      // (well away from the hole in the floor below, so holes never stack up into a chute; a scrambled pick
+      // so they wander about from floor to floor and level to level)
+      const prev = G[i - 1].hole, pc = prev ? (prev.a + prev.b) / 2 : 0;
+      const far = spots.filter(x => !prev || Math.abs(x - pc) >= 100);
+      // (no spot that far: the free spot furthest from it)
+      const pick = far.length || !spots.length ? far : [spots.reduce((a, x) => Math.abs(x - pc) > Math.abs(a - pc) ? x : a)];
+      if (pick.length) { const x = pick[((n * 7349 + i * 3571) * 2654435761 >>> 0) % pick.length]; g.hole = { a: x - HOLE / 2, b: x + HOLE / 2 }; }
+    }
     buildStage();
   }
   const surf = (g, x) => g.y1 + (g.y2 - g.y1) * (x - g.x1) / (g.x2 - g.x1);
@@ -972,6 +997,7 @@
     // back on its feet on the barker's floor (never inside Bruno's corner, where it would be knocked out again)
     const g = G[p.g];
     q.g = p.g; q.x = clamp(q.x, g.x1, g.x2);
+    q.x = outOfHole(g, q.x);   // (never inside a hole in that floor)
     if (q.g === APE) q.x = Math.max(q.x, 100);
     q.y = footY(g, q.x);
     q.state = 'walk'; q.vx = q.vy = 0; q.lad = null; q.hammer = 0; q.deathT = 0; q.safe = 120; q.nameT = 0;
@@ -1794,6 +1820,7 @@
       // back to the nearest spot on that floor, a little way in from its end (never in Bruno's corner)
       let x = clamp(P.x, from.x1 + 24, from.x2 - 24);
       if (P.fromG === APE) x = Math.max(x, 104);
+      x = outOfHole(from, x);   // (never into a hole in that floor)
       // up to 30 above that floor, against the air's gravity (0.22 a frame)
       const apex = footY(from, x) - 30;
       P.vy = -Math.sqrt(2 * 0.22 * Math.max(P.y - apex, 20));
@@ -1875,7 +1902,8 @@
 
   // The pug is drawn 32 world units wide, so it keeps its footing until its middle is this far past a girder's end
   const FOOT = 8;
-  const onGirder = (g, x) => x >= g.x1 - FOOT && x <= g.x2 + FOOT;
+  // (a pug keeps its footing up to FOOT past a floor's end, and the same way at the edges of a hole)
+  const onGirder = (g, x) => x >= g.x1 - FOOT && x <= g.x2 + FOOT && !(g.hole && x > g.hole.a + FOOT && x < g.hole.b - FOOT);
   const footY = (g, x) => surf(g, clamp(x, g.x1, g.x2));
 
   function updatePlayer(P) {
@@ -2074,7 +2102,8 @@
           }
         }
         if (b.state === 'roll') {
-          if (b.x < g.x1 || b.x > g.x2) { b.state = 'fall'; b.vy = 0.5; b.vx = dir * spd * 0.6; }
+          // (off the end of its floor, or into a hole)
+          if (b.x < g.x1 || b.x > g.x2 || holeAt(g, b.x)) { b.state = 'fall'; b.vy = 0.5; b.vx = dir * spd * 0.6; }
           else b.y = surf(g, b.x) - R;
         }
         if (b.g === 0 && b.x < 36) {
@@ -2089,7 +2118,7 @@
         if (b.x < R || b.x > W - R) { b.x = clamp(b.x, R, W - R); b.vx = 0; }
         for (let i = 0; i < b.g; i++) {
           const g = G[i];
-          if (b.x < g.x1 || b.x > g.x2) continue;
+          if (b.x < g.x1 || b.x > g.x2 || holeAt(g, b.x)) continue;
           const s = surf(g, b.x) - R;
           if (py <= Math.max(s, surf(g, clamp(ox, g.x1, g.x2)) - R) + 0.01 && b.y >= s) { b.y = s; b.g = i; b.state = 'roll'; b.lastLad = null; break; }
         }
@@ -2130,6 +2159,9 @@
       const lo = f.g === 0 ? 44 : f.g === APE ? 112 : g.x1 + 8, hi = g.x2 - 8;
       if (f.x < lo) { f.x = lo; f.dir = 1; }
       if (f.x > hi) { f.x = hi; f.dir = -1; }
+      // (it turns back at the edge of a hole too)
+      const fh = holeAt(g, f.x);
+      if (fh) { f.x = f.dir > 0 ? fh.a - 1 : fh.b + 1; f.dir = -f.dir; }
       if (T && f.g === T.g && Math.random() < 0.01) f.dir = Math.sign(T.x - f.x) || f.dir;
       for (const l of L) {
         if (l === f.lastLad || (l.lo !== f.g && l.hi !== f.g) || (px - l.x) * (f.x - l.x) > 0) continue;
@@ -2488,6 +2520,7 @@
   function drawGirder(c, g) {
     const x0 = px(g.x1), x1 = px(g.x2);
     for (let X = x0; X < x1; X++) {
+      if (holeAt(g, X * 2 + 1)) continue;   // (a hole: no girder there)
       const top = gTop(g, X), m = (X - x0) % 8;
       c.fillStyle = GIRDER_DARK; c.fillRect(X, top + 1, 1, 3);
       c.fillStyle = GIRDER;
@@ -2510,6 +2543,7 @@
     for (const gi of discoFloors) {
       const g = G[gi], x0 = px(g.x1), x1 = px(g.x2);
       for (let X = x0; X < x1; X++) {
+        if (holeAt(g, X * 2 + 1)) continue;
         const top = gTop(g, X), sq = Math.floor((X - x0) / 8);
         if ((X - x0) % 8 === 0) { ctx.fillStyle = '#07081a'; ctx.fillRect(X, top, 1, 5); continue; }
         const hue = (sq * 67 + Math.floor(frame / 20) * 40) % 360;
