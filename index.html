@@ -1641,7 +1641,8 @@
   // (whose coins and bag the Store uses). The Store's choices are a grid: each card's Buy button
   // (row 0) and Equip button (row 1), then Back below the cards (row 2).
   // Customize's sections, each a screen of its own (empty for now: just its name and Back)
-  const CUSTOM_PARTS = [{ view: 'suits', name: 'Suits' }, { view: 'hats', name: 'Hats' }, { view: 'necklaces', name: 'Necklaces' }];
+  const CUSTOM_PARTS = [{ view: 'suits', name: 'Suits' }, { view: 'hats', name: 'Hats' }, { view: 'necklaces', name: 'Necklaces' },
+    { view: 'pets', name: 'Pets' }];
   const customPart = view => CUSTOM_PARTS.find(c => c.view === view);
   const MENUS = {
     pause: () => [
@@ -1657,7 +1658,7 @@
       ]),
       { label: 'Back', act: () => storeBack(), row: 2 },
     ],
-    // Customize, from the main menu only: Suits, Hats and Necklaces, then Back to the main menu
+    // Customize, from the main menu only: Suits, Hats, Necklaces and Pets, then Back to the main menu
     custom: () => [
       ...CUSTOM_PARTS.map(c => ({ label: c.name, act: by => showPause(c.view, 0, null, by) })),
       { label: 'Back', act: () => backToTitle() },
