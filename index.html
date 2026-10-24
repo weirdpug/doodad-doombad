@@ -312,7 +312,7 @@
       <button type="button" class="jump" data-k="jump">Jump</button>
     </div>
   </div>
-  <p class="help">Arrows or WASD to move · Space or Up (away from ladders) to jump · B to bark · Y throws a hammer · X makes tacos (Taco Pug) or a disco floor (Snazz) · F shoots (Sniper Rifle) · P pause · M mute</p>
+  <p class="help">Arrows or WASD to move · Space or Up (away from ladders) to jump · B to bark · Y throws a hammer · X makes tacos (Taco Pug), a disco floor (Snazz) or a shot (Sniper Rifle) · P pause · M mute</p>
 </div>
 
 <script>
@@ -1140,7 +1140,6 @@
     // (on keyboards where Y sits where Z is, that key is also a jump key: a throw cancels the jump it queued)
     if ((e.key === 'y' || e.key === 'Y') && !e.repeat && claimKeyboard(true) === true && throwHammer(pById(kbSlot)) && k === 'jump') kbJp.jump = false;
     if ((e.key === 'x' || e.key === 'X') && !e.repeat && claimKeyboard(true) === true) xPower(pById(kbSlot));
-    if ((e.key === 'f' || e.key === 'F') && !e.repeat && claimKeyboard(true) === true) shoot(pById(kbSlot));   // F fires the Sniper Rifle
   });
   addEventListener('keyup', e => {
     // a menu button with keyboard focus must not also "click" itself when Space or Enter comes up
@@ -1211,14 +1210,14 @@
       const ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
       const now = {
         left: b(14) || ax < -STICK, right: b(15) || ax > STICK, up: b(12) || ay < -STICK, down: b(13) || ay > STICK,
-        jump: b(0), bark: b(1), taco: b(2), toss: b(3), fire: b(7) || b(5), start: b(9), mute: b(8),
+        jump: b(0), bark: b(1), taco: b(2), toss: b(3), start: b(9), mute: b(8),
       };
       const prev = padPrev[gp.index] || {};
       padPrev[gp.index] = now;
       const fresh = k => now[k] && !prev[k];
       let owner = padOwner[gp.index];
       if (owner === undefined) {
-        const anyFresh = ['jump', 'bark', 'taco', 'toss', 'fire', 'start', 'mute', 'left', 'right', 'up', 'down'].some(fresh);
+        const anyFresh = ['jump', 'bark', 'taco', 'toss', 'start', 'mute', 'left', 'right', 'up', 'down'].some(fresh);
         if (slotFree(0) && anyFresh) { owner = padOwner[gp.index] = 0; showControllerHelp(); adviseKeyboard(); }
         else if (fresh('jump') || fresh('start')) {
           // another controller pressing A or Menu takes the next free slot; that press only joins
@@ -1258,8 +1257,7 @@
       // menu press just un-paused never barks, so it can't spend coins waking a pug)
       if (fresh('bark') && ph === 'play') doBark(p);
       if (fresh('toss') && ph === 'play') throwHammer(p);   // Y throws the hammer
-      if (fresh('taco') && ph === 'play') xPower(p);       // X: tacos (Taco Pug) and a disco floor (Snazz)
-      if (fresh('fire') && ph === 'play') shoot(p);       // RT (or RB) fires the Sniper Rifle
+      if (fresh('taco') && ph === 'play') xPower(p);       // X: tacos (Taco Pug), a disco floor (Snazz) and a shot (Sniper Rifle)
     }
     // the keyboard's pug also hears the keyboard and touch buttons
     for (const p of players) {
@@ -1287,9 +1285,9 @@
     // the browser only sends key presses to the game once it has been clicked (a controller doesn't count)
     const clickFirst = kbCanJoin && !document.hasFocus() ? ' · Keyboard player: click the game first, then press an arrow key' : '';
     // with a controller connected and the keyboard driving a pug, show both sets of controls
-    const both = padCount && kbSlot !== null ? ' · Keyboard: arrows or WASD to move, Space to jump, B to bark, Y to throw a hammer, X for tacos or disco, F to shoot, P pause' : '';
+    const both = padCount && kbSlot !== null ? ' · Keyboard: arrows or WASD to move, Space to jump, B to bark, Y to throw a hammer, X for tacos, disco or a shot, P pause' : '';
     helpEl.textContent = (padCount
-      ? 'Controller connected: stick or D-pad to move · A to jump · B to bark · Y to throw a hammer · X for tacos or disco · RT to shoot · Menu to start or pause · View to mute'
+      ? 'Controller connected: stick or D-pad to move · A to jump · B to bark · Y to throw a hammer · X for tacos, disco or a shot · Menu to start or pause · View to mute'
       : helpKeyboard) + both + who + room + clickFirst
       + (multi() ? ' · Bark (B) next to a knocked-out pug to wake it up for 20 coins' : '')
       + (padCount && silent ? ' · Click the game or press a key once to turn on sound' : '');
@@ -1408,13 +1406,13 @@
       on(id) { toast(`${LOOK[id].name}: press X for a disco floor!`, LOOK[id].hex); sfx.disco(); },
       canOff: () => true,
       off() {} },
-    // Sniper Rifle, 60 coins: equipped, F on the keyboard (RT or RB on a controller) shoots straight along the
+    // Sniper Rifle, 60 coins: equipped, that pug's X (keyboard X or the controller's X) shoots straight along the
     // pug's floor the way it faces: the first barrel in the way breaks, or Bruno is stunned for 3 seconds (shoot).
     // 5 shots per rifle; when they run out the rifle is gone, and the next one the pug owns takes over
     { key: 'sniper', name: 'Sniper Rifle', what: 'a sniper rifle', does: SNIPER_SHOTS + ' shots', price: 60, alt: 'A sniper rifle',
       on(id) {
         if (!bag[id].sniperLeft) { bag[id].sniperLeft = SNIPER_SHOTS; saveBag(); }
-        toast(`${LOOK[id].name}: press F (or RT) to shoot!`, LOOK[id].hex); sfx.shot();
+        toast(`${LOOK[id].name}: press X to shoot!`, LOOK[id].hex); sfx.shot();
       },
       canOff: () => true,
       off() {} },
@@ -2154,7 +2152,7 @@
   // pugs. They still act just like barrels: touching one knocks a pug out (a barrel still dropping in from the floor above changes once it lands
   // and X is pressed again). It never wears off; barrels Bruno throws afterwards are barrels again until
   // X is pressed again.
-  // The Sniper Rifle (F, or a controller's RT or RB): the pug holds the rifle up and shoots straight along
+  // The Sniper Rifle (X, with the Taco Pug's and Snazz's powers): the pug holds the rifle up and shoots straight along
   // its floor the way it faces, all the way across. The first thing in the way is hit: a barrel (a disco
   // ball or taco pug too) breaks, for the same 300 points and 3 coins as a hammer smash, or Bruno (at home
   // on his floor, or rolling along this one) is stunned for 3 seconds: he sees stars, stops where he is and
@@ -2197,9 +2195,10 @@
     } else burst(ex, ey, 'Y', 3);   // (a miss sparks off the wall or the girder's end)
     shots.push({ x0: mx, y0: my, x1: ex, y1: ey, t: 8 });
   }
-  // X: the Taco Pug's tacos and Snazz's disco floor (a pug with both equipped gets both; disco goes first,
-  // so on a disco floor the barrels become disco balls and the tacos are only made elsewhere)
-  function xPower(p) { discoTime(p); tacoTime(p); }
+  // X: Snazz's disco floor, the Taco Pug's tacos and the Sniper Rifle's shot (a pug with several of them
+  // equipped gets them all at once; disco goes first, so on a disco floor the barrels become disco balls and
+  // the tacos are only made elsewhere, then the shot)
+  function xPower(p) { discoTime(p); tacoTime(p); shoot(p); }
   // Disco time (X): a pug with Snazz equipped turns the floor it is on into a disco party floor, for the
   // rest of the level. Its squares glow in party colours that keep changing, and the square under any pug
   // standing on it lights up bright, then fades (discoStep, drawDisco). Its barrels turn into disco balls.
