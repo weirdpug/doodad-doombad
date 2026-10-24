@@ -159,6 +159,23 @@
   #start:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #5a0f2a; }
   /* Pause menu (Resume, Store, Restart): the chosen button is filled in, the others are outlined */
   #overlay.menu-mode { cursor: default; }
+  /* the main menu (the start screen): the outdoor castle scene shows through. The title sits in the sky at the
+     top and the rest at the bottom on a dark fade, so the castle shows between them. */
+  #overlay.title-mode { justify-content: space-between; background: transparent; }
+  /* (the story, the controls and Start: one box on the main menu; everywhere else the box isn't there and they
+     sit in the overlay as before) */
+  .ovbody { display: contents; }
+  #overlay.title-mode .ovbody {
+    display: flex; flex-direction: column; align-items: center; gap: clamp(5px, 2cqw, 10px);
+    padding: clamp(6px, 2.4cqw, 12px) clamp(8px, 3cqw, 16px); background: rgba(7, 8, 26, .78); border: 2px solid rgba(255, 62, 108, .55); box-shadow: 3px 3px 0 rgba(0, 0, 0, .5);
+  }
+  #overlay.title-mode p { font-size: clamp(7px, 1.9cqw, 9px); }
+  #overlay.title-mode .keys { font-size: clamp(6px, 1.55cqw, 8px); line-height: 2; }
+  /* (on a phone the words need most of the screen: the box lets the castle show through, the words get a shadow) */
+  @container (max-width: 360px) {
+    #overlay.title-mode .ovbody { background: rgba(7, 8, 26, .5); }
+    #overlay.title-mode p, #overlay.title-mode .keys { text-shadow: 1px 1px 0 #000, -1px 0 0 #000; }
+  }
   .menu { display: grid; gap: clamp(6px, 2cqw, 10px); min-width: 11em; font-size: clamp(9px, 2.7cqw, 13px); }
   .menu button {
     font-family: var(--font-display); font-size: inherit; letter-spacing: .06em; text-transform: uppercase;
@@ -284,19 +301,21 @@
       <span class="num"><span id="coinBarNum"></span><span class="caret"></span></span>
       <span class="keys"><b>Enter</b> get them &nbsp; <b>Esc</b> cancel</span>
     </div>
-    <div id="overlay">
+    <div id="overlay" class="title-mode">
       <h1 id="ovTitle">Doodad<br>Doombad</h1>
       <div class="shelf" id="storeShelf" hidden>
         <div class="scroll" id="storeScroll"><div class="items" id="storeItems"></div></div>
         <button class="arrow l" id="shelfL" type="button" tabindex="-1" aria-label="More items to the left">&#9664;</button>
         <button class="arrow r" id="shelfR" type="button" tabindex="-1" aria-label="More items to the right">&#9654;</button>
       </div>
+      <div class="ovbody">
       <p id="ovText">Big Bruno has hauled Pearl to the top of the construction site. Climb the girders as a brave little pug, leap his barrels, and from level 2, dodge the fireball that crawls out of the tar drum. Grab a hammer to smash back. Every level the site grows two floors taller.</p>
       <div class="coinlist" id="coinList" hidden></div>
       <div class="menu" id="menu" hidden></div>
       <div class="keys" id="menuHint" hidden><b>Up</b>/<b>Down</b> choose &nbsp; <b>Enter</b> or <b>A</b> pick<br><b>Esc</b> or <b>B</b> back</div>
       <div class="keys" id="ovKeys"><b>Arrows</b> walk and climb<br><b>Space</b> or <b>Up</b> jump &nbsp; <b>B</b> bark &nbsp; <b>P</b> pause &nbsp; <b>M</b> mute<br><b>Xbox controller</b> stick or D-pad, <b>A</b> jump, <b>B</b> bark, <b>Menu</b> start<br><b>2-4 players</b> press A on another controller to join<br>a knocked-out pug waits for the next level · a heart is lost only when everyone is out</div>
       <button id="start" type="button">Start</button>
+      </div>
     </div>
   </div>
 
@@ -1359,6 +1378,7 @@
     storeScroll = document.getElementById('storeScroll'), shelfL = document.getElementById('shelfL'), shelfR = document.getElementById('shelfR');
   // the start and Game Over screens: one big button
   function showOverlay(title, text, btn, showKeys) {
+    ov.classList.remove('title-mode');   // (only the very first screen is the main menu)
     ovTitle.innerHTML = title; ovText.textContent = text; startBtn.textContent = btn;
     ovKeys.hidden = !showKeys; startBtn.hidden = false;
     menuEl.hidden = menuHint.hidden = coinList.hidden = storeShelf.hidden = true; ov.classList.remove('menu-mode');
@@ -2922,7 +2942,127 @@
       if (e2 <= dx) { err += dx; y0 += sy; }
     }
   }
+  // ---------- the main menu ----------
+  // The start screen is the main menu, outside at sunset: a starry sky fading to orange at the horizon,
+  // purple mountains, and a pixel castle on a green hill (two towers and a tall keep with pointed pink roofs,
+  // glowing windows and a gate), grass and flowers in front with a dirt path up to the gate. The still parts
+  // are drawn once into titleBg; drifting clouds, twinkling stars and waving flags go on top every frame.
+  const titleBg = document.createElement('canvas');
+  let titleBgReady = false;
+  const CASTLE_Y = 132;   // the castle's base, on top of the hill (between the title and the text box)
+  function buildTitleBg() {
+    titleBg.width = PW; titleBg.height = PH;
+    const c = titleBg.getContext('2d');
+    const rect = (col, x, y, w, h) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
+    const H0 = 170;   // the horizon
+    // the sky, in bands from night at the top to a warm glow at the horizon
+    const sky = ['#0b0c1c', '#11132a', '#181a3a', '#22265a', '#2f2f72', '#47387f', '#653f8a', '#8d4588', '#b8507a', '#d9606a', '#f07c5a', '#ffa35a'];
+    sky.forEach((col, i) => rect(col, 0, Math.floor(i * H0 / sky.length), PW, Math.ceil(H0 / sky.length) + 1));
+    // a big low sun behind the castle, banded like an old arcade sunset
+    for (let y = -22; y <= 22; y++) for (let x = -22; x <= 22; x++) {
+      if (x * x + y * y > 22 * 22) continue;
+      const Y = 118 + y;
+      if (Y > 120 && (Y % 4 === 0)) continue;   // (the stripes across its lower half)
+      rect(Y < 108 ? '#ffe08a' : '#ffc35a', 176 + x, Y, 1, 1);
+    }
+    // two rows of mountains: far ones pale purple, near ones dark
+    const ridge = (peaks, col) => {
+      for (let x = 0; x < PW; x++) {
+        let top = H0;
+        for (const [px0, h, w] of peaks) top = Math.min(top, H0 - h + Math.abs(x - px0) * h / w);
+        rect(col, x, Math.round(top), 1, H0 - Math.round(top) + 1);
+      }
+    };
+    ridge([[20, 46, 50], [80, 34, 40], [150, 40, 46], [215, 52, 48]], '#5a3c7a');
+    ridge([[0, 26, 34], [60, 20, 30], [196, 28, 36], [240, 22, 30]], '#36285a');
+    // the green hill under the castle, and the meadow in front
+    for (let x = 0; x < PW; x++) {
+      const t = (x - 120) / 96, top = Math.round(CASTLE_Y - 4 + Math.max(0, t * t) * 34);
+      rect('#2f8f66', x, Math.min(top, H0), 1, PH);
+      rect('#5fc88f', x, Math.min(top, H0), 1, 1);   // (a lit edge along the top)
+    }
+    rect('#2f8f66', 0, H0, PW, PH - H0);
+    // the dirt path from the gate down to the bottom, widening as it comes closer
+    for (let y = CASTLE_Y; y < PH; y++) {
+      const half = 6 + (y - CASTLE_Y) * 0.32;
+      rect('#a8743a', Math.round(120 - half) - 1, y, Math.round(half * 2) + 2, 1);
+      rect('#d9a066', Math.round(120 - half), y, Math.round(half * 2), 1);
+    }
+    // grass tufts and little flowers on the meadow (the same every time: a fixed pattern)
+    for (let i = 0; i < 90; i++) {
+      const x = (i * 53) % PW, y = H0 + 6 + (i * 37) % (PH - H0 - 8);
+      if (Math.abs(x - 120) < 8 + (y - CASTLE_Y) * 0.34) continue;   // (not on the path)
+      if (i % 5 === 0) { rect(['#ff7ab8', '#ffcc3d', '#ffffff'][i % 3], x, y, 1, 1); rect('#5fc88f', x, y + 1, 1, 1); }
+      else { rect('#5fc88f', x, y, 1, 2); rect('#5fc88f', x + 1, y + 1, 1, 1); }
+    }
+    // ---- the castle ----
+    const stone = '#8a92b4', mid = '#6a7090', dark = '#4e5370', deep = '#36363f';
+    // a stone block: light face with a darker right edge, mortar lines every 5 rows (staggered joints)
+    const block = (x, y, w, h) => {
+      rect(stone, x, y, w, h);
+      rect(mid, x + w - 2, y, 2, h);
+      for (let r = y + 4; r < y + h; r += 5) {
+        rect(dark, x, r, w, 1);
+        for (let j = x + ((r / 5) % 2 ? 2 : 5); j < x + w - 1; j += 6) rect(dark, j, r - 4, 1, 4);
+      }
+    };
+    // battlements along a top edge
+    const merlons = (x, y, w) => { for (let j = x; j < x + w; j += 5) block(j, y - 4, 3, 4); };
+    // a pointed roof: a pink triangle with a darker right half
+    const roof = (cx, base, w, h) => {
+      for (let r = 0; r < h; r++) {
+        const half = Math.round((w / 2) * (r + 1) / h);
+        rect('#d9586e', cx - half, base - h + r, half, 1);
+        rect('#9c2c55', cx, base - h + r, half, 1);
+      }
+      rect('#ff7ab8', cx - 1, base - h - 1, 2, 1);
+    };
+    const win = (x, y, h) => { rect(deep, x - 1, y - 1, 4, h + 2); rect('#ffcc3d', x, y, 2, h); rect('#fff2b0', x, y, 1, 1); };
+    // the curtain wall with its gate
+    block(78, CASTLE_Y - 24, 84, 24); merlons(78, CASTLE_Y - 24, 84);
+    // the tall keep behind the gate
+    block(104, CASTLE_Y - 50, 32, 26); merlons(104, CASTLE_Y - 50, 32);
+    roof(120, CASTLE_Y - 54, 34, 20);
+    win(110, CASTLE_Y - 45, 4); win(127, CASTLE_Y - 45, 4); win(118, CASTLE_Y - 36, 5);
+    // the two side towers
+    block(62, CASTLE_Y - 46, 20, 46); roof(72, CASTLE_Y - 50, 22, 18);
+    block(158, CASTLE_Y - 46, 20, 46); roof(168, CASTLE_Y - 50, 22, 18);
+    win(70, CASTLE_Y - 38, 4); win(70, CASTLE_Y - 23, 4); win(166, CASTLE_Y - 38, 4); win(166, CASTLE_Y - 23, 4);
+    // the gate: a dark arch with a portcullis
+    for (let y = 0; y < 18; y++) {
+      const inset = y < 4 ? [4, 2, 1, 0][y] : 0;
+      rect('#11132a', 112 + inset, CASTLE_Y - 18 + y, 16 - inset * 2, 1);
+    }
+    for (let x = 114; x < 128; x += 3) rect(deep, x, CASTLE_Y - 14, 1, 14);
+    rect(deep, 112, CASTLE_Y - 9, 16, 1);
+  }
+  // the flagpoles on the three roofs (their tips), for the waving flags
+  const FLAGS = [[120, CASTLE_Y - 81], [72, CASTLE_Y - 75], [168, CASTLE_Y - 75]];
+  function drawTitleScene() {
+    if (!titleBgReady) { buildTitleBg(); titleBgReady = true; }
+    ctx.drawImage(titleBg, 0, 0);
+    // twinkling stars in the dark top of the sky
+    for (let i = 0; i < 26; i++) {
+      const x = (i * 71 + 13) % PW, y = (i * 29 + 7) % 64;
+      if ((frame + i * 17) % 90 < 70) { ctx.fillStyle = (frame + i * 31) % 50 < 6 ? '#ffffff' : '#9fb4ff'; ctx.fillRect(x, y, 1, 1); }
+    }
+    // a few soft pixel clouds drifting slowly to the right
+    for (let i = 0; i < 3; i++) {
+      const w = 26 + i * 8, x = ((frame * (0.12 + i * 0.05) + i * 97) % (PW + w)) - w, y = 70 + i * 18;
+      ctx.fillStyle = i === 2 ? '#e8a0a8' : '#c8a6d8';
+      ctx.fillRect(Math.round(x), y, w, 3); ctx.fillRect(Math.round(x) + 4, y - 2, w - 10, 2); ctx.fillRect(Math.round(x) + 9, y - 4, 8, 2);
+    }
+    // the flags on the castle roofs, waving (two frames)
+    const wave = Math.floor(frame / 14) % 2;
+    for (const [x, y] of FLAGS) {
+      ctx.fillStyle = '#36363f'; ctx.fillRect(x, y, 1, 7);
+      ctx.fillStyle = '#ff3e6c'; ctx.fillRect(x + 1, y, 5, 2); ctx.fillRect(x + 1, y + 2, wave ? 4 : 6, 1);
+      ctx.fillStyle = '#ffcc3d'; ctx.fillRect(x + 1, y, 1, 1);
+    }
+  }
   function draw() {
+    // the main menu has its own scene
+    if (phase === 'title') { drawTitleScene(); updateHud(); updateCursor(); return; }
     const cam = Math.round(camY / 2);
     ctx.save();
     // (the screen shakes for a moment when Bruno's ball thumps onto a floor or he lands back home)
