@@ -433,6 +433,12 @@
     barrel_roll2: ["...GGGI...",".GGTTATII.",".GATTAJJI.","GTATTAJJAI","GTATJAJJAI","GTAJJAJJAI","ITAJJAJJAI",".IAJJAJJI.",".IIJJAJII.","...IIII..."],
     barrel_roll3: ["...GGGI...",".GGTATTII.",".GTATTJAI.","GTATTJAAJI","GATTJAAJJI","GTTJAAJJJI","ITJAAJJJAI",".IAAJJJAI.",".IIJJJAII.","...IIII..."],
     barrel_upright: [".AAAAAA.","AJTJJJNA","HGHHHHHI","AJTJJJNA","AJTJJJNA","AJTJJJNA","AJTJJJNA","HGHHHHHI","AJTJJJNA",".AAAAAA."],
+    // a barrel on a disco floor (Shnaz) turns into a disco ball: mirror squares that slide along as it
+    // turns, with pink, cyan and yellow party-light glints (four frames, like the rolling barrel)
+    disco_roll0: ["...GGGH...",".GGVWWVHH.",".GWVWGHGH.","GVVVVHHHHI","GCCVGGHGVI","GCCHGGHVVI","HVHHHHHHHI",".HPHGVHCI.",".HHHVVHII.","...IIII..."],
+    disco_roll1: ["...GGGH...",".GGWWVGHH.",".GVWWVGGH.","GVVVVHHHHI","GCVGGHGGHI","GCVGGHGVHI","HVHHHHHHHI",".HHGGHCCI.",".HHGVHCII.","...IIII..."],
+    disco_roll2: ["...GGGH...",".GGWVWGHH.",".GWWVGGHH.","GVVVVHHHHI","GVWGHGGHYI","GVGGHGGHYI","HVHHHHHHHI",".HGGHCCHI.",".HHGHCCII.","...IIII..."],
+    disco_roll3: ["...GGGH...",".GGVWWVHH.",".GWVWGHPH.","GVVVVHHHHI","GWWVGGHYYI","GWGHGGHYYI","HVHHHHHHHI",".HGHCCHVI.",".HHHCCHII.","...IIII..."],
     drum: ["VVVVVVVVVVVVVVVV",".BBBBBBBBBBBBBB.",".BBBBBBBBBBBBBB.",".VVVVVVVVVVVVVV.",".BBBBBBBBBBBBBB.",".BWWWBWWWBWWBBB.",".BBWBBWBWBWBWBB.",".BBWBBWWWBWWBBB.",".BBWBBWBWBWBWBB.",".BBWBBWBWBWBWBB.",".BBBBBBBBBBBBBB.",".BBBBBBBBBBBBBB.",".VVVVVVVVVVVVVV.",".BBBBBBBBBBBBBB.",".BBBBBBBBBBBBBB.","VVVVVVVVVVVVVVVV"],
     fire_0: [".M....M...",".MM...MM..",".MFM..MFM.",".MFFMMFFM.",".MFFFFFFM.","MFFYYYYFFM","MFYYYYYYFM","MFYYYKYKFM","MFYYYKYKFM","MFFYYYYFFM",".MFFFFFFM.","..MMMMMM.."],
     fire_1: ["....M...M.","...MM..MM.","..MFM.MFM.",".MFFMMFFM.",".MFFFFFFM.","MFFYYYYFFM","MFYYYYYYFM","MFYYYKYKFM","MFYYYKYKFM","MFFYYYYFFM",".MFFFFFFM.","..MMMMMM.."],
@@ -1365,7 +1371,7 @@
       off() {} },
     // Shnaz, 50 coins: equipped, that pug's X (keyboard X or the controller's X) turns the floor it is on
     // into a disco party floor for the rest of the level (discoTime); the square under each pug on a disco
-    // floor lights up. (With the Taco Pug equipped too, one X does both.)
+    // floor lights up, and barrels on it turn into disco balls. (With the Taco Pug equipped too, one X does both.)
     { key: 'shnaz', name: 'Shnaz', what: 'the Shnaz glasses', does: 'X: disco!', price: 50, alt: 'Pixel sunglasses',
       on(id) { toast(`${LOOK[id].name}: press X for a disco floor!`, LOOK[id].hex); sfx.disco(); },
       canOff: () => true,
@@ -2096,24 +2102,37 @@
   // pugs. They still act just like barrels: touching one knocks a pug out (a barrel still dropping in from the floor above changes once it lands
   // and X is pressed again). It never wears off; barrels Bruno throws afterwards are barrels again until
   // X is pressed again.
-  // X: the Taco Pug's tacos and Shnaz's disco floor (a pug with both equipped gets both)
-  function xPower(p) { tacoTime(p); discoTime(p); }
+  // X: the Taco Pug's tacos and Shnaz's disco floor (a pug with both equipped gets both; disco goes first,
+  // so on a disco floor the barrels become disco balls and the tacos are only made elsewhere)
+  function xPower(p) { discoTime(p); tacoTime(p); }
   // Disco time (X): a pug with Shnaz equipped turns the floor it is on into a disco party floor, for the
   // rest of the level. Its squares glow in party colours that keep changing, and the square under any pug
-  // standing on it lights up bright, then fades (discoStep, drawDisco).
+  // standing on it lights up bright, then fades (discoStep, drawDisco). Its barrels turn into disco balls.
   function discoTime(p) {
     if (phase !== 'play' || !p || !isIn(p) || !bag[p.id].on.shnaz || discoFloors.has(p.g)) return;
     discoFloors.add(p.g); sfx.disco();
     pops.push({ x: p.x, y: p.y - 44, text: 'DISCO!', t: 50 });
+    discoBalls();
+  }
+  // Barrels rolling on a disco floor turn into disco balls, with a burst of party-coloured sparks, and stay
+  // disco balls. They still act just like barrels: they knock pugs out and can be jumped and smashed.
+  // (A taco pug stays a taco pug.)
+  function discoBalls() {
+    for (const b of barrels) if (!b.dead && !b.taco && !b.disco && b.state === 'roll' && discoFloors.has(b.g)) {
+      b.disco = true;
+      burst(b.x, b.y - 4, 'P', 3); burst(b.x, b.y - 4, 'C', 3); burst(b.x, b.y - 4, 'Y', 3);
+    }
   }
   const discoSquare = (g, x) => Math.floor((px(x) - px(g.x1)) / 8);   // (the girder's 8-pixel sections)
   function discoStep() {
+    if (!discoFloors.size) return;
+    discoBalls();   // (barrels that have just rolled onto a disco floor)
     for (const p of players) if (isIn(p) && p.state === 'walk' && discoFloors.has(p.g)) discoLit.set(p.g * 1000 + discoSquare(G[p.g], p.x), frame);
   }
   function tacoTime(p) {
     if (phase !== 'play' || !p || !isIn(p) || !bag[p.id].on.taco) return;
     let n = 0;
-    for (const b of barrels) if (!b.dead && !b.taco && b.g === p.g) {
+    for (const b of barrels) if (!b.dead && !b.taco && !b.disco && b.g === p.g) {
       b.taco = true; n++;
       for (let i = 0; i < 3; i++) pops.push({ puff: true, x: b.x + (i - 1) * 6, y: b.y - 4, t: 12 });
     }
@@ -2167,7 +2186,7 @@
       if (b) {
         b.dead = true; h.gone = true;
         addScore(300, b.x, b.y - 10, h.by); giveCoins(3, b.x, b.y - 4, h.by); sfx.smash();
-        burst(b.x, b.y, 'O', 8); burst(h.x, h.y, 'G', 6);
+        burst(b.x, b.y, b.disco ? 'G' : 'O', 8); burst(h.x, h.y, 'G', 6);   // (a disco ball breaks into silver bits)
         continue;
       }
       if (h.rope) continue;   // (a hammer on a rope never lands on a girder)
@@ -2225,7 +2244,7 @@
         const z = hammerZone(P);
         if (Math.hypot(b.x - z.x, b.y - z.y) < 18) {
           b.dead = true; addScore(300, b.x, b.y - 10, id); giveCoins(3, b.x, b.y - 4, id); sfx.smash();
-          for (let i = 0; i < 8; i++) pops.push({ x: b.x, y: b.y, vx: (Math.random() - .5) * 4, vy: -Math.random() * 3, t: 30, chip: true });
+          for (let i = 0; i < 8; i++) pops.push({ x: b.x, y: b.y, vx: (Math.random() - .5) * 4, vy: -Math.random() * 3, t: 30, chip: true, color: b.disco ? 'G' : 'O' });
           continue;
         }
       }
@@ -2439,6 +2458,11 @@
   function drawTaco(b) {
     const f = ((Math.floor(b.rot / (Math.PI / 2)) % 4) + 4) % 4;
     blit('taco_roll' + f, px(b.x) - 5, Math.round(b.y / 2) - 6);
+  }
+  // a disco ball (a barrel on a disco floor), turning like a barrel
+  function drawDiscoBall(b) {
+    const f = ((Math.floor(b.rot / (Math.PI / 4)) % 4) + 4) % 4;
+    blit('disco_roll' + f, px(b.x) - 5, Math.round(b.y / 2) - 6);
   }
   // Rolling barrel centred on a world-space point
   function drawRollingBarrel(x, y, rot) {
@@ -2686,7 +2710,7 @@
     if (boom && boom.t < BOOM_TALK) { ctx.save(); ctx.translate(boom.t % 4 < 2 ? 1 : -1, 0); drawApe(); ctx.restore(); }
     else drawApe();
     drawPearl();
-    for (const b of barrels) if (!b.dead) { if (b.taco) drawTaco(b); else drawRollingBarrel(b.x, b.y, b.rot); }
+    for (const b of barrels) if (!b.dead) { if (b.taco) drawTaco(b); else if (b.disco) drawDiscoBall(b); else drawRollingBarrel(b.x, b.y, b.rot); }
     // thrown hammers tumble end over end (upright, then on its side, every 3 frames); one thrown with a
     // Harpoon trails its rope back to the pug's paws, a twisted tan-and-brown line
     for (const h of thrown) {
