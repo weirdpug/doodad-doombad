@@ -247,6 +247,8 @@
   .item .equip.sel { background: var(--ladder); color: #07081a; }
   .item .equip.on.sel { background: var(--gold); color: #07081a; }
   .item .equip:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #0b3a40; }
+  /* (a Customize card has just the one button, Wear / Take off, at its bottom) */
+  .item .wear { margin-top: auto; }
   .item .pic { height: 54px; display: flex; align-items: end; }
   .item img { display: block; width: calc(var(--w, 16) * 3px); height: auto; image-rendering: crisp-edges; image-rendering: pixelated; }
   @container (max-width: 360px) { .item .pic { height: 36px; } .item img { width: calc(var(--w, 16) * 2px); } }
@@ -313,6 +315,7 @@
         <button class="arrow l" id="shelfL" type="button" tabindex="-1" aria-label="More items to the left">&#9664;</button>
         <button class="arrow r" id="shelfR" type="button" tabindex="-1" aria-label="More items to the right">&#9654;</button>
       </div>
+      <div class="shelf" id="lookShelf" hidden><div class="items" id="lookItems"></div></div>
       <div class="ovbody">
       <p id="ovText">Big Bruno has hauled Pearl to the top of the construction site. Climb the girders as a brave little pug, leap his barrels, and from level 2, dodge the fireball that crawls out of the tar drum. Grab a hammer to smash back. Every level the site grows two floors taller.</p>
       <div class="coinlist" id="coinList" hidden></div>
@@ -652,6 +655,27 @@
   // and flip. Climbing shows the pug from behind, so there are none for that.
   Object.assign(SPRITES, { shades_stand: ["................","................","................","........KKKKKK..",".......KWKK.WKK.","................","................","................","................","................","................","................","................"], shades_walk1: ["................","................","................","........KKKKKK..",".......KWKK.WKK.","................","................","................","................","................","................","................","................"], shades_walk2: ["................","................","................","........KKKKKK..",".......KWKK.WKK.","................","................","................","................","................","................","................","................"], shades_jump: ["................","................","................","........KKKKKK..",".......KWKK.WKK.","................","................","................","................","................","................","................","................"],
     shades_dead: ["................","................","................","..........KKKK..",".........KWK.WKK","................","................","................","................","................"] });
+  // The Alpha Necklace (Customize > Necklaces): a gold chain with a gold $ hanging from it. The big one is its
+  // picture on the Necklaces card. The rest go over the pug like the sunglasses (same anchor and flip): the
+  // chain runs down the side of the neck to a little $ under the chin (on a dark backing so it shows on a
+  // cream chest), climbing shows just the chain across the back of the neck, and belly-up the $ lies on the chest.
+  const ALPHA_SIDE = ["................", "................", "................", "................",
+    "......Y.........", "......F.........", ".......YF.......", ".......NYY......",
+    ".......YFN......", ".......NYN......", ".......NFY......", ".......YYN......", "................"];
+  const ALPHA_BACK = ["............", "............", "............", "............", "............", "............",
+    "............", "..YFYFFYFY..", "............", "............", "............", "............",
+    "............", "............", "............", "............"];
+  Object.assign(SPRITES, {
+    alpha_necklace: [".Y.................Y.", ".F.................F.", "..Y...............Y..", "..F...............F..",
+      "...Y.............Y...", "....F...........F....", ".....Y.........Y.....", "......FY.....YF......",
+      "........FYFYF........", "..........F..........", "........WYYYY........", ".......YY.F..........",
+      ".......YY.F..........", "........YYYYY........", "..........F.YY.......", "..........F.YY.......",
+      "........YYYYY........", "..........F.........."],
+    alpha_stand: ALPHA_SIDE, alpha_walk1: ALPHA_SIDE, alpha_walk2: ALPHA_SIDE, alpha_jump: ALPHA_SIDE,
+    alpha_climb1: ALPHA_BACK, alpha_climb2: ALPHA_BACK,
+    alpha_dead: ["................", "........Y.......", ".....NYYF.......", ".....YFNY.......", ".....NYNF.......",
+      ".....NFYY.......", ".....YYNF.......", "........Y.......", "................", "................"],
+  });
   /*TACO SUIT*/
   // The taco suit a pug wears with the Taco Pug equipped: one overlay per pose, the pose's own size, drawn
   // over the pug with the same feet anchor and flip ('.' lets the pug show through; the head is never covered)
@@ -809,6 +833,24 @@
   }
   function saveBag() { try { localStorage.setItem(BAG_KEY, JSON.stringify(bag)); } catch (e) {} }
   let bag = loadBag();
+  // What each pug wears, chosen in Customize (from the main menu): for now a necklace (one at a time, free).
+  // Saved in the browser like the bag. Each necklace's key names its sprites: <key>_necklace for its
+  // picture, <key>_stand and so on for the pug's poses.
+  const LOOKS_KEY = 'doodad-doombad-looks';
+  const NECKLACES = [{ key: 'alpha', name: 'Alpha Necklace', does: 'Gold chain, gold $', alt: 'A gold chain with a gold dollar sign on it' }];
+  function loadLooks() {
+    const l = [0, 1, 2, 3].map(() => ({ necklace: '' }));
+    try {
+      const saved = JSON.parse(localStorage.getItem(LOOKS_KEY));
+      if (Array.isArray(saved)) l.forEach((x, i) => {
+        const n = (saved[i] || {}).necklace;
+        if (NECKLACES.some(c => c.key === n)) x.necklace = n;
+      });
+    } catch (e) {}
+    return l;
+  }
+  function saveLooks() { try { localStorage.setItem(LOOKS_KEY, JSON.stringify(looks)); } catch (e) {} }
+  const looks = loadLooks();
   // the team's hearts: 3, plus one for every pug in the game with a succulent equipped
   const startLives = () => 3 + [0, 1, 2, 3].filter(i => joined[i] && bag[i].on.succulent).length;
   lives = startLives();
@@ -1409,7 +1451,7 @@
     ov.classList.remove('title-mode');   // (only the very first screen is the main menu)
     ovTitle.innerHTML = title; ovText.textContent = text; startBtn.textContent = btn;
     ovKeys.hidden = !showKeys; ovText.hidden = startBtn.hidden = false;
-    menuEl.hidden = menuHint.hidden = coinList.hidden = storeShelf.hidden = true; ov.classList.remove('menu-mode');
+    menuEl.hidden = menuHint.hidden = coinList.hidden = storeShelf.hidden = lookShelf.hidden = true; ov.classList.remove('menu-mode');
     // (while the explosion picture is up, the Game Over screen waits until it goes: see step)
     ov.hidden = !boomPic.hidden;
     if (!ov.hidden) startBtn.focus({ preventScroll: true });
@@ -1462,7 +1504,7 @@
     fromTitle = false; phase = 'title';
     ov.classList.remove('menu-mode'); ov.classList.add('title-mode');
     ovTitle.innerHTML = 'Doodad<br>Doombad'; startBtn.textContent = 'Start'; startBtn.hidden = false;
-    menuEl.hidden = menuHint.hidden = coinList.hidden = storeShelf.hidden = true;
+    menuEl.hidden = menuHint.hidden = coinList.hidden = storeShelf.hidden = lookShelf.hidden = true;
     ov.hidden = false; markTitle(sel || 0, true);
     updateHud(true);
   }
@@ -1561,6 +1603,39 @@
     storeItems.append(card);
     it.card = card; it.ownEl = own; it.buyBtn = buy; it.eqBtn = eq; it.doesEl = does;
   }
+  // Customize > Necklaces: one card per necklace (like the Store's), with its picture, name and a
+  // Wear / Take off button, for the same pug the Store would show (storeBy)
+  const lookShelf = document.getElementById('lookShelf'), lookItems = document.getElementById('lookItems');
+  for (const n of NECKLACES) {
+    const card = document.createElement('div'), pic = document.createElement('div'), img = document.createElement('img'),
+      name = document.createElement('span'), does = document.createElement('span'), wear = document.createElement('button');
+    card.className = 'item'; pic.className = 'pic'; img.alt = n.alt;
+    try { const s = sprite(n.key + '_necklace'); if (s) { img.src = s.toDataURL(); img.style.setProperty('--w', s.width); } } catch (e) {}
+    pic.append(img);
+    name.textContent = n.name; does.className = 'does'; does.textContent = n.does;
+    wear.type = 'button'; wear.className = 'equip wear';
+    card.append(pic, name, does, wear);
+    lookItems.append(card);
+    n.card = card; n.wearBtn = wear;
+  }
+  function renderLooks() {
+    for (const n of NECKLACES) {
+      const on = looks[storeBy].necklace === n.key;
+      n.wearBtn.textContent = on ? 'Take off' : 'Wear';
+      n.wearBtn.setAttribute('aria-label', `${on ? 'Take off' : 'Wear'} the ${n.name}`);
+      n.wearBtn.classList.toggle('on', on);
+    }
+  }
+  // Wear puts the necklace on (in place of any other), Take off takes it off
+  function wearNecklace(n, by) {
+    if (phase !== 'paused' || pauseView !== 'necklaces') return;
+    const id = joined[by] ? by : 0, name = LOOK[id].name, on = looks[id].necklace === n.key;
+    storeBy = id;
+    looks[id].necklace = on ? '' : n.key; saveLooks();
+    ovText.textContent = on ? `${name} took off the ${n.name}.` : `${name} is wearing the ${n.name}!`;
+    if (on) sfx.tick(); else sfx.coin();
+    renderLooks();
+  }
   // The choices on each screen, in Tab order. Each choice gets the id of the player who picked it
   // (whose coins and bag the Store uses). The Store's choices are a grid: each card's Buy button
   // (row 0) and Equip button (row 1), then Back below the cards (row 2).
@@ -1583,24 +1658,32 @@
     ],
     // Customize, from the main menu only: Suits, Hats and Necklaces, then Back to the main menu
     custom: () => [
-      ...CUSTOM_PARTS.map(c => ({ label: c.name, act: () => showPause(c.view) })),
+      ...CUSTOM_PARTS.map(c => ({ label: c.name, act: by => showPause(c.view, 0, null, by) })),
       { label: 'Back', act: () => backToTitle() },
     ],
     // each section's Back goes to Customize, with that section chosen
     ...Object.fromEntries(CUSTOM_PARTS.map((c, i) => [c.view, () => [{ label: 'Back', act: () => showPause('custom', i) }]])),
+    // Necklaces: each necklace card's Wear / Take off, then Back
+    necklaces: () => [
+      ...NECKLACES.map(n => ({ label: 'Wear', btn: n.wearBtn, look: n, act: by => wearNecklace(n, by) })),
+      { label: 'Back', act: () => showPause('custom', 2) },
+    ],
   };
   // (storeCol: the card that Up or Down from Back goes to, the one chosen last)
   let pauseView = 'pause', menuSel = 0, storeBy = 0, storeCol = 0, menuEntries = [], menuBtns = [];
   function showPause(view, sel, note, by) {
     pauseView = view; menuSel = sel || 0;
     const store = view === 'store', part = customPart(view), custom = view === 'custom' || !!part,
-      opening = store && storeShelf.hidden;
-    if (store && by !== undefined && joined[by]) storeBy = by;
+      neck = view === 'necklaces', opening = store && storeShelf.hidden;
+    // (the Store and Necklaces show the bag or look of the pug that opened them)
+    if ((store || neck) && by !== undefined && joined[by]) storeBy = by;
     if (!joined[storeBy]) storeBy = kbBy();
     ovTitle.textContent = store ? 'Store' : part ? part.name : custom ? 'Customize' : 'Paused';
-    ovText.hidden = custom;
+    // (Necklaces keeps a line for what was just put on, and with 2-4 pugs, whose look it is)
+    ovText.hidden = custom && !neck;
     ovText.textContent = note || (store
       ? (multi() ? `${LOOK[storeBy].name}'s bag. Each pug pays with its own coins!` : 'Buy things, then equip them!')
+      : neck ? (multi() ? `${LOOK[storeBy].name}'s necklace` : '')
       : 'Take a breather. Bruno will wait.');
     menuEntries = MENUS[view]();
     const list = [];
@@ -1612,9 +1695,10 @@
     });
     menuEl.replaceChildren(...list);
     if (store) renderStore();
+    if (neck) renderLooks();
     // (an item only hops right after it is bought, not every time the Store opens again)
     for (const it of SHOP) it.card.classList.remove('bought');
-    coinList.hidden = storeShelf.hidden = !store; ovKeys.hidden = store || custom; startBtn.hidden = true;
+    coinList.hidden = storeShelf.hidden = !store; lookShelf.hidden = !neck; ovKeys.hidden = store || custom; startBtn.hidden = true;
     menuEl.hidden = false; menuHint.hidden = store || custom;   // (the Store needs the room on small screens)
     // (a game started from the main menu leaves its look on the hidden screen: the menus never use it)
     ov.classList.remove('title-mode'); ov.classList.add('menu-mode'); ov.hidden = false;
@@ -1690,6 +1774,7 @@
     // in the Store, the card of the item whose Buy or Equip button is chosen is framed too
     const cur = menuEntries[menuSel];
     SHOP.forEach(it => it.card.classList.toggle('sel', pauseView === 'store' && !!cur && cur.it === it));
+    NECKLACES.forEach(n => n.card.classList.toggle('sel', pauseView === 'necklaces' && !!cur && cur.look === n));
     if (pauseView === 'store' && cur && cur.it) storeCol = SHOP.indexOf(cur.it);
     const b = menuBtns[menuSel];
     if (focus && b) {
@@ -2868,12 +2953,14 @@
     // draw a pose, plus the pug's outfit (President Pug's top hat and tie) on top with the same anchor and flip
     // with the Taco Pug equipped the pug wears a taco suit over its body (never its head), drawn the same way,
     // and with Snazz equipped it wears pixel sunglasses
-    const suit = bag[P.id].on.taco, shades = bag[P.id].on.shnaz;
+    // and a necklace chosen in Customize goes on last (over President Pug's tie)
+    const suit = bag[P.id].on.taco, shades = bag[P.id].on.shnaz, neck = looks[P.id].necklace;
     const pug = (pose, x, y, flip) => {
       blitFeet(pose, x, y, flip, sw);
       if (suit) blitFeet('suit_' + pose.replace('player_', ''), x, y, flip);
       if (shades) blitFeet('shades_' + pose.replace('player_', ''), x, y, flip);
       if (outfit) blitFeet(outfit + pose.replace('player_', ''), x, y, flip);
+      if (neck) blitFeet(neck + '_' + pose.replace('player_', ''), x, y, flip);
     };
     const Y = Math.round(P.y / 2), left = P.face < 0;
     // the pug's sprites differ in size (side view, climbing from behind, belly-up), so each is
