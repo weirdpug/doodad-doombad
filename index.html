@@ -1455,7 +1455,8 @@
   }
   titleBtns.forEach((b, i) => { if (i) b.addEventListener('click', () => openFromTitle(TITLE_VIEWS[i], kbBy())); });
   // back to the main menu from the Store or Customize, with that one's button chosen
-  const backToTitle = () => showTitle(TITLE_VIEWS.indexOf(pauseView));
+  // (from Customize or one of its sections, Customize is chosen)
+  const backToTitle = () => showTitle(pauseView === 'store' ? 1 : 2);
   // the main menu again (sel: the button to choose), from the pause menu, the Store or Customize
   function showTitle(sel) {
     fromTitle = false; phase = 'title';
@@ -1563,6 +1564,9 @@
   // The choices on each screen, in Tab order. Each choice gets the id of the player who picked it
   // (whose coins and bag the Store uses). The Store's choices are a grid: each card's Buy button
   // (row 0) and Equip button (row 1), then Back below the cards (row 2).
+  // Customize's sections, each a screen of its own (empty for now: just its name and Back)
+  const CUSTOM_PARTS = [{ view: 'suits', name: 'Suits' }, { view: 'hats', name: 'Hats' }, { view: 'necklaces', name: 'Necklaces' }];
+  const customPart = view => CUSTOM_PARTS.find(c => c.view === view);
   const MENUS = {
     pause: () => [
       { label: 'Resume', act: () => resumeGame() },
@@ -1577,17 +1581,23 @@
       ]),
       { label: 'Back', act: () => storeBack(), row: 2 },
     ],
-    // Customize, from the main menu only: empty for now (the user asked for nothing in it yet)
-    custom: () => [{ label: 'Back', act: () => backToTitle() }],
+    // Customize, from the main menu only: Suits, Hats and Necklaces, then Back to the main menu
+    custom: () => [
+      ...CUSTOM_PARTS.map(c => ({ label: c.name, act: () => showPause(c.view) })),
+      { label: 'Back', act: () => backToTitle() },
+    ],
+    // each section's Back goes to Customize, with that section chosen
+    ...Object.fromEntries(CUSTOM_PARTS.map((c, i) => [c.view, () => [{ label: 'Back', act: () => showPause('custom', i) }]])),
   };
   // (storeCol: the card that Up or Down from Back goes to, the one chosen last)
   let pauseView = 'pause', menuSel = 0, storeBy = 0, storeCol = 0, menuEntries = [], menuBtns = [];
   function showPause(view, sel, note, by) {
     pauseView = view; menuSel = sel || 0;
-    const store = view === 'store', custom = view === 'custom', opening = store && storeShelf.hidden;
+    const store = view === 'store', part = customPart(view), custom = view === 'custom' || !!part,
+      opening = store && storeShelf.hidden;
     if (store && by !== undefined && joined[by]) storeBy = by;
     if (!joined[storeBy]) storeBy = kbBy();
-    ovTitle.textContent = store ? 'Store' : custom ? 'Customize' : 'Paused';
+    ovTitle.textContent = store ? 'Store' : part ? part.name : custom ? 'Customize' : 'Paused';
     ovText.hidden = custom;
     ovText.textContent = note || (store
       ? (multi() ? `${LOOK[storeBy].name}'s bag. Each pug pays with its own coins!` : 'Buy things, then equip them!')
@@ -1751,7 +1761,11 @@
     storeScroll.scrollLeft = x + e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? storeScroll.clientWidth : 1);
   }, { passive: false });
   function chooseSel(by) { if (phase === 'paused' && menuEntries[menuSel]) menuEntries[menuSel].act(by || 0); }
-  function menuBack() { if (pauseView === 'store') storeBack(); else resumeGame(); }
+  function menuBack() {
+    const part = CUSTOM_PARTS.findIndex(c => c.view === pauseView);
+    if (part >= 0) showPause('custom', part);   // (from Suits, Hats or Necklaces back to Customize)
+    else if (pauseView === 'store') storeBack(); else resumeGame();
+  }
   // the Store's Back: to the pause menu, or to the main menu when the Store was opened from there
   function storeBack() { if (fromTitle) backToTitle(); else showPause('pause', 1); }
   const menuButton = e => { const b = e.target.closest('button'); return b && menuBtns.includes(b) ? b : null; };
