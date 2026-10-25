@@ -667,6 +667,17 @@
     turd_fly2: ["...........", "...........", "........OO.", "NN...OOOKOF", ".NAOOOOOOO.", "..NLNAALON.", "....NAN....", ".....N....."],
     turd_pet: ["...........", "........OO.", ".......OKOF", "NN.....OOO.", ".NAAAAOOOO.", "..NAAAOLLO.", "...NNOLLLN.", "......F.F..", ".....FF.FF."],
   });
+  // Donkey Joe (Customize > Pets): a blue donkey with long ears, a navy mane, a light blue muzzle and belly,
+  // navy hooves and a tufted tail, facing right (flipped for left). He walks behind his pug (walk1 is also
+  // how he stands, and his picture on the Pets card; walk2 has his legs apart), and now and then he farts.
+  const JOE_TOP = ["............n..n..", "............Bn.Bn.", "............BB.BB.", "...........nBBBBB.", "..........nBBBKBBB",
+    "..........nBBBBBVV", "..........BBB.BVVV", "..nBBBBBBBBBB..VVn", ".n.BBBBBBBBBB.....", ".n.BBBBBBBBBB.....",
+    "nn.BVVVVVVVVB....."];
+  Object.assign(SPRITES, {
+    joe_walk1: [...JOE_TOP, "...BB.....BB......", "...BB.....BB......", "...nn.....nn......"],
+    joe_walk2: [...JOE_TOP, "...BB....BB.......", "..BB......BB......", ".nn........nn....."],
+  });
+  SPRITES.joe_pet = SPRITES.joe_walk1;
   // Underwear (Customize > Suits): white briefs with a blue waistband. The big pair is its picture on the
   // Suits card. The rest go over the pug like the sunglasses (same anchor and flip): side on, they cover the
   // pug's hips and the tops of its back legs; climbing (seen from behind) the curly tail pokes out over the
@@ -949,7 +960,10 @@
     { key: 'glasses2', name: 'Glasses 2', what: 'Glasses 2', h: 0, alt: 'Half-moon glasses with brown frames' }];
   const NECKLACES = [{ key: 'alpha', name: 'Alpha Necklace', what: 'the Alpha Necklace', alt: 'A gold chain with a gold dollar sign on it' },
     { key: 'tie', name: "President Pug's Tie", what: "President Pug's tie", alt: "President Pug's blue tie with a navy knot" }];
-  const PETS = [{ key: 'turd', name: 'Turd the Bird', alt: 'A small brown bird' }];
+  // (kind: how a pet goes along with its pug: 'fly' above and behind its head, 'walk' behind it on its floor;
+  // farts: now and then it farts, a green cloud and a raspberry)
+  const PETS = [{ key: 'turd', name: 'Turd the Bird', alt: 'A small brown bird', kind: 'fly' },
+    { key: 'joe', name: 'Donkey Joe', alt: 'A blue donkey', kind: 'walk', farts: true }];
   // the Customize sections with things to choose: which of a pug's looks each sets, its things, the
   // button's words while it isn't / is chosen, and what the screen says after
   const LOOK_SECTIONS = {
@@ -1140,6 +1154,8 @@
     shot: () => { tone(900, 0.05, 'square', 0.06, -760); tone(130, 0.14, 'sawtooth', 0.07, -70); },   // the Snifer Ripple goes bang
     stun: () => [988, 740, 988, 740].forEach((f, i) => tone(f, 0.07, 'triangle', 0.05, 0, i * 0.08)),   // Bruno sees stars
     taco: () => [659, 831, 988, 1319, 988, 1319].forEach((f, i) => tone(f, 0.07, 'square', 0.04, 0, i * 0.065)),   // a festive taco jingle
+    // Donkey Joe farts: a low sliding raspberry with a flutter of quick low pops
+    fart: () => { tone(95, 0.38, 'sawtooth', 0.08, -40); [0, 0.06, 0.12, 0.19, 0.26].forEach((d, i) => tone(70 + (i % 2) * 18, 0.05, 'square', 0.05, -12, d)); },
     clank: () => { tone(980, 0.05, 'square', 0.04); tone(640, 0.09, 'triangle', 0.05, 0, 0.04); },   // ...and lands on a girder
     grr: () => [110, 98, 87, 78].forEach((f, i) => tone(f, 0.14, 'sawtooth', 0.07, -12, i * 0.12)),
     rumble: () => tone(70, 0.09, 'triangle', 0.07, -15),
@@ -1735,7 +1751,7 @@
   // Customize > Necklaces and Pets: one card per thing (like the Store's), with its picture, name and a
   // button (Wear / Take off, Bring / Send home), for the same pug the Store would show (storeBy). Only the
   // open section's cards show. No blue line saying what it does: the user asked for none on Customize cards.
-  // (a pet's picture is its little flying sprite, shown twice as big as the others so it isn't tiny)
+  // (a pet's picture is its little game sprite, Turd's shown twice as big so it isn't tiny)
   const lookShelf = document.getElementById('lookShelf'), lookItems = document.getElementById('lookItems');
   for (const [view, sec] of Object.entries(LOOK_SECTIONS)) for (const n of sec.list) {
     const card = document.createElement('div'), pic = document.createElement('div'), img = document.createElement('img'),
@@ -1743,7 +1759,8 @@
     card.className = 'item'; pic.className = 'pic'; img.alt = n.alt;
     try {
       const s = sprite(n.key + '_' + sec.pic);
-      if (s) { img.src = s.toDataURL(); img.style.setProperty('--w', s.width * (sec.slot === 'pet' ? 2 : 1)); }
+      // (a small pet's picture is drawn bigger, as big as fits the card)
+      if (s) { img.src = s.toDataURL(); img.style.setProperty('--w', s.width * (sec.slot === 'pet' ? Math.max(1, Math.floor(18 / s.height)) : 1)); }
     } catch (e) {}
     pic.append(img);
     name.textContent = n.name;
@@ -2788,21 +2805,50 @@
 
   function clearPresses() { for (const p of players) p.jp.jump = p.jp.up = false; }
 
-  // A pet chosen in Customize (Turd the Bird) flies along with its pug all over the map: it heads for a
-  // spot just above and behind the pug's head, easing in so it trails a little, bobs as it flaps, and
-  // faces the way it is flying (or the pug's way once it has caught up). It is just company: nothing hits it.
+  // A pet chosen in Customize goes along with its pug all over the map. It is just company: nothing hits it.
+  // A flying pet (Turd the Bird) heads for a spot just above and behind the pug's head, easing in so it trails
+  // a little, and bobs as it flaps. A walking pet (Donkey Joe) trots after the pug on the pug's floor (the
+  // floor at the bottom of its ladder while it climbs), so when the pug reaches a new floor it hops up or down
+  // to it. Both face the way they are going (or the pug's way once they have caught up). A pet that farts
+  // does so every 4 to 9 seconds: a green cloud puffs out behind it and drifts off, with a raspberry.
+  const FART_T = 45;   // frames a fart cloud lasts
+  const fartWait = () => 240 + Math.floor(Math.random() * 300);
+  const petOf = P => PETS.find(x => x.key === looks[P.id].pet);
   function movePet(P) {
-    if (!looks[P.id].pet || P.state === 'out') return;
-    const b = P.pet || (P.pet = { x: P.x - P.face * 24, y: P.y - 40, face: P.face });
-    const tx = clamp(P.x - P.face * 22, 10, 470);
-    const ty = P.y - 36 - hatUp(P.id) * 2 + Math.sin(frame / 14 + P.id) * 4;
-    b.x += (tx - b.x) * 0.07; b.y += (ty - b.y) * 0.07;
-    b.face = Math.abs(tx - b.x) > 6 ? (tx > b.x ? 1 : -1) : P.face;
+    const pet = petOf(P);
+    if (!pet || P.state === 'out') return;
+    const floor = G[P.state === 'climb' && P.lad ? P.lad.lo : P.g] || G[0];
+    if (P.pet && P.pet.key !== pet.key) P.pet = null;   // (a different pet starts over beside its pug)
+    if (pet.kind === 'walk') {
+      const tx = clamp(P.x - P.face * 30, 20, 460);
+      const b = P.pet || (P.pet = { key: pet.key, x: tx, y: surf(floor, tx), face: P.face, step: 0, fartT: fartWait() });
+      const dx = (tx - b.x) * 0.05;
+      b.x += dx; b.y += (surf(floor, b.x) - b.y) * 0.25;
+      b.moving = Math.abs(dx) > 0.15;
+      if (b.moving) b.step++;
+      b.face = Math.abs(tx - b.x) > 6 ? (tx > b.x ? 1 : -1) : P.face;
+    } else {
+      const b = P.pet || (P.pet = { key: pet.key, x: P.x - P.face * 24, y: P.y - 40, face: P.face, fartT: fartWait() });
+      const tx = clamp(P.x - P.face * 22, 10, 470);
+      const ty = P.y - 36 - hatUp(P.id) * 2 + Math.sin(frame / 14 + P.id) * 4;
+      b.x += (tx - b.x) * 0.07; b.y += (ty - b.y) * 0.07;
+      b.face = Math.abs(tx - b.x) > 6 ? (tx > b.x ? 1 : -1) : P.face;
+    }
+    const b = P.pet;
+    if (pet.farts && --b.fartT <= 0) {
+      b.fartT = fartWait();
+      pops.push({ fart: true, x: b.x - b.face * 16, y: b.y - 14, vx: -b.face * 0.35, t: FART_T });
+      sfx.fart();
+    }
   }
   function drawPet(P) {
-    const b = P.pet, pet = looks[P.id].pet;
+    const b = P.pet, pet = petOf(P);
     if (!b || !pet || P.state === 'out') return;
-    const s = sprite(pet + '_fly' + (Math.floor(frame / 6) % 2 + 1), b.face < 0);
+    if (pet.kind === 'walk') {
+      blitFeet(pet.key + (b.moving && Math.floor(b.step / 8) % 2 ? '_walk2' : '_walk1'), px(b.x), Math.round(b.y / 2), b.face < 0);
+      return;
+    }
+    const s = sprite(pet.key + '_fly' + (Math.floor(frame / 6) % 2 + 1), b.face < 0);
     if (s) ctx.drawImage(s, px(b.x) - (s.width >> 1), Math.round(b.y / 2) - (s.height >> 1));
   }
   function step() {
@@ -2876,6 +2922,7 @@
       if (p.chip) { p.x += p.vx; p.y += p.vy; p.vy += 0.2; }
       else if (p.coin) { p.y += p.vy; p.vy = Math.min(p.vy + 0.1, 0.6); }   // coins hop up, then drift down
       else if (p.puff) p.y -= 0.8;   // flames float up
+      else if (p.fart) { p.x += p.vx; p.y -= 0.25; }   // a fart cloud drifts off behind its pet
       else if (!p.spr) p.y -= 0.6;   // (a Bouncy Pillow stays put on its girder)
     }
     pops = pops.filter(p => p.t > 0);
@@ -3454,6 +3501,14 @@
       else if (p.t > 4) blit('puff_1', X - 1, Y - 1);
       else { ctx.fillStyle = PAL.F; ctx.fillRect(X, Y, 1, 1); }
     }
+    // Donkey Joe's farts: a little green cloud of four puffs that grows as it drifts off, pale as it thins
+    // out, and blinks away at the end (behind the pugs and pets too)
+    for (const p of pops) {
+      if (!p.fart || (p.t < 8 && frame % 4 < 2)) continue;
+      const X = px(p.x), Y = Math.round(p.y / 2), s = 1 + ((FART_T - p.t) >> 4);
+      ctx.fillStyle = PAL[p.t > FART_T / 2 ? 3 : 4];
+      for (const [dx, dy] of [[0, 0], [-1, -1], [1, -1], [0, -2]]) ctx.fillRect(X + dx * (s + 1), Y + dy * (s + 1), s + 1, s + 1);
+    }
     if (phase !== 'title') for (const p of players) drawPlayer(p);
     if (phase !== 'title') for (const p of players) drawPet(p);   // (pets fly in front of every pug)
     if (phase === 'play' || phase === 'paused') for (const p of players) if (p.barkT > 0 && isIn(p)) drawWoof(p);
@@ -3474,7 +3529,7 @@
       } else if (Math.floor(frame / 30) % 2 === 0) drawText('WAIT', X, Y, LOOK[p.id].tag, 'center');
     }
     for (const p of pops) {
-      if (p.puff || p.spr) continue;   // drawn behind the pugs above
+      if (p.puff || p.spr || p.fart) continue;   // drawn behind the pugs above
       if (p.chip) { ctx.fillStyle = PAL[p.color || 'O']; ctx.fillRect(px(p.x), Math.round(p.y / 2), 1, 1); }
       else if (p.coin) {
         // a spinning coin with "+N" beside it (the pixel font has no "+", so it is drawn by hand)
