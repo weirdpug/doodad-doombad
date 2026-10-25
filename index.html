@@ -765,19 +765,19 @@
     glasses1_dead: ["................", "................", "................", "..........BB.BB.", ".........B..B..B",
       "..........BB.BB.", "................", "................", "................", "................"],
   });
-  // Glasses 2 (Customize > Hats): half-circle (half-moon) glasses, blue like Glasses 1: each lens is flat along
+  // Glasses 2 (Customize > Hats): half-circle (half-moon) glasses with brown rims: each lens is flat along
   // the top, where one straight bar runs across both lenses and the bridge, and curves round underneath. The
   // big pair is its picture on the Hats card. On the pug it sits like Glasses 1; belly-up the head is upside
   // down, so the flat side is underneath. None for climbing (seen from behind).
-  const GLASSES2_SIDE = ["................", "................", ".....BBBBBBBBBB.", ".......B..BB..B.", ".......B..BB..B.",
-    "........BB..BB..", "................", "................", "................", "................", "................",
+  const GLASSES2_SIDE = ["................", "................", ".....NNNNNNNNNN.", ".......N..NN..N.", ".......N..NN..N.",
+    "........NN..NN..", "................", "................", "................", "................", "................",
     "................", "................"];
   Object.assign(SPRITES, {
-    glasses2_hat: ["BBBBBBBBBBBBBBBBBBBB", "B.W....B....B.W....B", "B.V....B....B.V....B", "B......B....B......B",
-      ".B....B......B....B.", "..BBBB........BBBB.."],
+    glasses2_hat: ["NNNNNNNNNNNNNNNNNNNN", "N.W....N....N.W....N", "N.V....N....N.V....N", "N......N....N......N",
+      ".N....N......N....N.", "..NNNN........NNNN.."],
     glasses2_stand: GLASSES2_SIDE, glasses2_walk1: GLASSES2_SIDE, glasses2_walk2: GLASSES2_SIDE, glasses2_jump: GLASSES2_SIDE,
-    glasses2_dead: ["................", "................", "................", "..........BB.BB.", ".........B..B..B",
-      ".........BBBBBBB", "................", "................", "................", "................"],
+    glasses2_dead: ["................", "................", "................", "..........NN.NN.", ".........N..N..N",
+      ".........NNNNNNN", "................", "................", "................", "................"],
   });
   /*TACO SUIT*/
   // The taco suit a pug wears with the Taco Pug equipped: one overlay per pose, the pose's own size, drawn
@@ -948,7 +948,7 @@
   const HATS = [{ key: 'tophat', name: "President Pug's Top Hat", what: "President Pug's top hat", h: 6,
     alt: "President Pug's charcoal top hat with a red band" },
     { key: 'glasses1', name: 'Glasses 1', what: 'Glasses 1', h: 0, alt: 'Round glasses with blue frames' },
-    { key: 'glasses2', name: 'Glasses 2', what: 'Glasses 2', h: 0, alt: 'Half-moon glasses with blue frames' }];
+    { key: 'glasses2', name: 'Glasses 2', what: 'Glasses 2', h: 0, alt: 'Half-moon glasses with brown frames' }];
   const NECKLACES = [{ key: 'alpha', name: 'Alpha Necklace', what: 'the Alpha Necklace', alt: 'A gold chain with a gold dollar sign on it' },
     { key: 'tie', name: "President Pug's Tie", what: "President Pug's tie", alt: "President Pug's blue tie with a navy knot" }];
   const PETS = [{ key: 'turd', name: 'Turd the Bird', alt: 'A small brown bird' }];
