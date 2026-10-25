@@ -747,6 +747,20 @@
     tophat_dead: [".............kk.", ".........mmmmRk.", "........kkkkRk..", "........kkkkRk..", "............kk..",
       ...blankRows(16, 11)],
   });
+  // Glasses 1 (Customize > Hats): round glasses with blue frames (blue shows on every pug's fur, where black
+  // frames would vanish into the black eyes). The big pair is its picture on the Hats card. On the pug (same
+  // anchor and flip): a round frame round each eye with a bridge between and an arm back to the ear, and
+  // belly-up round its upside-down eyes. Climbing shows the pug from behind, so there are none for that.
+  const GLASSES_SIDE = ["................", "................", "........BB..BB..", "......BB..BB..B.", ".......B..BB..B.",
+    "........BB..BB..", "................", "................", "................", "................", "................",
+    "................", "................"];
+  Object.assign(SPRITES, {
+    glasses1_hat: ["..BBBB........BBBB..", ".B....B......B....B.", "B.W....BBBBBB.W....B", "B.V....B....B.V....B",
+      "B......B....B......B", ".B....B......B....B.", "..BBBB........BBBB.."],
+    glasses1_stand: GLASSES_SIDE, glasses1_walk1: GLASSES_SIDE, glasses1_walk2: GLASSES_SIDE, glasses1_jump: GLASSES_SIDE,
+    glasses1_dead: ["................", "................", "................", "..........BB.BB.", ".........B..B..B",
+      "..........BB.BB.", "................", "................", "................", "................"],
+  });
   /*TACO SUIT*/
   // The taco suit a pug wears with the Taco Pug equipped: one overlay per pose, the pose's own size, drawn
   // over the pug with the same feet anchor and flip ('.' lets the pug show through; the head is never covered)
@@ -914,7 +928,8 @@
     { key: 'tuxedo', name: 'Tuxedo', what: 'a tuxedo', alt: 'A black tuxedo with a white shirt and a bow tie' }];
   // (h: how far a hat stands above the head, in screen pixels: hatUp lifts the name tag and the rest over it)
   const HATS = [{ key: 'tophat', name: "President Pug's Top Hat", what: "President Pug's top hat", h: 6,
-    alt: "President Pug's charcoal top hat with a red band" }];
+    alt: "President Pug's charcoal top hat with a red band" },
+    { key: 'glasses1', name: 'Glasses 1', what: 'Glasses 1', h: 0, alt: 'Round glasses with blue frames' }];
   const NECKLACES = [{ key: 'alpha', name: 'Alpha Necklace', what: 'the Alpha Necklace', alt: 'A gold chain with a gold dollar sign on it' },
     { key: 'tie', name: "President Pug's Tie", what: "President Pug's tie", alt: "President Pug's blue tie with a navy knot" }];
   const PETS = [{ key: 'turd', name: 'Turd the Bird', alt: 'A small brown bird' }];
