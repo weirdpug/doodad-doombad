@@ -918,17 +918,6 @@
   }
   function saveCoins() { try { localStorage.setItem(COIN_KEY, JSON.stringify(coins)); } catch (e) {} }
   let coins = loadCoins();
-  // A one-time coin reset for the user's own game only (they asked for their coins to be cleared, just the
-  // coins, without a secret code, and not anyone else's, 2026-10-25): it runs only in their private copy on
-  // claude.ai, never on the public GitHub Pages copy other people play. The first time this version loads
-  // there, every pug's coins go to 0, and a note saved beside them stops it happening again. Store things
-  // already bought are kept.
-  const COIN_RESET_KEY = 'doodad-doombad-coins-reset-1';
-  try {
-    if (!/github\.io$/.test(location.hostname) && !localStorage.getItem(COIN_RESET_KEY)) {
-      coins = [0, 0, 0, 0]; saveCoins(); localStorage.setItem(COIN_RESET_KEY, '1');
-    }
-  } catch (e) {}
   // Each pug's bag of Store things: how many of each it owns (bought) and which it has equipped.
   // Saved in the browser like coins, so they stay when the game is closed.
   const BAG_KEY = 'doodad-doombad-bag', BAG_ITEMS = ['succulent', 'spicy', 'taco', 'pillow', 'harpoon', 'bouncy', 'shnaz', 'sniper'];
@@ -1286,11 +1275,21 @@
   //   B0O/\/\   makes Bruno say "an explosion explodes" and blow up the screen (codeBoom), during a round
   //   |_!FE     nothing can knock the pugs out, not even the explosion, until it is typed again (toggleSafe)
   //   /\/EXT    skips straight to the next level (skipLevel), during a round
-  // A code's first key still does its usual job if it is a game key (B barks), but once a code has begun,
-  // its next keys only type the code: the coin code's S doesn't also climb down or pick a menu choice, the
-  // skip code's X makes no tacos. A key that doesn't fit, or nothing typed for 25 seconds, ends it.
+  //   ZER0      every pug's coins go back to 0 (zeroCoins), on any screen
+  // A code's first key still does its usual job if it is a game key (B barks, ZER0's Z jumps), but once a
+  // code has begun, its next keys only type the code: the coin code's S doesn't also climb down or pick a
+  // menu choice, the skip code's X makes no tacos. A key that doesn't fit, or nothing typed for 25 seconds,
+  // ends it.
   const CODES = [{ code: 'C0!NS', at: 0, run: () => openCoinBar() }, { code: 'B0O/\\/\\', at: 0, run: () => codeBoom() },
-    { code: '|_!FE', at: 0, run: () => toggleSafe() }, { code: '/\\/EXT', at: 0, run: () => skipLevel() }];
+    { code: '|_!FE', at: 0, run: () => toggleSafe() }, { code: '/\\/EXT', at: 0, run: () => skipLevel() },
+    { code: 'ZER0', at: 0, run: () => zeroCoins() }];
+  // The zero code (the user asked for one to reset their coins): every pug's coins are set to 0 and saved.
+  // Store things already bought are kept.
+  function zeroCoins() {
+    coins = [0, 0, 0, 0]; saveCoins(); updateHud(true); sfx.tick();
+    toast('All coins reset to 0', '#ffcc3d');
+    if (phase === 'paused' && pauseView === 'store') renderStore();
+  }
   // The skip code: straight on to the next level (no level-clear banner, bonus or extra heart), every time
   function skipLevel() {
     if (phase !== 'play') return;
