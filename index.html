@@ -950,8 +950,8 @@
   }
   function saveBag() { try { localStorage.setItem(BAG_KEY, JSON.stringify(bag)); } catch (e) {} }
   let bag = loadBag();
-  // What each pug has, chosen in Customize (from the main menu): a suit, a necklace and a pet (one of each
-  // at a time, free). Saved in the browser like the bag. A suit's or necklace's key names its sprites:
+  // What each pug has, chosen in Customize (from the main menu): a suit, a hat and a necklace (one of each
+  // at a time) and up to 3 pets, all free. Saved in the browser like the bag. A suit's or necklace's key names its sprites:
   // <key>_suit or <key>_necklace for its picture, <key>_stand and so on for the pug's poses; a pet's:
   // <key>_pet for its picture and <key>_fly1/<key>_fly2 for flying along with its pug (movePet).
   const LOOKS_KEY = 'doodad-doombad-looks';
@@ -978,22 +978,30 @@
       put: (who, n) => `${who} is wearing ${n.what}!`, took: (who, n) => `${who} took off ${n.what}.` },
     necklaces: { slot: 'necklace', list: NECKLACES, pic: 'necklace', off: 'Wear', on: 'Take off',
       put: (who, n) => `${who} is wearing ${n.what}!`, took: (who, n) => `${who} took off ${n.what}.` },
-    pets: { slot: 'pet', list: PETS, pic: 'pet', off: 'Bring', on: 'Send home',
-      put: (who, n) => `${n.name} is following ${who}!`, took: (who, n) => `${who} sent ${n.name} home.` },
+    // (max: things that can be chosen together, up to that many at once; the slot is then a list)
+    pets: { slot: 'pets', list: PETS, pic: 'pet', off: 'Bring', on: 'Send home', max: 3,
+      put: (who, n) => `${n.name} is following ${who}!`, took: (who, n) => `${who} sent ${n.name} home.`,
+      full: who => `${who} already has 3 pets! Send one home first.` },
   };
   function loadLooks() {
-    const l = [0, 1, 2, 3].map(() => ({ suit: '', hat: '', necklace: '', pet: '' }));
+    const l = [0, 1, 2, 3].map(() => ({ suit: '', hat: '', necklace: '', pets: [] }));
     try {
       const saved = JSON.parse(localStorage.getItem(LOOKS_KEY));
       if (Array.isArray(saved)) l.forEach((x, i) => {
+        const s0 = saved[i] || {};
         for (const s of Object.values(LOOK_SECTIONS)) {
-          const k = (saved[i] || {})[s.slot];
-          if (s.list.some(c => c.key === k)) x[s.slot] = k;
+          const ok = k => s.list.some(c => c.key === k);
+          if (!s.max) { if (ok(s0[s.slot])) x[s.slot] = s0[s.slot]; continue; }
+          // (a list: known things, each once, up to max; a save from when a pug had one pet keeps it)
+          const keys = (Array.isArray(s0[s.slot]) ? s0[s.slot] : []).concat(s.slot === 'pets' && s0.pet ? [s0.pet] : []);
+          x[s.slot] = [...new Set(keys.filter(ok))].slice(0, s.max);
         }
       });
     } catch (e) {}
     return l;
   }
+  // whether a pug has a thing chosen, in a section of one-at-a-time things or of a list
+  const lookOn = (id, sec, key) => sec.max ? looks[id][sec.slot].includes(key) : looks[id][sec.slot] === key;
   function saveLooks() { try { localStorage.setItem(LOOKS_KEY, JSON.stringify(looks)); } catch (e) {} }
   const looks = loadLooks();
   // how far the pug's hat stands above its head (0 without one), in screen pixels: what floats over a pug's
@@ -1766,7 +1774,7 @@
     try {
       const s = sprite(n.key + '_' + sec.pic);
       // (a small pet's picture is drawn bigger, as big as fits the card)
-      if (s) { img.src = s.toDataURL(); img.style.setProperty('--w', s.width * (sec.slot === 'pet' ? Math.max(1, Math.floor(18 / s.height)) : 1)); }
+      if (s) { img.src = s.toDataURL(); img.style.setProperty('--w', s.width * (sec.slot === 'pets' ? Math.max(1, Math.floor(18 / s.height)) : 1)); }
     } catch (e) {}
     pic.append(img);
     name.textContent = n.name;
@@ -1777,20 +1785,26 @@
   }
   function renderLooks() {
     for (const sec of Object.values(LOOK_SECTIONS)) for (const n of sec.list) {
-      const on = looks[storeBy][sec.slot] === n.key;
+      const on = lookOn(storeBy, sec, n.key);
       n.wearBtn.textContent = on ? sec.on : sec.off;
       n.wearBtn.setAttribute('aria-label', `${on ? sec.on : sec.off} ${n.name}`);
       n.wearBtn.classList.toggle('on', on);
       n.card.hidden = n.view !== pauseView;
     }
   }
-  // Wear (or Bring) chooses the thing, in place of any other in its section; Take off (Send home) unchooses it
+  // Wear (or Bring) chooses the thing, in place of any other in its section (pets join the ones already
+  // brought, up to 3); Take off (Send home) unchooses it
   function wearLook(n, by) {
     const sec = LOOK_SECTIONS[n.view];
     if (phase !== 'paused' || pauseView !== n.view) return;
-    const id = joined[by] ? by : 0, name = LOOK[id].name, on = looks[id][sec.slot] === n.key;
+    const id = joined[by] ? by : 0, name = LOOK[id].name, on = lookOn(id, sec, n.key);
     storeBy = id;
-    looks[id][sec.slot] = on ? '' : n.key; saveLooks();
+    if (sec.max) {
+      const list = looks[id][sec.slot];
+      if (!on && list.length >= sec.max) { ovText.textContent = sec.full(name); sfx.nope(); return; }
+      looks[id][sec.slot] = on ? list.filter(k => k !== n.key) : [...list, n.key];
+    } else looks[id][sec.slot] = on ? '' : n.key;
+    saveLooks();
     ovText.textContent = on ? sec.took(name, n) : sec.put(name, n);
     if (on) sfx.tick(); else sfx.coin();
     renderLooks();
@@ -1842,7 +1856,8 @@
     ovText.hidden = custom && !neck;
     ovText.textContent = note || (store
       ? (multi() ? `${LOOK[storeBy].name}'s bag. Each pug pays with its own coins!` : 'Buy things, then equip them!')
-      : neck ? (multi() ? `${LOOK[storeBy].name}'s ${part.name.toLowerCase()}` : '')
+      : neck ? [multi() ? `${LOOK[storeBy].name}'s ${part.name.toLowerCase()}` : '',
+        LOOK_SECTIONS[view].max ? `Bring up to ${LOOK_SECTIONS[view].max} at a time!` : ''].filter(Boolean).join('. ')
       : 'Take a breather. Bruno will wait.');
     menuEntries = MENUS[view]();
     const list = [];
@@ -2820,28 +2835,37 @@
   // its pug spicy (Spicy equipped), the farts are flaming: spicy flames instead of the cloud, and a whoosh.
   const FART_T = 45;   // frames a fart cloud lasts
   const fartWait = () => 240 + Math.floor(Math.random() * 300);
-  const petOf = P => PETS.find(x => x.key === looks[P.id].pet);
-  function movePet(P) {
-    const pet = petOf(P);
-    if (!pet || P.state === 'out') return;
+  // A pug can bring up to 3 pets. They line up behind it in the order they were brought: each walker a
+  // little further back than the one before, each flier further back and a little higher (P.pets holds where
+  // each one is, by its key).
+  const petsOf = P => looks[P.id].pets.map(k => PETS.find(x => x.key === k)).filter(Boolean);
+  function movePets(P) {
+    if (P.state === 'out') return;
+    const pets = petsOf(P);
+    P.pets = P.pets || {};
+    for (const k of Object.keys(P.pets)) if (!pets.some(pet => pet.key === k)) delete P.pets[k];
+    let walkers = 0, fliers = 0;
+    for (const pet of pets) movePet(P, pet, pet.kind === 'walk' ? walkers++ : fliers++);
+  }
+  // (n: how many pets of the same kind are ahead of this one in the line)
+  function movePet(P, pet, n) {
     const floor = G[P.state === 'climb' && P.lad ? P.lad.lo : P.g] || G[0];
-    if (P.pet && P.pet.key !== pet.key) P.pet = null;   // (a different pet starts over beside its pug)
     if (pet.kind === 'walk') {
-      const tx = clamp(P.x - P.face * 30, 20, 460);
-      const b = P.pet || (P.pet = { key: pet.key, x: tx, y: surf(floor, tx), face: P.face, step: 0, fartT: fartWait() });
+      const tx = clamp(P.x - P.face * (30 + 28 * n), 20, 460);
+      const b = P.pets[pet.key] || (P.pets[pet.key] = { x: tx, y: surf(floor, tx), face: P.face, step: 0, fartT: fartWait() });
       const dx = (tx - b.x) * 0.05;
       b.x += dx; b.y += (surf(floor, b.x) - b.y) * 0.25;
       b.moving = Math.abs(dx) > 0.15;
       if (b.moving) b.step++;
       b.face = Math.abs(tx - b.x) > 6 ? (tx > b.x ? 1 : -1) : P.face;
     } else {
-      const b = P.pet || (P.pet = { key: pet.key, x: P.x - P.face * 24, y: P.y - 40, face: P.face, fartT: fartWait() });
-      const tx = clamp(P.x - P.face * 22, 10, 470);
-      const ty = P.y - 36 - hatUp(P.id) * 2 + Math.sin(frame / 14 + P.id) * 4;
+      const b = P.pets[pet.key] || (P.pets[pet.key] = { x: P.x - P.face * 24, y: P.y - 40, face: P.face, fartT: fartWait() });
+      const tx = clamp(P.x - P.face * (22 + 20 * n), 10, 470);
+      const ty = P.y - 36 - 8 * n - hatUp(P.id) * 2 + Math.sin(frame / 14 + P.id + n * 2) * 4;
       b.x += (tx - b.x) * 0.07; b.y += (ty - b.y) * 0.07;
       b.face = Math.abs(tx - b.x) > 6 ? (tx > b.x ? 1 : -1) : P.face;
     }
-    const b = P.pet;
+    const b = P.pets[pet.key];
     if (pet.farts && --b.fartT <= 0) {
       b.fartT = fartWait();
       const flame = bag[P.id].on.spicy;
@@ -2849,15 +2873,18 @@
       if (flame) sfx.fireFart(); else sfx.fart();
     }
   }
-  function drawPet(P) {
-    const b = P.pet, pet = petOf(P);
-    if (!b || !pet || P.state === 'out') return;
-    if (pet.kind === 'walk') {
-      blitFeet(pet.key + (b.moving && Math.floor(b.step / 8) % 2 ? '_walk2' : '_walk1'), px(b.x), Math.round(b.y / 2), b.face < 0);
-      return;
+  function drawPets(P) {
+    if (P.state === 'out' || !P.pets) return;
+    for (const pet of petsOf(P)) {
+      const b = P.pets[pet.key];
+      if (!b) continue;
+      if (pet.kind === 'walk') {
+        blitFeet(pet.key + (b.moving && Math.floor(b.step / 8) % 2 ? '_walk2' : '_walk1'), px(b.x), Math.round(b.y / 2), b.face < 0);
+        continue;
+      }
+      const s = sprite(pet.key + '_fly' + (Math.floor(frame / 6) % 2 + 1), b.face < 0);
+      if (s) ctx.drawImage(s, px(b.x) - (s.width >> 1), Math.round(b.y / 2) - (s.height >> 1));
     }
-    const s = sprite(pet.key + '_fly' + (Math.floor(frame / 6) % 2 + 1), b.face < 0);
-    if (s) ctx.drawImage(s, px(b.x) - (s.width >> 1), Math.round(b.y / 2) - (s.height >> 1));
   }
   function step() {
     if (coinBarOpen) return;   // (everything waits while the coin bar is open)
@@ -2915,7 +2942,7 @@
       updateApe(); updateBarrels(); barrels = barrels.filter(b => !b.dead);
     }
     // pets fly along with their pugs while a level plays and during the level-clear banner
-    if (phase === 'play' || phase === 'win') for (const p of players) movePet(p);
+    if (phase === 'play' || phase === 'win') for (const p of players) movePets(p);
     if (drumFlare > 0) drumFlare--;
     if (shakeT > 0) shakeT--;
     // the explosion picture goes after 5 seconds, and the Game Over screen it held back shows (or, if
@@ -3529,7 +3556,7 @@
       for (const [dx, dy] of FART_PUFFS) ctx.fillRect(X + dx * (s + 1), Y + dy * (s + 1), s + 1, s + 1);
     }
     if (phase !== 'title') for (const p of players) drawPlayer(p);
-    if (phase !== 'title') for (const p of players) drawPet(p);   // (pets fly in front of every pug)
+    if (phase !== 'title') for (const p of players) drawPets(p);   // (pets fly in front of every pug)
     if (phase === 'play' || phase === 'paused') for (const p of players) if (p.barkT > 0 && isIn(p)) drawWoof(p);
     // a pug that just joined (or every pug at the start of a game) shows its name above its head
     if (phase === 'play' || phase === 'paused') {
