@@ -470,6 +470,7 @@
     a: '#b4b8c8', b: '#7f8396', c: '#eef0f6',   // silver pug (Player 3)
     d: '#c8582e', e: '#8f3a1c', f: '#f2b48a',   // orange pug, President Pug (Player 4)
     g: '#5fd068',                               // Player 4's green tag colour
+    n: '#1d2f8c',                               // navy: the knot and shading of President Pug's tie (a necklace)
     // the castle background: dark stone, night sky, moon/stars, wood and banner cloth
     x: '#0b0c1c', y: '#15172e', z: '#1d2040', q: '#282c52', s: '#0b1838', r: '#132a5a', t: '#f4e9a8',
     u: '#5a3c22', v: '#6e1c3a', w: '#9c2c55',
@@ -704,6 +705,27 @@
     tuxedo_dead: ["................", "................", "................", "................", "KKKKKIWWK.......",
       "KKKKKIWWK.......", "KKKKKKKK........", "KKKKKKKK........", "KKKKKKKK........", ".KKKKKKK........"],
   });
+  // President Pug's Tie (Customize > Necklaces): the blue tie with a navy knot and a white collar that
+  // President Pug used to wear, now for any pug. The big one is its picture on the Necklaces card. On the pug
+  // (same anchor and flip, the same pixels as before): it hangs under the chin, flies back when jumping, shows
+  // as a navy band round the neck from behind, and lies on the chest belly-up.
+  const TIE_SIDE = ["................", "................", "................", "................", "................",
+    "................", "................", ".......Wnn......", "........VB......", ".......VBBn.....", ".......VBBn.....",
+    "........VB......", "................"];
+  const TIE_BACK = ["............", "............", "............", "............", "............", "............",
+    "............", "...nnnnnn...", "............", "............", "............", "............", "............",
+    "............", "............", "............"];
+  Object.assign(SPRITES, {
+    tie_necklace: ["WWW....WWW", ".WWWnnWWW.", "...nnnn...", "....nn....", "....VB....", "...VBBn...", "...VBBn...",
+      "..VBBBBn..", "..VBBBBn..", "..VBBBBn..", "..VBBBBn..", "..VBBBBn..", "...VBBn...", "....Vn...."],
+    tie_stand: TIE_SIDE, tie_walk1: TIE_SIDE, tie_walk2: TIE_SIDE,
+    tie_jump: ["................", "................", "................", "................", "................",
+      "................", "................", ".......Wnn......", ".......VB.......", "......VBBn......", ".....VBBn.......",
+      ".....VB.........", "................"],
+    tie_climb1: TIE_BACK, tie_climb2: TIE_BACK,
+    tie_dead: ["................", "................", "................", "...VV...........", "..VBBVBnn.......",
+      "..BBBBBnn.......", "...nn...........", "................", "................", "................"],
+  });
   /*TACO SUIT*/
   // The taco suit a pug wears with the Taco Pug equipped: one overlay per pose, the pose's own size, drawn
   // over the pug with the same feet anchor and flip ('.' lets the pug show through; the head is never covered)
@@ -866,10 +888,11 @@
   // <key>_suit or <key>_necklace for its picture, <key>_stand and so on for the pug's poses; a pet's:
   // <key>_pet for its picture and <key>_fly1/<key>_fly2 for flying along with its pug (movePet).
   const LOOKS_KEY = 'doodad-doombad-looks';
-  // (what: how the Suits screen says it, as in "Cinnamon is wearing a tuxedo!")
+  // (what: how the Suits and Necklaces screens say it, as in "Cinnamon is wearing a tuxedo!")
   const SUITS = [{ key: 'underwear', name: 'Underwear', what: 'underwear', alt: 'White underpants with a blue waistband' },
     { key: 'tuxedo', name: 'Tuxedo', what: 'a tuxedo', alt: 'A black tuxedo with a white shirt and a bow tie' }];
-  const NECKLACES = [{ key: 'alpha', name: 'Alpha Necklace', alt: 'A gold chain with a gold dollar sign on it' }];
+  const NECKLACES = [{ key: 'alpha', name: 'Alpha Necklace', what: 'the Alpha Necklace', alt: 'A gold chain with a gold dollar sign on it' },
+    { key: 'tie', name: "President Pug's Tie", what: "President Pug's tie", alt: "President Pug's blue tie with a navy knot" }];
   const PETS = [{ key: 'turd', name: 'Turd the Bird', alt: 'A small brown bird' }];
   // the Customize sections with things to choose: which of a pug's looks each sets, its things, the
   // button's words while it isn't / is chosen, and what the screen says after
@@ -877,7 +900,7 @@
     suits: { slot: 'suit', list: SUITS, pic: 'suit', off: 'Wear', on: 'Take off',
       put: (who, n) => `${who} is wearing ${n.what}!`, took: (who, n) => `${who} took off the ${n.name.toLowerCase()}.` },
     necklaces: { slot: 'necklace', list: NECKLACES, pic: 'necklace', off: 'Wear', on: 'Take off',
-      put: (who, n) => `${who} is wearing the ${n.name}!`, took: (who, n) => `${who} took off the ${n.name}.` },
+      put: (who, n) => `${who} is wearing ${n.what}!`, took: (who, n) => `${who} took off ${n.what}.` },
     pets: { slot: 'pet', list: PETS, pic: 'pet', off: 'Bring', on: 'Send home',
       put: (who, n) => `${n.name} is following ${who}!`, took: (who, n) => `${who} sent ${n.name} home.` },
   };
