@@ -918,12 +918,15 @@
   }
   function saveCoins() { try { localStorage.setItem(COIN_KEY, JSON.stringify(coins)); } catch (e) {} }
   let coins = loadCoins();
-  // A one-time coin reset (the user asked for their coins to be cleared, 2026-10-25): the first time this
-  // version loads in a browser, every pug's coins go to 0, and a note saved beside them stops it happening
-  // again. Store things already bought are kept.
+  // A one-time coin reset for the user's own coins only (they asked for them to be cleared, 2026-10-25, and
+  // not anyone else's): it runs only in the private copy on claude.ai, never on the public GitHub Pages copy
+  // other people play. The first time this version loads there, every pug's coins go to 0, and a note saved
+  // beside them stops it happening again. Store things already bought are kept.
   const COIN_RESET_KEY = 'doodad-doombad-coins-reset-1';
   try {
-    if (!localStorage.getItem(COIN_RESET_KEY)) { coins = [0, 0, 0, 0]; saveCoins(); localStorage.setItem(COIN_RESET_KEY, '1'); }
+    if (!/github\.io$/.test(location.hostname) && !localStorage.getItem(COIN_RESET_KEY)) {
+      coins = [0, 0, 0, 0]; saveCoins(); localStorage.setItem(COIN_RESET_KEY, '1');
+    }
   } catch (e) {}
   // Each pug's bag of Store things: how many of each it owns (bought) and which it has equipped.
   // Saved in the browser like coins, so they stay when the game is closed.
