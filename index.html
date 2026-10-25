@@ -1161,6 +1161,7 @@
     taco: () => [659, 831, 988, 1319, 988, 1319].forEach((f, i) => tone(f, 0.07, 'square', 0.04, 0, i * 0.065)),   // a festive taco jingle
     // Donkey Joe farts: a low sliding raspberry with a flutter of quick low pops
     fart: () => { tone(95, 0.38, 'sawtooth', 0.08, -40); [0, 0.06, 0.12, 0.19, 0.26].forEach((d, i) => tone(70 + (i % 2) * 18, 0.05, 'square', 0.05, -12, d)); },
+    fireFart: () => { sfx.fart(); tone(220, 0.32, 'sawtooth', 0.05, 900, 0.05); },   // ...and a spicy one: the raspberry with a fiery whoosh
     clank: () => { tone(980, 0.05, 'square', 0.04); tone(640, 0.09, 'triangle', 0.05, 0, 0.04); },   // ...and lands on a girder
     grr: () => [110, 98, 87, 78].forEach((f, i) => tone(f, 0.14, 'sawtooth', 0.07, -12, i * 0.12)),
     rumble: () => tone(70, 0.09, 'triangle', 0.07, -15),
@@ -2815,7 +2816,8 @@
   // a little, and bobs as it flaps. A walking pet (Donkey Joe) trots after the pug on the pug's floor (the
   // floor at the bottom of its ladder while it climbs), so when the pug reaches a new floor it hops up or down
   // to it. Both face the way they are going (or the pug's way once they have caught up). A pet that farts
-  // does so every 4 to 9 seconds: a green cloud puffs out behind it and drifts off, with a raspberry.
+  // does so every 4 to 9 seconds: a green cloud puffs out behind it and drifts off, with a raspberry. With
+  // its pug spicy (Spicy equipped), the farts are flaming: spicy flames instead of the cloud, and a whoosh.
   const FART_T = 45;   // frames a fart cloud lasts
   const fartWait = () => 240 + Math.floor(Math.random() * 300);
   const petOf = P => PETS.find(x => x.key === looks[P.id].pet);
@@ -2842,8 +2844,9 @@
     const b = P.pet;
     if (pet.farts && --b.fartT <= 0) {
       b.fartT = fartWait();
-      pops.push({ fart: true, x: b.x - b.face * 16, y: b.y - 14, vx: -b.face * 0.35, t: FART_T });
-      sfx.fart();
+      const flame = bag[P.id].on.spicy;
+      pops.push({ fart: true, flame, x: b.x - b.face * 16, y: b.y - 14, vx: -b.face * 0.35, t: FART_T });
+      if (flame) sfx.fireFart(); else sfx.fart();
     }
   }
   function drawPet(P) {
@@ -2927,7 +2930,7 @@
       if (p.chip) { p.x += p.vx; p.y += p.vy; p.vy += 0.2; }
       else if (p.coin) { p.y += p.vy; p.vy = Math.min(p.vy + 0.1, 0.6); }   // coins hop up, then drift down
       else if (p.puff) p.y -= 0.8;   // flames float up
-      else if (p.fart) { p.x += p.vx; p.y -= 0.25; }   // a fart cloud drifts off behind its pet
+      else if (p.fart) { p.x += p.vx; p.y -= p.flame ? 0.5 : 0.25; }   // a fart drifts off behind its pet (flames rise faster)
       else if (!p.spr) p.y -= 0.6;   // (a Bouncy Pillow stays put on its girder)
     }
     pops = pops.filter(p => p.t > 0);
@@ -3507,12 +3510,23 @@
       else { ctx.fillStyle = PAL.F; ctx.fillRect(X, Y, 1, 1); }
     }
     // Donkey Joe's farts: a little green cloud of four puffs that grows as it drifts off, pale as it thins
-    // out, and blinks away at the end (behind the pugs and pets too)
+    // out, and blinks away at the end (behind the pugs and pets too). A flaming fart (his pug is spicy) puts
+    // a spicy flame where each puff would be: big flames, then small ones, then embers.
+    const FART_PUFFS = [[0, 0], [-1, -1], [1, -1], [0, -2]];
     for (const p of pops) {
       if (!p.fart || (p.t < 8 && frame % 4 < 2)) continue;
       const X = px(p.x), Y = Math.round(p.y / 2), s = 1 + ((FART_T - p.t) >> 4);
+      if (p.flame) {
+        for (const [dx, dy] of FART_PUFFS) {
+          const fx = X + dx * (s + 2), fy = Y + dy * (s + 2);
+          if (p.t > FART_T / 2) blit('puff_0', fx - 2, fy - 2);
+          else if (p.t > 12) blit('puff_1', fx - 1, fy - 1);
+          else { ctx.fillStyle = PAL.F; ctx.fillRect(fx, fy, 1, 1); }
+        }
+        continue;
+      }
       ctx.fillStyle = PAL[p.t > FART_T / 2 ? 3 : 4];
-      for (const [dx, dy] of [[0, 0], [-1, -1], [1, -1], [0, -2]]) ctx.fillRect(X + dx * (s + 1), Y + dy * (s + 1), s + 1, s + 1);
+      for (const [dx, dy] of FART_PUFFS) ctx.fillRect(X + dx * (s + 1), Y + dy * (s + 1), s + 1, s + 1);
     }
     if (phase !== 'title') for (const p of players) drawPlayer(p);
     if (phase !== 'title') for (const p of players) drawPet(p);   // (pets fly in front of every pug)
