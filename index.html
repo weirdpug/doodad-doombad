@@ -669,6 +669,25 @@
     turd_fly2: ["...........", "...........", "........OO.", "NN...OOOKOF", ".NAOOOOOOO.", "..NLNAALON.", "....NAN....", ".....N....."],
     turd_pet: ["...........", "........OO.", ".......OKOF", "NN.....OOO.", ".NAAAAOOOO.", "..NAAAOLLO.", "...NNOLLLN.", "......F.F..", ".....FF.FF."],
   });
+  // Underwear (Customize > Suits): white briefs with a blue waistband. The big pair is its picture on the
+  // Suits card. The rest go over the pug like the sunglasses (same anchor and flip): side on, they cover the
+  // pug's hips and the tops of its back legs; climbing (seen from behind) the curly tail pokes out over the
+  // waistband; belly-up they cover its rear end.
+  const UNDIES_SIDE = ["................", "................", "................", "................", "................",
+    "................", "................", "BBBBBBB.........", "WWWWWWW.........", ".WWWWWG.........", ".GWWG...........",
+    "................", "................"];
+  const UNDIES_BACK = ["............", "............", "............", "............", "............", "............",
+    "............", "............", "............", "............", "............", "..BBBBBBBB..", "..WWWWWWWW..",
+    "..WWG..GWW..", "............", "............"];
+  Object.assign(SPRITES, {
+    underwear_suit: ["BBBBBBBBBBBBBBBBBB", "BVVVVVVVVVVVVVVVVB", "BBBBBBBBBBBBBBBBBB", "GWWWWWWWWWWWWWWWWG",
+      "GWWWWWWWWWWWWWWWWG", "GWWWWWWWGGWWWWWWWG", ".GWWWWWWWWWWWWWWG.", "..GWWWWWWWWWWWWG..", "...GWWWWWWWWWWG...",
+      "....GGWWWWWWGG....", "......GWWWWG......", ".......GGGG......."],
+    underwear_stand: UNDIES_SIDE, underwear_walk1: UNDIES_SIDE, underwear_walk2: UNDIES_SIDE, underwear_jump: UNDIES_SIDE,
+    underwear_climb1: UNDIES_BACK, underwear_climb2: UNDIES_BACK,
+    underwear_dead: ["................", "................", "................", "................", "WWWWB...........",
+      "WWWWB...........", "WWWWB...........", "WWWWB...........", "WWWWB...........", ".WWWB..........."],
+  });
   /*TACO SUIT*/
   // The taco suit a pug wears with the Taco Pug equipped: one overlay per pose, the pose's own size, drawn
   // over the pug with the same feet anchor and flip ('.' lets the pug show through; the head is never covered)
@@ -826,23 +845,26 @@
   }
   function saveBag() { try { localStorage.setItem(BAG_KEY, JSON.stringify(bag)); } catch (e) {} }
   let bag = loadBag();
-  // What each pug has, chosen in Customize (from the main menu): a necklace and a pet (one of each at a
-  // time, free). Saved in the browser like the bag. A necklace's key names its sprites: <key>_necklace for
-  // its picture, <key>_stand and so on for the pug's poses; a pet's: <key>_pet for its picture and
-  // <key>_fly1/<key>_fly2 for flying along with its pug (movePet).
+  // What each pug has, chosen in Customize (from the main menu): a suit, a necklace and a pet (one of each
+  // at a time, free). Saved in the browser like the bag. A suit's or necklace's key names its sprites:
+  // <key>_suit or <key>_necklace for its picture, <key>_stand and so on for the pug's poses; a pet's:
+  // <key>_pet for its picture and <key>_fly1/<key>_fly2 for flying along with its pug (movePet).
   const LOOKS_KEY = 'doodad-doombad-looks';
+  const SUITS = [{ key: 'underwear', name: 'Underwear', alt: 'White underpants with a blue waistband' }];
   const NECKLACES = [{ key: 'alpha', name: 'Alpha Necklace', alt: 'A gold chain with a gold dollar sign on it' }];
   const PETS = [{ key: 'turd', name: 'Turd the Bird', alt: 'A small brown bird' }];
   // the Customize sections with things to choose: which of a pug's looks each sets, its things, the
   // button's words while it isn't / is chosen, and what the screen says after
   const LOOK_SECTIONS = {
+    suits: { slot: 'suit', list: SUITS, pic: 'suit', off: 'Wear', on: 'Take off',
+      put: (who, n) => `${who} is wearing ${n.name.toLowerCase()}!`, took: (who, n) => `${who} took off the ${n.name.toLowerCase()}.` },
     necklaces: { slot: 'necklace', list: NECKLACES, pic: 'necklace', off: 'Wear', on: 'Take off',
       put: (who, n) => `${who} is wearing the ${n.name}!`, took: (who, n) => `${who} took off the ${n.name}.` },
     pets: { slot: 'pet', list: PETS, pic: 'pet', off: 'Bring', on: 'Send home',
       put: (who, n) => `${n.name} is following ${who}!`, took: (who, n) => `${who} sent ${n.name} home.` },
   };
   function loadLooks() {
-    const l = [0, 1, 2, 3].map(() => ({ necklace: '', pet: '' }));
+    const l = [0, 1, 2, 3].map(() => ({ suit: '', necklace: '', pet: '' }));
     try {
       const saved = JSON.parse(localStorage.getItem(LOOKS_KEY));
       if (Array.isArray(saved)) l.forEach((x, i) => {
@@ -2984,10 +3006,11 @@
     // draw a pose, then anything the pug has on over it, with the same anchor and flip
     // with the Taco Pug equipped the pug wears a taco suit over its body (never its head), drawn the same way,
     // and with Snazz equipped it wears pixel sunglasses
-    // and a necklace chosen in Customize goes on last
-    const suit = bag[P.id].on.taco, shades = bag[P.id].on.shnaz, neck = looks[P.id].necklace;
+    // a suit chosen in Customize (the underwear) goes on first, under the taco suit, and a necklace goes on last
+    const suit = bag[P.id].on.taco, shades = bag[P.id].on.shnaz, neck = looks[P.id].necklace, under = looks[P.id].suit;
     const pug = (pose, x, y, flip) => {
       blitFeet(pose, x, y, flip, sw);
+      if (under) blitFeet(under + '_' + pose.replace('player_', ''), x, y, flip);
       if (suit) blitFeet('suit_' + pose.replace('player_', ''), x, y, flip);
       if (shades) blitFeet('shades_' + pose.replace('player_', ''), x, y, flip);
       if (neck) blitFeet(neck + '_' + pose.replace('player_', ''), x, y, flip);
