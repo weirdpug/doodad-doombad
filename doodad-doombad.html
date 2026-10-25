@@ -747,19 +747,21 @@
     tophat_dead: [".............kk.", ".........mmmmRk.", "........kkkkRk..", "........kkkkRk..", "............kk..",
       ...blankRows(16, 11)],
   });
-  // Glasses 1 (Customize > Hats): round glasses with blue frames (blue shows on every pug's fur, where black
-  // frames would vanish into the black eyes). The big pair is its picture on the Hats card. On the pug (same
-  // anchor and flip): a round frame round each eye with a bridge between and an arm back to the ear, and
-  // belly-up round its upside-down eyes. Climbing shows the pug from behind, so there are none for that.
-  const GLASSES_SIDE = ["................", "................", "........BB..BB..", "......BB..BB..B.", ".......B..BB..B.",
-    "........BB..BB..", "................", "................", "................", "................", "................",
+  // Glasses 1 (Customize > Hats): round glasses with black rims (the user's choice). The big pair is its picture
+  // on the Hats card, with a light grey outline round the outside so the black shows on the dark card (like
+  // the Snazz sunglasses' card). On the pug (same anchor and flip): a round frame round each eye with a bridge
+  // between and an arm back to the ear, and belly-up round its upside-down eyes. Climbing shows the pug from
+  // behind, so there are none for that.
+  const GLASSES_SIDE = ["................", "................", "........KK..KK..", "......KK..KK..K.", ".......K..KK..K.",
+    "........KK..KK..", "................", "................", "................", "................", "................",
     "................", "................"];
   Object.assign(SPRITES, {
-    glasses1_hat: ["..BBBB........BBBB..", ".B....B......B....B.", "B.W....BBBBBB.W....B", "B.V....B....B.V....B",
-      "B......B....B......B", ".B....B......B....B.", "..BBBB........BBBB.."],
+    glasses1_hat: ["...GGGG........GGGG...", "..GKKKKG......GKKKKG..", ".GK....KGGGGGGK....KG.", "GK.W....KKKKKK.W....KG",
+      "GK.V....KGGGGK.V....KG", "GK......KG..GK......KG", ".GK....KG....GK....KG.", "..GKKKKG......GKKKKG..",
+      "...GGGG........GGGG..."],
     glasses1_stand: GLASSES_SIDE, glasses1_walk1: GLASSES_SIDE, glasses1_walk2: GLASSES_SIDE, glasses1_jump: GLASSES_SIDE,
-    glasses1_dead: ["................", "................", "................", "..........BB.BB.", ".........B..B..B",
-      "..........BB.BB.", "................", "................", "................", "................"],
+    glasses1_dead: ["................", "................", "................", "..........KK.KK.", ".........K..K..K",
+      "..........KK.KK.", "................", "................", "................", "................"],
   });
   // Glasses 2 (Customize > Hats): half-circle (half-moon) glasses with brown rims: each lens is flat along
   // the top, where one straight bar runs across both lenses and the bridge, and curves round underneath. The
@@ -943,7 +945,7 @@
   // (h: how far a hat stands above the head, in screen pixels: hatUp lifts the name tag and the rest over it)
   const HATS = [{ key: 'tophat', name: "President Pug's Top Hat", what: "President Pug's top hat", h: 6,
     alt: "President Pug's charcoal top hat with a red band" },
-    { key: 'glasses1', name: 'Glasses 1', what: 'Glasses 1', h: 0, alt: 'Round glasses with blue frames' },
+    { key: 'glasses1', name: 'Glasses 1', what: 'Glasses 1', h: 0, alt: 'Round glasses with black frames' },
     { key: 'glasses2', name: 'Glasses 2', what: 'Glasses 2', h: 0, alt: 'Half-moon glasses with brown frames' }];
   const NECKLACES = [{ key: 'alpha', name: 'Alpha Necklace', what: 'the Alpha Necklace', alt: 'A gold chain with a gold dollar sign on it' },
     { key: 'tie', name: "President Pug's Tie", what: "President Pug's tie", alt: "President Pug's blue tie with a navy knot" }];
