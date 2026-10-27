@@ -311,7 +311,7 @@
         <button class="arrow l" id="shelfL" type="button" tabindex="-1" aria-label="More items to the left">&#9664;</button>
         <button class="arrow r" id="shelfR" type="button" tabindex="-1" aria-label="More items to the right">&#9654;</button>
       </div>
-      <div class="shelf" id="lookShelf" hidden><div class="items" id="lookItems"></div></div>
+      <div class="shelf" id="lookShelf" hidden><div class="scroll" id="lookScroll"><div class="items" id="lookItems"></div></div></div>
       <div class="ovbody">
       <p id="ovText">Big Bruno has hauled Pearl to the top of the construction site. Climb the girders as a brave little pug, leap his barrels, and from level 2, dodge the fireball that crawls out of the tar drum. Grab a hammer to smash back. Every level the site grows two floors taller.</p>
       <div class="coinlist" id="coinList" hidden></div>
@@ -809,6 +809,25 @@
     knight_dead: ["................", "................", "................", "................", "HGGWWGGH........",
       "HGGGGGGH........", "HYYYYYYH........", "HUUUUUUH........", "HUUUUUUH........", ".HHHHHHH........"],
   });
+  // Knight Helmet (Customize > Hats): a steel helmet with a red plume, to go with the Knight Armor. The face
+  // stays open (a pug should still look like a pug): the dome covers the top of the head and the ears down to
+  // a darker brim over the eyes, with a nose guard between the eyes and cheek guards at the sides. The big one
+  // is its picture on the Hats card. On the pug each overlay is the pose's width and 6 rows taller, like the
+  // top hat (room for the dome and plume; hatUp lifts the name tag and the rest over it).
+  const HELMET_SIDE = [".......RR.......", "......RMMR......", ".......RR.......", ".........HHHH...", ".......HGGWWGH..",
+    "......HGGGWGGGH.", "......HGGGGGGGGH", "......HGGGGGGGGH", "......HUUUUUUUUH", ".......G..HH..G.", ".......G..HH..G.",
+    ".......H......H.", ...blankRows(16, 7)];
+  const HELMET_BACK = [...blankRows(12, 4), ".....RR.....", "....RMMR....", ".....RR.....", "....HHHH....", "...HGGWGH...",
+    "..HGGGGGGH..", "..HUUUUUUH..", ...blankRows(12, 11)];
+  Object.assign(SPRITES, {
+    helmet_hat: ["......RR......", ".....RMMR.....", "......RR......", "....HHHHHH....", "...HGGWGGGH...",
+      "..HGGGWGGGGH..", ".HGGGGWGGGGGH.", ".HGGGGGGGGGGH.", ".HUUUUUUUUUUH.", ".HGH..HH..HGH.", ".HGH..HH..HGH.",
+      ".HGH......HGH.", "..HH......HH.."],
+    helmet_stand: HELMET_SIDE, helmet_walk1: HELMET_SIDE, helmet_walk2: HELMET_SIDE, helmet_jump: HELMET_SIDE,
+    helmet_climb1: HELMET_BACK, helmet_climb2: HELMET_BACK,
+    helmet_dead: [...blankRows(16, 3), ".........RRR....", "..........RMR...", "..........HHHH..", ".........HGGWGH.",
+      ".........HGGGGGH", ".........HUUUUUH", "............H...", "............H...", ...blankRows(16, 5)],
+  });
   /*TACO SUIT*/
   // The taco suit a pug wears with the Taco Pug equipped: one overlay per pose, the pose's own size, drawn
   // over the pug with the same feet anchor and flip ('.' lets the pug show through; the head is never covered)
@@ -979,7 +998,8 @@
   const HATS = [{ key: 'tophat', name: "President Pug's Top Hat", what: "President Pug's top hat", h: 6,
     alt: "President Pug's charcoal top hat with a red band" },
     { key: 'glasses1', name: 'Glasses 1', what: 'Glasses 1', h: 0, alt: 'Round glasses with dark grey frames' },
-    { key: 'glasses2', name: 'Glasses 2', what: 'Glasses 2', h: 0, alt: 'Half-moon glasses with brown frames' }];
+    { key: 'glasses2', name: 'Glasses 2', what: 'Glasses 2', h: 0, alt: 'Half-moon glasses with brown frames' },
+    { key: 'helmet', name: 'Knight Helmet', what: 'the knight helmet', h: 6, alt: 'A steel knight helmet with a red plume' }];
   const NECKLACES = [{ key: 'alpha', name: 'Alpha Necklace', what: 'the Alpha Necklace', alt: 'A gold chain with a gold dollar sign on it' },
     { key: 'tie', name: "President Pug's Tie", what: "President Pug's tie", alt: "President Pug's blue tie with a navy knot" }];
   // (kind: how a pet goes along with its pug: 'fly' above and behind its head, 'walk' behind it on its floor;
@@ -1793,7 +1813,9 @@
   // button (Wear / Take off, Bring / Send home), for the same pug the Store would show (storeBy). Only the
   // open section's cards show. No blue line saying what it does: the user asked for none on Customize cards.
   // (a pet's picture is its little game sprite, Turd's shown twice as big so it isn't tiny)
-  const lookShelf = document.getElementById('lookShelf'), lookItems = document.getElementById('lookItems');
+  // (the cards sit in a row that scrolls sideways like the Store's, so more things never squeeze it)
+  const lookShelf = document.getElementById('lookShelf'), lookScroll = document.getElementById('lookScroll'),
+    lookItems = document.getElementById('lookItems');
   for (const [view, sec] of Object.entries(LOOK_SECTIONS)) for (const n of sec.list) {
     const card = document.createElement('div'), pic = document.createElement('div'), img = document.createElement('img'),
       name = document.createElement('span'), wear = document.createElement('button');
@@ -1872,6 +1894,7 @@
   // (storeCol: the card that Up or Down from Back goes to, the one chosen last)
   let pauseView = 'pause', menuSel = 0, storeBy = 0, storeCol = 0, menuEntries = [], menuBtns = [];
   function showPause(view, sel, note, by) {
+    const was = pauseView;
     pauseView = view; menuSel = sel || 0;
     const store = view === 'store', part = customPart(view), custom = view === 'custom' || !!part,
       neck = !!LOOK_SECTIONS[view], opening = store && storeShelf.hidden;   // (neck: Necklaces or Pets, with cards)
@@ -1905,6 +1928,7 @@
     ov.classList.remove('title-mode'); ov.classList.add('menu-mode'); ov.hidden = false;
     // (the Store opens at the start of its row of cards)
     if (opening) { storeCol = 0; storeScroll.scrollLeft = 0; }
+    if (neck && was !== view) lookScroll.scrollLeft = 0;   // (a Customize section opens at its first card)
     if (store) shelfArrows();
     markSel(true);
   }
@@ -1981,6 +2005,7 @@
     if (focus && b) {
       b.focus({ preventScroll: true });
       if (slide && pauseView === 'store' && cur && cur.it) showCard(cur.it.card);
+      if (slide && cur && cur.look) showCard(cur.look.card);   // (a Customize card the same way)
       // on a short screen the menu can scroll: keep the chosen button in view
       const r = b.getBoundingClientRect(), o = ov.getBoundingClientRect();
       if (r.bottom > o.bottom) ov.scrollTop += r.bottom - o.bottom + 8;
@@ -2011,13 +2036,14 @@
   // move along it with the keyboard or a controller. Smooth, unless the player's system asks for less
   // motion.
   const calm = window.matchMedia ? matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
-  const slideTo = left => storeScroll.scrollTo({ left, behavior: calm.matches ? 'auto' : 'smooth' });
+  const slideTo = (left, sc = storeScroll) => sc.scrollTo({ left, behavior: calm.matches ? 'auto' : 'smooth' });
   // a card that isn't all in view (clear of the arrows) slides to the middle, as far as the row goes
+  // (in the Store's row or Customize's, whichever the card is in)
   function showCard(card) {
-    const s = storeScroll.getBoundingClientRect(), r = card.getBoundingClientRect(),
-      edge = parseFloat(getComputedStyle(storeItems).paddingLeft) || 0;
+    const sc = card.closest('.scroll'), s = sc.getBoundingClientRect(), r = card.getBoundingClientRect(),
+      edge = parseFloat(getComputedStyle(card.parentElement).paddingLeft) || 0;
     if (r.left >= s.left + edge - 1 && r.right <= s.right - edge + 1) return;
-    slideTo(storeScroll.scrollLeft + (r.left + r.right) / 2 - (s.left + s.right) / 2);
+    slideTo(sc.scrollLeft + (r.left + r.right) / 2 - (s.left + s.right) / 2, sc);
   }
   // the arrows only show when there are more cards that way
   function shelfArrows() {
@@ -2039,12 +2065,13 @@
   // A mouse wheel only scrolls up and down, so over the cards it slides them along instead (a trackpad,
   // Shift+wheel and a touch screen already go sideways). At either end of the row, the wheel scrolls
   // the screen as usual.
-  storeScroll.addEventListener('wheel', e => {
+  // (the same over Customize's row of cards)
+  for (const sc of [storeScroll, lookScroll]) sc.addEventListener('wheel', e => {
     if (e.ctrlKey || e.shiftKey || Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return;
-    const x = storeScroll.scrollLeft, max = storeScroll.scrollWidth - storeScroll.clientWidth;
+    const x = sc.scrollLeft, max = sc.scrollWidth - sc.clientWidth;
     if (max <= 1 || (e.deltaY < 0 ? x <= 0 : x >= max - 1)) return;
     e.preventDefault();
-    storeScroll.scrollLeft = x + e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? storeScroll.clientWidth : 1);
+    sc.scrollLeft = x + e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? sc.clientWidth : 1);
   }, { passive: false });
   function chooseSel(by) { if (phase === 'paused' && menuEntries[menuSel]) menuEntries[menuSel].act(by || 0); }
   function menuBack() {
