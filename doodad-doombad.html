@@ -789,6 +789,26 @@
     glasses2_dead: ["................", "................", "................", "..........NN.NN.", ".........N..N..N",
       ".........NNNNNNN", "................", "................", "................", "................"],
   });
+  // Knight Armor (Customize > Suits): silver plate armor with a gold belt, and no helmet (the user asked for
+  // none). The big one is its picture on the Suits card: a breastplate with shoulder plates and hip plates.
+  // On the pug (same anchor and flip): side on, the plates cover its body down to a gold belt, with the
+  // breastplate under its chin, a hip plate over its back leg and steel on its front legs; from behind, the
+  // back plate, belt and split hip plates; belly-up, the breastplate on its chest. The head is never covered.
+  const KNIGHT_SIDE = ["................", "................", "................", "................", ".HGGGH..........",
+    "HGWWWGH.........", "HGGGGGGH........", "HGGGGGHGG.......", "HYYYYYHGG.......", "HUUUUUHG........",
+    ".HUUH...UU......", "................", "................"];
+  const KNIGHT_BACK = ["............", "............", "............", "............", "............", "............",
+    "............", ".HGGGGGGGGH.", "..HGWWWGGH..", "..HGGGGGGH..", "..HGGGGGGH..", "..HYYYYYYH..", "..HUUHHUUH..",
+    "...UU..UU...", "............", "............"];
+  Object.assign(SPRITES, {
+    knight_suit: ["..HHH......HHH..", ".HGGGH.HH.HGGGH.", "HGWGGGHGGHGGGWGH", "HGGGGHGWWGHGGGGH", ".HHHHGGWGGGHHHH.",
+      "....HGGWGGGH....", "....HGGGGGGH....", "....HGGGGGGH....", "....HYYYYYYH....", "....HUUUUUUH....",
+      "...HUUHUUHUUH...", "...HUUHUUHUUH...", "...HHH.HH.HHH..."],
+    knight_stand: KNIGHT_SIDE, knight_walk1: KNIGHT_SIDE, knight_walk2: KNIGHT_SIDE, knight_jump: KNIGHT_SIDE,
+    knight_climb1: KNIGHT_BACK, knight_climb2: KNIGHT_BACK,
+    knight_dead: ["................", "................", "................", "................", "HGGWWGGH........",
+      "HGGGGGGH........", "HYYYYYYH........", "HUUUUUUH........", "HUUUUUUH........", ".HHHHHHH........"],
+  });
   /*TACO SUIT*/
   // The taco suit a pug wears with the Taco Pug equipped: one overlay per pose, the pose's own size, drawn
   // over the pug with the same feet anchor and flip ('.' lets the pug show through; the head is never covered)
@@ -953,7 +973,8 @@
   const LOOKS_KEY = 'doodad-doombad-looks';
   // (what: how the Suits and Necklaces screens say it, as in "Cinnamon is wearing a tuxedo!")
   const SUITS = [{ key: 'underwear', name: 'Underwear', what: 'underwear', alt: 'White underpants with a blue waistband' },
-    { key: 'tuxedo', name: 'Tuxedo', what: 'a tuxedo', alt: 'A black tuxedo with a white shirt and a bow tie' }];
+    { key: 'tuxedo', name: 'Tuxedo', what: 'a tuxedo', alt: 'A black tuxedo with a white shirt and a bow tie' },
+    { key: 'knight', name: 'Knight Armor', what: 'knight armor', alt: 'Silver knight armor with a gold belt, no helmet' }];
   // (h: how far a hat stands above the head, in screen pixels: hatUp lifts the name tag and the rest over it)
   const HATS = [{ key: 'tophat', name: "President Pug's Top Hat", what: "President Pug's top hat", h: 6,
     alt: "President Pug's charcoal top hat with a red band" },
