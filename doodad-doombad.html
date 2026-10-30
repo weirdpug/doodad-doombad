@@ -3765,7 +3765,8 @@
   let banana = null, bananaBgReady = false, padHeld = [{}, {}, {}, {}];
   // the frames between Bruno's throws, the bananas' gravity, and Bruno's walking speed, all by the score
   const bananaGap = s => Math.max(38, 100 - s * 3);
-  const bananaGravity = s => Math.min(0.04 + s * 0.0015, 0.09);
+  // (the user asked for slower bananas: half the gravity to start with, and at most 0.05)
+  const bananaGravity = s => Math.min(0.02 + s * 0.0008, 0.05);
   // the bowl on the pug's head: its middle (over the head, which is off to the side the pug faces), half its
   // width, and the line a banana has to fall through to land in it
   const bowlSpan = () => ({ cx: banana.x + (banana.face > 0 ? 2.5 : -3.5), half: 6, top: BANANA_GROUND - 16 });
@@ -3778,13 +3779,16 @@
     releaseAll(); fromTitle = true; phase = 'mini'; hideOverlay();
   }
   function throwBanana() {
-    const g = banana, b = g.bruno, gr = bananaGravity(g.score), y0 = BANANA_BRUNO_Y - 34, vy = -1.5;
+    const g = banana, b = g.bruno, gr = bananaGravity(g.score), y0 = BANANA_BRUNO_Y - 34;
+    // (tossed up just 14 pixels above his hands before it falls, so a slow banana stays on screen)
+    const vy = -Math.sqrt(2 * gr * 14);
     // (it lands where the pug can get to in time from where the last one lands)
     const T = (-vy + Math.sqrt(vy * vy + 2 * gr * (bowlSpan().top - y0))) / gr;
     const reach = BANANA_SPEED * bananaGap(g.score) * 0.7;
     const target = clamp(g.lastTarget + (Math.random() * 2 - 1) * reach, 14, PW - 14);
     g.lastTarget = target;
-    g.items.push({ x: b.x, y: y0, vx: (target - b.x) / T, vy, spin: 0 });
+    // (each banana keeps the gravity it was thrown with, so a catch raising the score never changes where one lands)
+    g.items.push({ x: b.x, y: y0, vx: (target - b.x) / T, vy, gr, spin: 0 });
     sfx.toss();
   }
   function pauseBanana() {
@@ -3809,10 +3813,10 @@
       }
     }
     // the bananas fall: into the bowl is a point, onto the floor is the end
-    const gr = bananaGravity(g.score), bowl = bowlSpan();
+    const bowl = bowlSpan();
     for (const it of g.items) {
       const prevY = it.y;
-      it.x += it.vx; it.vy += gr; it.y += it.vy; it.spin++;
+      it.x += it.vx; it.vy += it.gr; it.y += it.vy; it.spin++;
       if (g.lost) continue;
       if (it.vy > 0 && prevY < bowl.top && it.y >= bowl.top && Math.abs(it.x - bowl.cx) <= bowl.half) {
         it.caught = true; g.score++; sfx.coin();
