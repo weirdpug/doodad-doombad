@@ -3764,7 +3764,9 @@
   // banana touches the floor, it's over. Left/Right (arrows, A/D, the touch pad, any controller's stick or
   // D-pad) move; Esc or P (or a controller's Menu) pauses. The best score is saved in the browser.
   // (It is played from The Arcade, so fromTitle stays on: Back goes to The Arcade, zoomed in on Earth.)
-  const BANANA_GROUND = 262, BANANA_BRUNO_Y = 66, BANANA_SPEED = 3, BANANA_BEST_KEY = 'doodad-doombad-banana-best';
+  // (BANANA_SPEED: how far the pug walks a frame, slowed from 3 at the user's request; bananas are aimed to land
+  // within reach at this speed)
+  const BANANA_GROUND = 262, BANANA_BRUNO_Y = 66, BANANA_SPEED = 2, BANANA_BEST_KEY = 'doodad-doombad-banana-best';
   const bananaBg = document.createElement('canvas');
   let banana = null, bananaBgReady = false, padHeld = [{}, {}, {}, {}];
   // the frames between Bruno's throws, the bananas' gravity, and Bruno's walking speed, all by the score
