@@ -856,6 +856,15 @@
     helmet_dead: [...blankRows(16, 3), ".........RRR....", "..........RMR...", "..........HHHH..", ".........HGGWGH.",
       ".........HGGGGGH", ".........HUUUUUH", "............H...", "............H...", ...blankRows(16, 5)],
   });
+  // Earth's mini-game (Banana Catch): the bowl the pug wears on its head to catch bananas in (white rim, blue
+  // bowl), a banana (yellow, with a brown stem, the darker underside orange; two frames so it tumbles as it
+  // falls: the second one upside down), and a banana squashed flat on the floor.
+  Object.assign(SPRITES, {
+    bowl: ["W........W", "WBBBBBBBBW", ".BBBBBBBB.", "..nnnnnn.."],
+    banana: [".....NN", "Y....Y.", "YY..YY.", ".FFFF.."],
+    banana_flip: [".YYYY..", "YY..YY.", "Y....Y.", ".....NN"],
+    banana_splat: ["..Y...Y..", ".YYEYYEY.", "YYYYFYYYY"],
+  });
   /*TACO SUIT*/
   // The taco suit a pug wears with the Taco Pug equipped: one overlay per pose, the pose's own size, drawn
   // over the pug with the same feet anchor and flip ('.' lets the pug show through; the head is never covered)
@@ -1173,7 +1182,7 @@
     players = players.filter(p => p.id !== id);
     showControllerHelp(); updateHud(true);
     // (in the Store opened from the main menu no game is running: it just shows the pugs still here)
-    if (fromTitle) { showPause(pauseView, menuSel); return; }
+    if (fromTitle) { if (phase === 'paused') showPause(pauseView, menuSel); return; }
     if (phase === 'play' || phase === 'paused' || phase === 'win') {
       // if everyone left was sitting out, the team is out: that costs a heart and the level restarts
       // (or the game ends on the last heart)
@@ -1448,6 +1457,13 @@
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (coinBarOpen) return coinBarKey(e);
     if (secretCode(e)) return;
+    // Banana Catch: the arrows (or A/D) move and Esc or P pauses; nothing else does anything
+    if (phase === 'mini') {
+      const km = keyMap[e.code];
+      if (km) { e.preventDefault(); keys[km] = true; }
+      if ((e.key === 'Escape' || e.key === 'p' || e.key === 'P') && !e.repeat) pauseBanana();
+      return;
+    }
     const k = keyMap[e.code];
     // On the Game Over screen a key press starts the game, without also making the pug jump. On the main
     // menu the arrows (or WASD) choose Start or Store and Enter or Space picks. A key's auto-repeat never
@@ -1608,7 +1624,7 @@
       }
       // Fresh presses only, so holding a button does one thing; at most one start/pause/jump action per poll
       if (fresh('start')) {
-        if (ph === 'title' || ph === 'over') startClicked(); else if (ph === 'play' && phase === 'play') togglePause();
+        if (ph === 'title' || ph === 'over') startClicked(); else if (ph === 'play' && phase === 'play') togglePause(); else if (ph === 'mini') pauseBanana();
       } else if (fresh('jump')) {
         // A on the main menu picks Start or Store, and on the Game Over screen starts, without also jumping
         if (ph === 'title') pickTitle(owner);
@@ -1629,6 +1645,7 @@
       if (fresh('toss') && ph === 'play') throwHammer(p);   // Y throws the hammer
       if (fresh('taco') && ph === 'play') xPower(p);       // RB (the keyboard's X): tacos (Taco Pug), a disco floor (Snazz) and a shot (Snifer Ripple)
     }
+    padHeld = held;   // (Banana Catch reads every controller's directions from here)
     // the keyboard's pug also hears the keyboard and touch buttons
     for (const p of players) {
       const h = held[p.id], kb = p.id === kbSlot;
@@ -1922,8 +1939,11 @@
     // The Arcade (space, from the main menu's night sky): just Back to the main menu
     // (zoomed in on a planet, Back zooms out first)
     // (zoomed in on a planet there is a Play button above Back: playFromArcade)
+    // Banana Catch paused (Resume or Back to The Arcade), and its score screen when a banana hits the floor
+    bananaPause: () => [{ label: 'Resume', act: () => resumeGame() }, { label: 'Back', act: () => backToArcade() }],
+    bananaOver: () => [{ label: 'Play again', act: by => startBanana(by) }, { label: 'Back', act: () => backToArcade() }],
     arcade: () => [
-      ...(arcadeZoom.target && !arcadeZoom.out ? [{ label: 'Play', act: () => playFromArcade() }] : []),
+      ...(arcadeZoom.target && !arcadeZoom.out ? [{ label: 'Play', act: by => playFromArcade(by) }] : []),
       { label: 'Back', act: () => arcadeZoom.target && !arcadeZoom.out ? zoomOut() : backToTitle() },
     ],
     custom: () => [
@@ -1947,13 +1967,16 @@
     // (the Store and Necklaces show the bag or look of the pug that opened them)
     if ((store || neck) && by !== undefined && joined[by]) storeBy = by;
     if (!joined[storeBy]) storeBy = kbBy();
-    ovTitle.textContent = arcade ? (arcadeZoom.target && !arcadeZoom.out ? arcadeZoom.target.name : 'The Arcade') : store ? 'Store' : part ? part.name : custom ? 'Customize' : 'Paused';
+    const bpause = view === 'bananaPause', bover = view === 'bananaOver';
+    ovTitle.textContent = bpause ? 'Paused' : bover ? 'Splat!' : arcade ? (arcadeZoom.target && !arcadeZoom.out ? arcadeZoom.target.name : 'The Arcade') : store ? 'Store' : part ? part.name : custom ? 'Customize' : 'Paused';
     // (Necklaces keeps a line for what was just put on, and with 2-4 pugs, whose look it is)
     ovText.hidden = arcade || (custom && !neck);
     ovText.textContent = note || (store
       ? (multi() ? `${LOOK[storeBy].name}'s bag. Each pug pays with its own coins!` : 'Buy things, then equip them!')
       : neck ? [multi() ? `${LOOK[storeBy].name}'s ${part.name.toLowerCase()}` : '',
         LOOK_SECTIONS[view].max ? `Bring up to ${LOOK_SECTIONS[view].max} at a time!` : ''].filter(Boolean).join('. ')
+      : bpause ? 'Banana Catch. Catch every banana in your bowl!'
+      : bover && banana ? `A banana hit the floor! You caught ${banana.score} banana${banana.score === 1 ? '' : 's'}. Best: ${banana.best}.`
       : 'Take a breather. Bruno will wait.');
     menuEntries = MENUS[view]();
     const list = [];
@@ -1968,8 +1991,8 @@
     if (neck) renderLooks();
     // (an item only hops right after it is bought, not every time the Store opens again)
     for (const it of SHOP) it.card.classList.remove('bought');
-    coinList.hidden = storeShelf.hidden = !store; lookShelf.hidden = !neck; ovKeys.hidden = store || custom || arcade; startBtn.hidden = true;
-    menuEl.hidden = false; menuHint.hidden = store || custom || arcade;   // (the Store needs the room on small screens)
+    coinList.hidden = storeShelf.hidden = !store; lookShelf.hidden = !neck; ovKeys.hidden = store || custom || arcade || bpause || bover; startBtn.hidden = true;
+    menuEl.hidden = false; menuHint.hidden = store || custom || arcade || bpause || bover;   // (the Store needs the room on small screens)
     // (a game started from the main menu leaves its look on the hidden screen: the menus never use it)
     ov.classList.remove('title-mode'); ov.classList.add('menu-mode'); ov.classList.toggle('arcade-mode', arcade); ov.hidden = false;
     // (the Store opens at the start of its row of cards)
@@ -2166,6 +2189,8 @@
   }
   function resumeGame() {
     if (phase !== 'paused') return;
+    if (fromTitle && pauseView === 'bananaPause') { releaseAll(); phase = 'mini'; hideOverlay(); return; }
+    if (fromTitle && pauseView === 'bananaOver') return backToArcade();
     if (fromTitle) return backToTitle();   // (the Store or Customize opened from the main menu goes back there)
     releaseAll(); phase = 'play'; hideOverlay();
   }
@@ -2183,7 +2208,7 @@
     resetLevel(); showTitle(0);
   }
   function togglePause() { if (phase === 'play') pauseGame(); else if (phase === 'paused') resumeGame(); }
-  document.addEventListener('visibilitychange', () => { if (document.hidden && phase === 'play') pauseGame(); }, sig);
+  document.addEventListener('visibilitychange', () => { if (document.hidden && phase === 'play') pauseGame(); else if (document.hidden && phase === 'mini') pauseBanana(); }, sig);
   document.getElementById('pauseBtn').addEventListener('pointerdown', e => { e.preventDefault(); initAudio(); togglePause(); });
 
   // ---------- clicking Big Bruno ----------
@@ -3063,7 +3088,7 @@
       }
     } else if (phase === 'title') {
       updateApe(); updateBarrels(); barrels = barrels.filter(b => !b.dead);
-    }
+    } else if (phase === 'mini') stepBanana();
     // pets fly along with their pugs while a level plays and during the level-clear banner
     if (phase === 'play' || phase === 'win') for (const p of players) movePets(p);
     if (drumFlare > 0) drumFlare--;
@@ -3622,7 +3647,7 @@
   const SPACE_PLANETS = [
     { name: 'Saturn', x: 70, y: 122, r: 24, cols: ['#ffd9a0', '#e8a05a', '#a8743a'], stripe: '#c8742f', ring: [42, 10] },
     { name: 'Mars', x: 192, y: 66, r: 10, cols: ['#ff8a6a', '#e8282f', '#a8141f'] },
-    { name: 'Earth', x: 182, y: 196, r: 18, cols: ['#9fb4ff', '#2f5bff', '#1d2f8c'] },
+    { name: 'Earth', x: 182, y: 196, r: 18, cols: ['#9fb4ff', '#2f5bff', '#1d2f8c'], game: 'banana' },
     { name: 'The Moon', x: 214, y: 172, r: 6, cols: ['#eef0f6', '#b4b8c8', '#7f8396'] },
     { name: 'Pluto', x: 32, y: 222, r: 7, cols: ['#d8a6e8', '#9c5ab8', '#5a2c7a'], stripe: '#7a3c9a' },
   ];
@@ -3640,10 +3665,11 @@
   // (zooming in or out redoes The Arcade's screen: its title, and Play shown or gone)
   function zoomTo(p) { arcadeZoom = { target: p, p: 0, out: false }; showPause('arcade', 0); sfx.tick(); }
   function zoomOut() { if (!arcadeZoom.target || arcadeZoom.out) return; arcadeZoom.out = true; showPause('arcade', 0); sfx.tick(); }
-  // A planet's Play button: for now every planet starts a new game, the same as Start on the main menu (each
-  // planet is meant to get its own game later)
-  function playFromArcade() {
+  // A planet's Play button: a planet with its own game plays it (Earth: Banana Catch); the others start a new
+  // game, the same as Start on the main menu (each is meant to get its own game later)
+  function playFromArcade(by) {
     if (!(fromTitle && pauseView === 'arcade')) return;
+    if (arcadeZoom.target && arcadeZoom.target.game === 'banana') { startBanana(by); return; }
     fromTitle = false; phase = 'title';
     startClicked();
   }
@@ -3731,7 +3757,153 @@
       for (let k = 0; k < 8; k++) { ctx.fillStyle = k < 2 ? '#ffffff' : k < 5 ? '#9fb4ff' : '#4a5a9a'; ctx.fillRect(sx + k * 2, sy - k, 1, 1); }
     }
   }
+  // ----- Earth's mini-game: Banana Catch (Play on Earth in The Arcade) -----
+  // The pug that pressed Play stands on the grass wearing a bowl on its head, and Big Bruno walks back and forth
+  // on a girder up top throwing bananas. Catch every banana in the bowl: each one is a point, and they come
+  // faster and fall quicker as the score climbs (never further from the last one than the pug can run). If a
+  // banana touches the floor, it's over. Left/Right (arrows, A/D, the touch pad, any controller's stick or
+  // D-pad) move; Esc or P (or a controller's Menu) pauses. The best score is saved in the browser.
+  // (It is played from The Arcade, so fromTitle stays on: Back goes to The Arcade, zoomed in on Earth.)
+  const BANANA_GROUND = 262, BANANA_BRUNO_Y = 66, BANANA_SPEED = 3, BANANA_BEST_KEY = 'doodad-doombad-banana-best';
+  const bananaBg = document.createElement('canvas');
+  let banana = null, bananaBgReady = false, padHeld = [{}, {}, {}, {}];
+  // the frames between Bruno's throws, the bananas' gravity, and Bruno's walking speed, all by the score
+  const bananaGap = s => Math.max(38, 100 - s * 3);
+  const bananaGravity = s => Math.min(0.04 + s * 0.0015, 0.09);
+  // the bowl on the pug's head: its middle (over the head, which is off to the side the pug faces), half its
+  // width, and the line a banana has to fall through to land in it
+  const bowlSpan = () => ({ cx: banana.x + (banana.face > 0 ? 2.5 : -3.5), half: 6, top: BANANA_GROUND - 16 });
+  function startBanana(by) {
+    let best = 0;
+    try { best = Math.max(0, Math.floor(+localStorage.getItem(BANANA_BEST_KEY)) || 0); } catch (e) {}
+    banana = { id: joined[by] ? by : 0, x: PW / 2, face: 1, anim: 0, moving: false, score: 0, best, items: [], plus: [],
+      bruno: { x: PW / 2, dir: 1, throwT: 50, holdT: 0 }, lastTarget: PW / 2, lost: 0, splat: null, startT: 100 };
+    try { initAudio(); } catch (e) {}
+    releaseAll(); fromTitle = true; phase = 'mini'; hideOverlay();
+  }
+  function throwBanana() {
+    const g = banana, b = g.bruno, gr = bananaGravity(g.score), y0 = BANANA_BRUNO_Y - 34, vy = -1.5;
+    // (it lands where the pug can get to in time from where the last one lands)
+    const T = (-vy + Math.sqrt(vy * vy + 2 * gr * (bowlSpan().top - y0))) / gr;
+    const reach = BANANA_SPEED * bananaGap(g.score) * 0.7;
+    const target = clamp(g.lastTarget + (Math.random() * 2 - 1) * reach, 14, PW - 14);
+    g.lastTarget = target;
+    g.items.push({ x: b.x, y: y0, vx: (target - b.x) / T, vy, spin: 0 });
+    sfx.toss();
+  }
+  function pauseBanana() {
+    if (phase !== 'mini' || !banana || banana.lost) return;
+    releaseAll(); phase = 'paused'; showPause('bananaPause', 0);
+  }
+  function stepBanana() {
+    const g = banana, b = g.bruno;
+    if (g.startT > 0) g.startT--;   // (a moment to get ready while the banner shows)
+    if (!g.lost) {
+      // the pug: any keyboard or controller moves it
+      const held = k => keys[k] || padHeld.some(h => h && h[k]);
+      const d = (held('right') ? 1 : 0) - (held('left') ? 1 : 0);
+      g.moving = !!d;
+      if (d) { g.face = d; g.x = clamp(g.x + d * BANANA_SPEED, 10, PW - 10); g.anim++; }
+      // Bruno walks back and forth, and stops to wind up each throw (holding the banana up) before it flies
+      if (b.holdT > 0) { if (--b.holdT === 0) throwBanana(); }
+      else {
+        b.x += b.dir * (0.6 + Math.min(g.score, 40) * 0.02);
+        if (b.x < 30 || b.x > PW - 30) { b.dir = -b.dir; b.x = clamp(b.x, 30, PW - 30); }
+        if (g.startT === 0 && --b.throwT <= 0) { b.holdT = 14; b.throwT = bananaGap(g.score); }
+      }
+    }
+    // the bananas fall: into the bowl is a point, onto the floor is the end
+    const gr = bananaGravity(g.score), bowl = bowlSpan();
+    for (const it of g.items) {
+      const prevY = it.y;
+      it.x += it.vx; it.vy += gr; it.y += it.vy; it.spin++;
+      if (g.lost) continue;
+      if (it.vy > 0 && prevY < bowl.top && it.y >= bowl.top && Math.abs(it.x - bowl.cx) <= bowl.half) {
+        it.caught = true; g.score++; sfx.coin();
+        g.plus.push({ x: bowl.cx, y: bowl.top - 4, t: 30 });
+      } else if (it.y >= BANANA_GROUND) { it.dead = true; g.lost = 1; g.splat = { x: it.x }; sfx.die(); }
+    }
+    g.items = g.items.filter(it => !it.caught && !it.dead && it.y < PH + 10);
+    for (const p of g.plus) { p.t--; p.y -= 0.5; }
+    g.plus = g.plus.filter(p => p.t > 0);
+    // (after a moment to see the squashed banana, the score screen)
+    if (g.lost && ++g.lost > 70) bananaOver();
+  }
+  function bananaOver() {
+    const g = banana;
+    if (g.score > g.best) { g.best = g.score; try { localStorage.setItem(BANANA_BEST_KEY, String(g.score)); } catch (e) {} }
+    phase = 'paused'; showPause('bananaOver', 0);
+  }
+  // back to The Arcade, zoomed in on Earth (showPause('arcade') starts it zoomed out, so the zoom is put back)
+  function backToArcade() {
+    showPause('arcade', 0);
+    arcadeZoom = { target: SPACE_PLANETS.find(p => p.game === 'banana'), p: 1, out: false };
+    showPause('arcade', 0);
+  }
+  // Earth in daytime: a blue sky with a sun and clouds, green hills, and the grass the pug stands on; up top,
+  // the girder Big Bruno walks along
+  function buildBananaBg() {
+    bananaBg.width = PW; bananaBg.height = PH;
+    const c = bananaBg.getContext('2d');
+    const rect = (col, x, y, w, h) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
+    const sky = ['#5aa8f0', '#68b2f2', '#78bcf4', '#8ac6f6', '#9ed0f8', '#b2dafa', '#c6e4fc'];
+    sky.forEach((col, i) => rect(col, 0, Math.floor(i * 220 / sky.length), PW, Math.ceil(220 / sky.length) + 1));
+    for (let y = -14; y <= 14; y++) for (let x = -14; x <= 14; x++) if (x * x + y * y <= 196) rect(x * x + y * y > 140 ? '#ffe08a' : '#fff2b0', 200 + x, 112 + y, 1, 1);
+    for (const [x, y, w] of [[22, 104, 34], [120, 132, 28], [70, 160, 40]]) {
+      rect('#ffffff', x, y, w, 4); rect('#ffffff', x + 5, y - 3, w - 12, 3); rect('#e8f2ff', x, y + 4, w, 1);
+    }
+    // two rows of green hills
+    for (let x = 0; x < PW; x++) {
+      const far = Math.round(214 - 12 * Math.abs(Math.sin(x / 38)) - 6 * Math.sin(x / 17));
+      rect('#5fc88f', x, far, 1, PH);
+      const near = Math.round(232 - 8 * Math.abs(Math.sin((x + 40) / 30)));
+      rect('#2f8f66', x, near, 1, PH);
+    }
+    // the grass the pug runs on, with a dirt edge and tufts
+    rect('#3a9a5a', 0, BANANA_GROUND, PW, PH - BANANA_GROUND);
+    rect('#5fd068', 0, BANANA_GROUND, PW, 1);
+    rect('#8f5a2a', 0, BANANA_GROUND + 6, PW, PH - BANANA_GROUND - 6);
+    for (let i = 0; i < 30; i++) rect('#2f8f66', (i * 37) % PW, BANANA_GROUND + 1 + (i % 4), 1, 2);
+    // Bruno's girder: pink steel with a dark truss
+    rect('#7a1c3a', 12, BANANA_BRUNO_Y, PW - 24, 7);
+    rect('#ff3e6c', 12, BANANA_BRUNO_Y, PW - 24, 2);
+    rect('#ff3e6c', 12, BANANA_BRUNO_Y + 5, PW - 24, 2);
+    for (let x = 12; x < PW - 12; x += 6) { rect('#ff3e6c', x, BANANA_BRUNO_Y + 2, 1, 3); rect('#ff3e6c', x + 3, BANANA_BRUNO_Y + 3, 1, 1); }
+  }
+  function drawBanana() {
+    if (!bananaBgReady) { buildBananaBg(); bananaBgReady = true; }
+    const g = banana, b = g.bruno;
+    ctx.drawImage(bananaBg, 0, 0);
+    // Bruno: winding up a throw he holds a banana over his head; walking, he pounds his chest
+    const beat = Math.floor(frame / 20) % 4;
+    blit(b.holdT > 0 ? 'ape_throw' : beat === 1 ? 'ape_poundL' : beat === 3 ? 'ape_poundR' : 'ape_idle', Math.round(b.x) - 18, BANANA_BRUNO_Y - 32);
+    if (b.holdT > 0) blit('banana', Math.round(b.x) - 3, BANANA_BRUNO_Y - 38);
+    for (const it of g.items) blit(Math.floor(it.spin / 6) % 2 ? 'banana_flip' : 'banana', Math.round(it.x) - 3, Math.round(it.y) - 3);
+    if (g.splat) blit('banana_splat', Math.round(g.splat.x) - 4, BANANA_GROUND - 3);
+    // the pug, in its Customize suit and necklace, with the bowl on its head (no hat: the bowl is the hat)
+    const sw = LOOK[g.id].swap, X = Math.round(g.x), flip = g.face < 0;
+    const pose = g.moving && !g.lost ? (Math.floor(g.anim / 6) % 2 ? 'walk2' : 'walk1') : 'stand';
+    blitFeet('player_' + pose, X, BANANA_GROUND, flip, sw);
+    if (looks[g.id].suit) blitFeet(looks[g.id].suit + '_' + pose, X, BANANA_GROUND, flip);
+    if (looks[g.id].necklace) blitFeet(looks[g.id].necklace + '_' + pose, X, BANANA_GROUND, flip);
+    const bowl = bowlSpan();
+    blit('bowl', Math.round(bowl.cx) - 5, bowl.top - 1);
+    // "+1" over the bowl for each catch (the pixel font has no "+", so it is drawn by hand)
+    for (const p of g.plus) {
+      if (p.t <= 8 && frame % 4 >= 2) continue;
+      const X0 = Math.round(p.x), Y0 = Math.round(p.y) - 7;
+      ctx.fillStyle = PAL.Y; ctx.fillRect(X0 - 5, Y0 + 3, 3, 1); ctx.fillRect(X0 - 4, Y0 + 2, 1, 3);
+      drawText('1', X0, Y0, 'gold');
+    }
+    drawText('BANANAS ' + g.score, 6, 6, 'gold');
+    drawText('BEST ' + Math.max(g.best, g.score), 6, 16);
+    if (g.startT > 0) banner('CATCH THE BANANAS!', 120, 'gold');
+  }
   function draw() {
+    // Banana Catch (and its pause and score screens) has its own scene
+    if (banana && (phase === 'mini' || (fromTitle && (pauseView === 'bananaPause' || pauseView === 'bananaOver')))) {
+      drawBanana(); updateHud(); return;
+    }
     // the main menu has its own scene (it stays behind the Store or Customize opened from there); The Arcade
     // has space
     if (fromTitle && pauseView === 'arcade') { drawSpaceScene(); updateHud(); updateCursor(); return; }
