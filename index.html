@@ -1921,7 +1921,11 @@
     // Customize, from the main menu only: Suits, Hats, Necklaces and Pets, then Back to the main menu
     // The Arcade (space, from the main menu's night sky): just Back to the main menu
     // (zoomed in on a planet, Back zooms out first)
-    arcade: () => [{ label: 'Back', act: () => arcadeZoom.target && !arcadeZoom.out ? zoomOut() : backToTitle() }],
+    // (zoomed in on a planet there is a Play button above Back: playFromArcade)
+    arcade: () => [
+      ...(arcadeZoom.target && !arcadeZoom.out ? [{ label: 'Play', act: () => playFromArcade() }] : []),
+      { label: 'Back', act: () => arcadeZoom.target && !arcadeZoom.out ? zoomOut() : backToTitle() },
+    ],
     custom: () => [
       ...CUSTOM_PARTS.map(c => ({ label: c.name, act: by => showPause(c.view, 0, null, by) })),
       { label: 'Back', act: () => backToTitle() },
@@ -3633,8 +3637,16 @@
     return [...SPACE_PLANETS].sort((a, b) => a.r - b.r).find(p => Math.hypot(x - p.x, y - p.y) <= p.r + 3 ||
       (p.ring && Math.abs(x - p.x) <= p.ring[0] + 2 && Math.abs(y - p.y) <= p.ring[1] + 2));
   }
-  function zoomTo(p) { arcadeZoom = { target: p, p: 0, out: false }; ovTitle.textContent = p.name; sfx.tick(); }
-  function zoomOut() { if (!arcadeZoom.target || arcadeZoom.out) return; arcadeZoom.out = true; ovTitle.textContent = 'The Arcade'; sfx.tick(); }
+  // (zooming in or out redoes The Arcade's screen: its title, and Play shown or gone)
+  function zoomTo(p) { arcadeZoom = { target: p, p: 0, out: false }; showPause('arcade', 0); sfx.tick(); }
+  function zoomOut() { if (!arcadeZoom.target || arcadeZoom.out) return; arcadeZoom.out = true; showPause('arcade', 0); sfx.tick(); }
+  // A planet's Play button: for now every planet starts a new game, the same as Start on the main menu (each
+  // planet is meant to get its own game later)
+  function playFromArcade() {
+    if (!(fromTitle && pauseView === 'arcade')) return;
+    fromTitle = false; phase = 'title';
+    startClicked();
+  }
   // a click in The Arcade: on a planet zooms in on it; anywhere while zoomed in zooms back out
   ov.addEventListener('click', e => {
     if (!(fromTitle && pauseView === 'arcade') || e.target.closest('button')) return;
