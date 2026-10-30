@@ -172,6 +172,8 @@
   /* the main menu (the start screen): the outdoor castle scene shows through. The title sits in the sky at the
      top and the rest at the bottom on a dark fade, so the castle shows between them. */
   #overlay.title-mode { justify-content: space-between; background: transparent; }
+  /* The Arcade (space): see-through too, its name at the top and Back at the bottom */
+  #overlay.arcade-mode { justify-content: space-between; background: transparent; }
   /* (the story, the controls and Start sit together in .ovbody; it adds nothing to the layout anywhere) */
   .ovbody { display: contents; }
   /* the main menu shows just the title, the castle and Start: no story text and no controls (the user asked
@@ -1679,7 +1681,7 @@
     storeScroll = document.getElementById('storeScroll'), shelfL = document.getElementById('shelfL'), shelfR = document.getElementById('shelfR');
   // the start and Game Over screens: one big button
   function showOverlay(title, text, btn, showKeys) {
-    ov.classList.remove('title-mode');   // (only the very first screen is the main menu)
+    ov.classList.remove('title-mode', 'arcade-mode');   // (only the very first screen is the main menu)
     ovTitle.innerHTML = title; ovText.textContent = text; startBtn.textContent = btn;
     ovKeys.hidden = !showKeys; ovText.hidden = startBtn.hidden = false;
     menuEl.hidden = menuHint.hidden = coinList.hidden = storeShelf.hidden = lookShelf.hidden = true; ov.classList.remove('menu-mode');
@@ -1702,7 +1704,15 @@
   }
   // Press, tap or click anywhere on the start or game-over screen (button included), except the main
   // menu's Store and Customize buttons. The pause screen is different: there only its menu buttons do anything.
-  const ovPressed = e => { if (phase !== 'paused' && !e.target.closest('.titlebtns .alt')) startClicked(); };
+  // On the main menu a press on the dark night sky at the top (where the stars are) goes to The Arcade instead.
+  const inNightSky = e => {
+    const pt = e.touches ? e.touches[0] : e, r = cv.getBoundingClientRect();
+    return !!pt && r.height > 0 && (pt.clientY - r.top) / r.height * PH < NIGHT_Y;
+  };
+  const ovPressed = e => {
+    if (phase === 'title' && !e.target.closest('button') && inNightSky(e)) { openFromTitle('arcade', kbBy()); return; }
+    if (phase !== 'paused' && !e.target.closest('.titlebtns .alt')) startClicked();
+  };
   ov.addEventListener('pointerdown', ovPressed);
   ov.addEventListener('click', ovPressed);
   ov.addEventListener('touchstart', ovPressed, { passive: true });
@@ -1729,11 +1739,11 @@
   titleBtns.forEach((b, i) => { if (i) b.addEventListener('click', () => openFromTitle(TITLE_VIEWS[i], kbBy())); });
   // back to the main menu from the Store or Customize, with that one's button chosen
   // (from Customize or one of its sections, Customize is chosen)
-  const backToTitle = () => showTitle(pauseView === 'store' ? 1 : 2);
+  const backToTitle = () => showTitle(pauseView === 'store' ? 1 : pauseView === 'arcade' ? 0 : 2);
   // the main menu again (sel: the button to choose), from the pause menu, the Store or Customize
   function showTitle(sel) {
     fromTitle = false; phase = 'title';
-    ov.classList.remove('menu-mode'); ov.classList.add('title-mode');
+    ov.classList.remove('menu-mode', 'arcade-mode'); ov.classList.add('title-mode');
     ovTitle.innerHTML = 'Doodad<br>Doombad'; startBtn.textContent = 'Start'; startBtn.hidden = false;
     menuEl.hidden = menuHint.hidden = coinList.hidden = storeShelf.hidden = lookShelf.hidden = true;
     ov.hidden = false; markTitle(sel || 0, true);
@@ -1905,6 +1915,8 @@
       { label: 'Back', act: () => storeBack(), row: 2 },
     ],
     // Customize, from the main menu only: Suits, Hats, Necklaces and Pets, then Back to the main menu
+    // The Arcade (space, from the main menu's night sky): just Back to the main menu
+    arcade: () => [{ label: 'Back', act: () => backToTitle() }],
     custom: () => [
       ...CUSTOM_PARTS.map(c => ({ label: c.name, act: by => showPause(c.view, 0, null, by) })),
       { label: 'Back', act: () => backToTitle() },
@@ -1922,13 +1934,13 @@
     const was = pauseView;
     pauseView = view; menuSel = sel || 0;
     const store = view === 'store', part = customPart(view), custom = view === 'custom' || !!part,
-      neck = !!LOOK_SECTIONS[view], opening = store && storeShelf.hidden;   // (neck: Necklaces or Pets, with cards)
+      neck = !!LOOK_SECTIONS[view], arcade = view === 'arcade', opening = store && storeShelf.hidden;   // (neck: Necklaces or Pets, with cards)
     // (the Store and Necklaces show the bag or look of the pug that opened them)
     if ((store || neck) && by !== undefined && joined[by]) storeBy = by;
     if (!joined[storeBy]) storeBy = kbBy();
-    ovTitle.textContent = store ? 'Store' : part ? part.name : custom ? 'Customize' : 'Paused';
+    ovTitle.textContent = arcade ? 'The Arcade' : store ? 'Store' : part ? part.name : custom ? 'Customize' : 'Paused';
     // (Necklaces keeps a line for what was just put on, and with 2-4 pugs, whose look it is)
-    ovText.hidden = custom && !neck;
+    ovText.hidden = arcade || (custom && !neck);
     ovText.textContent = note || (store
       ? (multi() ? `${LOOK[storeBy].name}'s bag. Each pug pays with its own coins!` : 'Buy things, then equip them!')
       : neck ? [multi() ? `${LOOK[storeBy].name}'s ${part.name.toLowerCase()}` : '',
@@ -1947,10 +1959,10 @@
     if (neck) renderLooks();
     // (an item only hops right after it is bought, not every time the Store opens again)
     for (const it of SHOP) it.card.classList.remove('bought');
-    coinList.hidden = storeShelf.hidden = !store; lookShelf.hidden = !neck; ovKeys.hidden = store || custom; startBtn.hidden = true;
-    menuEl.hidden = false; menuHint.hidden = store || custom;   // (the Store needs the room on small screens)
+    coinList.hidden = storeShelf.hidden = !store; lookShelf.hidden = !neck; ovKeys.hidden = store || custom || arcade; startBtn.hidden = true;
+    menuEl.hidden = false; menuHint.hidden = store || custom || arcade;   // (the Store needs the room on small screens)
     // (a game started from the main menu leaves its look on the hidden screen: the menus never use it)
-    ov.classList.remove('title-mode'); ov.classList.add('menu-mode'); ov.hidden = false;
+    ov.classList.remove('title-mode'); ov.classList.add('menu-mode'); ov.classList.toggle('arcade-mode', arcade); ov.hidden = false;
     // (the Store opens at the start of its row of cards)
     if (opening) { storeCol = 0; storeScroll.scrollLeft = 0; }
     if (neck && was !== view) lookScroll.scrollLeft = 0;   // (a Customize section opens at its first card)
@@ -3585,8 +3597,76 @@
       ctx.fillStyle = '#ffcc3d'; ctx.fillRect(x + 1, y, 1, 1);
     }
   }
+  // ----- The Arcade: out in space, reached by clicking the night sky on the main menu -----
+  // A deep sky with a faint nebula, lots of stars and planets hanging in it (built once, like the castle
+  // scene): a big ringed one, a red one, a blue and green one with its little moon, and a small purple one.
+  // On top, some stars twinkle and every few seconds a shooting star streaks past. (The Arcade is opened
+  // like the Store from the main menu, so the game is 'paused' and frame stands still: spaceT counts instead.)
+  const spaceBg = document.createElement('canvas');
+  let spaceBgReady = false, spaceT = 0;
+  const NIGHT_Y = 64;   // the dark night top of the main menu's sky (where its stars are): a click there goes to The Arcade
+  function buildSpaceBg() {
+    spaceBg.width = PW; spaceBg.height = PH;
+    const c = spaceBg.getContext('2d');
+    const dot = (col, x, y, w = 1, h = 1) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
+    // deep space, a touch lighter across the middle, and a faint purple nebula band sloping across it
+    const bands = ['#05061a', '#070822', '#0a0b2a', '#0c0d30', '#0a0b2a', '#070822', '#05061a'];
+    bands.forEach((col, i) => dot(col, 0, Math.floor(i * PH / bands.length), PW, Math.ceil(PH / bands.length) + 1));
+    for (let x = 0; x < PW; x++) {
+      const y0 = Math.round(150 - x * 0.35 + Math.sin(x / 13) * 6);
+      for (let k = -8; k <= 8; k++) if ((x * 7 + k * 13) % 5 < 2) dot(Math.abs(k) < 4 ? '#2a1a4a' : '#1a1238', x, y0 + k);
+    }
+    // still stars, mostly dim, a few bright (the same every time: a fixed pattern)
+    for (let i = 0; i < 140; i++) dot(i % 9 === 0 ? '#ffffff' : i % 3 ? '#5a6090' : '#9fb4ff', (i * 97 + 11) % PW, (i * 61 + 29) % PH);
+    // a planet: a ball lit from the top left (light, mid and dark), with stripes across its lit side if it has them
+    const ball = (cx, cy, r, [hi, mid, lo], stripe) => {
+      for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) {
+        if (x * x + y * y > r * r) continue;
+        const l = (x + y) / (r * 1.4);
+        let col = l < -0.35 ? hi : l < 0.4 ? mid : lo;
+        if (stripe && Math.floor((cy + y) / 3) % 3 === 0 && l < 0.4) col = stripe;
+        dot(col, cx + x, cy + y);
+      }
+    };
+    // a planet's ring, two pixels thick: its back half goes behind the planet, its front half in front
+    const ring = (cx, cy, rx, ry, col, front) => {
+      for (let a = 0; a < 720; a++) {
+        const t = a * Math.PI / 360;
+        if ((Math.sin(t) > 0) !== front) continue;
+        for (const d of [0, 2]) dot(col, Math.round(cx + Math.cos(t) * (rx - d)), Math.round(cy + Math.sin(t) * (ry - d / 4)));
+      }
+    };
+    ring(70, 122, 42, 10, '#d9a066', false);
+    ball(70, 122, 24, ['#ffd9a0', '#e8a05a', '#a8743a'], '#c8742f');
+    ring(70, 122, 42, 10, '#f4e9a8', true);
+    ball(192, 66, 10, ['#ff8a6a', '#e8282f', '#a8141f']);
+    ball(182, 196, 18, ['#9fb4ff', '#2f5bff', '#1d2f8c']);
+    // (the blue planet's green land)
+    for (const [x, y, w, h] of [[172, 186, 6, 3], [170, 189, 4, 4], [184, 198, 7, 3], [186, 201, 4, 3], [176, 205, 3, 2]]) dot('#2f8f66', x, y, w, h);
+    ball(214, 172, 6, ['#eef0f6', '#b4b8c8', '#7f8396']);
+    for (const [x, y] of [[212, 170], [216, 174], [213, 175]]) dot('#7f8396', x, y);   // (the moon's craters)
+    ball(32, 222, 7, ['#d8a6e8', '#9c5ab8', '#5a2c7a'], '#7a3c9a');
+  }
+  function drawSpaceScene() {
+    if (!spaceBgReady) { buildSpaceBg(); spaceBgReady = true; }
+    spaceT++;
+    ctx.drawImage(spaceBg, 0, 0);
+    // twinkling stars
+    for (let i = 0; i < 30; i++) {
+      const x = (i * 83 + 5) % PW, y = (i * 47 + 19) % PH;
+      if ((spaceT + i * 13) % 80 < 60) { ctx.fillStyle = (spaceT + i * 29) % 40 < 5 ? '#ffffff' : '#9fb4ff'; ctx.fillRect(x, y, 1, 1); }
+    }
+    // a shooting star every 7 seconds, streaking down to the left with a fading tail
+    const t = spaceT % 420;
+    if (t < 40) {
+      const sx = 230 - t * 5, sy = 18 + t * 2;
+      for (let k = 0; k < 8; k++) { ctx.fillStyle = k < 2 ? '#ffffff' : k < 5 ? '#9fb4ff' : '#4a5a9a'; ctx.fillRect(sx + k * 2, sy - k, 1, 1); }
+    }
+  }
   function draw() {
-    // the main menu has its own scene (it stays behind the Store or Customize opened from there)
+    // the main menu has its own scene (it stays behind the Store or Customize opened from there); The Arcade
+    // has space
+    if (fromTitle && pauseView === 'arcade') { drawSpaceScene(); updateHud(); updateCursor(); return; }
     if (phase === 'title' || fromTitle) { drawTitleScene(); updateHud(); updateCursor(); return; }
     const cam = Math.round(camY / 2);
     ctx.save();
