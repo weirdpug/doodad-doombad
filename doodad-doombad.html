@@ -679,6 +679,17 @@
     joe_walk2: [...JOE_TOP, "...BB....BB.......", "..BB......BB......", ".nn........nn....."],
   });
   SPRITES.joe_pet = SPRITES.joe_walk1;
+  // Baby Burrito (Customize > Pets): a little burrito with two big eyes (3x3 each, white with a black pupil
+  // looking ahead), a cream tortilla with tan folds and a brown edge, lettuce, tomato, cheese and beans
+  // peeking out of its open end, and tiny feet, facing right (flipped for left). He hops along behind his pug
+  // (walk2 has his feet apart; walk1 is also how he stands, and his picture on the Pets card).
+  const BURRITO_TOP = ["...OOOOOOOO...", "..OEEEEEEEEEO.", ".OEEEWWWEWWWgO", ".OELEWKKEWKKRO", ".OEEEWKKEWKKYO",
+    ".OELEEEEEEEENO", "..OEELEEEELEO.", "...OOOOOOOOO.."];
+  Object.assign(SPRITES, {
+    burrito_walk1: [...BURRITO_TOP, "....OO...OO..."],
+    burrito_walk2: [...BURRITO_TOP, "...OO.....OO.."],
+  });
+  SPRITES.burrito_pet = SPRITES.burrito_walk1;
   // Underwear (Customize > Suits): white briefs with a blue waistband. The big pair is its picture on the
   // Suits card. The rest go over the pug like the sunglasses (same anchor and flip): side on, they cover the
   // pug's hips and the tops of its back legs; climbing (seen from behind) the curly tail pokes out over the
@@ -1003,9 +1014,10 @@
   const NECKLACES = [{ key: 'alpha', name: 'Alpha Necklace', what: 'the Alpha Necklace', alt: 'A gold chain with a gold dollar sign on it' },
     { key: 'tie', name: "President Pug's Tie", what: "President Pug's tie", alt: "President Pug's blue tie with a navy knot" }];
   // (kind: how a pet goes along with its pug: 'fly' above and behind its head, 'walk' behind it on its floor;
-  // farts: now and then it farts, a green cloud and a raspberry)
+  // farts: now and then it farts, a green cloud and a raspberry; hops: a walker that bounces as it goes)
   const PETS = [{ key: 'turd', name: 'Turd the Bird', alt: 'A small brown bird', kind: 'fly' },
-    { key: 'joe', name: 'Donkey Joe', alt: 'A blue donkey', kind: 'walk', farts: true }];
+    { key: 'joe', name: 'Donkey Joe', alt: 'A blue donkey', kind: 'walk', farts: true },
+    { key: 'burrito', name: 'Baby Burrito', alt: 'A little burrito with big eyes', kind: 'walk', hops: true }];
   // the Customize sections with things to choose: which of a pug's looks each sets, its things, the
   // button's words while it isn't / is chosen, and what the screen says after
   const LOOK_SECTIONS = {
@@ -2933,7 +2945,9 @@
       const b = P.pets[pet.key];
       if (!b) continue;
       if (pet.kind === 'walk') {
-        blitFeet(pet.key + (b.moving && Math.floor(b.step / 8) % 2 ? '_walk2' : '_walk1'), px(b.x), Math.round(b.y / 2), b.face < 0);
+        // (a hopper bounces up to 3 pixels off its floor as it goes)
+        const lift = pet.hops && b.moving ? Math.round(Math.abs(Math.sin(b.step / 5)) * 3) : 0;
+        blitFeet(pet.key + (b.moving && Math.floor(b.step / 8) % 2 ? '_walk2' : '_walk1'), px(b.x), Math.round(b.y / 2) - lift, b.face < 0);
         continue;
       }
       const s = sprite(pet.key + '_fly' + (Math.floor(frame / 6) % 2 + 1), b.face < 0);
