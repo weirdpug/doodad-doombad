@@ -860,7 +860,7 @@
   // bowl), a banana (yellow, with a brown stem, the darker underside orange; two frames so it tumbles as it
   // falls: the second one upside down), and a banana squashed flat on the floor.
   Object.assign(SPRITES, {
-    bowl: ["W........W", "WBBBBBBBBW", ".BBBBBBBB.", "..nnnnnn.."],
+    bowl: ["W............W", "WBBBBBBBBBBBBW", ".BBBBBBBBBBBB.", "..BBBBBBBBBB..", "...nnnnnnnn..."],
     banana: [".....NN", "Y....Y.", "YY..YY.", ".FFFF.."],
     banana_flip: [".YYYY..", "YY..YY.", "Y....Y.", ".....NN"],
     banana_splat: ["..Y...Y..", ".YYEYYEY.", "YYYYFYYYY"],
@@ -3773,7 +3773,8 @@
   const bananaGravity = s => Math.min(0.02 + s * 0.0008, 0.05);
   // the bowl on the pug's head: its middle (over the head, which is off to the side the pug faces), half its
   // width, and the line a banana has to fall through to land in it
-  const bowlSpan = () => ({ cx: banana.x + (banana.face > 0 ? 2.5 : -3.5), half: 6, top: BANANA_GROUND - 16 });
+  // (the bowl is 14 pixels across, made a bit bigger at the user's request: a banana anywhere over it counts)
+  const bowlSpan = () => ({ cx: banana.x + (banana.face > 0 ? 2.5 : -3.5), half: 8, top: BANANA_GROUND - 18 });
   function startBanana(by) {
     let best = 0;
     try { best = Math.max(0, Math.floor(+localStorage.getItem(BANANA_BEST_KEY)) || 0); } catch (e) {}
@@ -3891,7 +3892,7 @@
     if (looks[g.id].suit) blitFeet(looks[g.id].suit + '_' + pose, X, BANANA_GROUND, flip);
     if (looks[g.id].necklace) blitFeet(looks[g.id].necklace + '_' + pose, X, BANANA_GROUND, flip);
     const bowl = bowlSpan();
-    blit('bowl', Math.round(bowl.cx) - 5, bowl.top - 1);
+    blit('bowl', Math.round(bowl.cx) - 7, bowl.top);
     // "+1" over the bowl for each catch (the pixel font has no "+", so it is drawn by hand)
     for (const p of g.plus) {
       if (p.t <= 8 && frame % 4 >= 2) continue;
