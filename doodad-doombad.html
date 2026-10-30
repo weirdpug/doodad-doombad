@@ -1916,7 +1916,8 @@
     ],
     // Customize, from the main menu only: Suits, Hats, Necklaces and Pets, then Back to the main menu
     // The Arcade (space, from the main menu's night sky): just Back to the main menu
-    arcade: () => [{ label: 'Back', act: () => backToTitle() }],
+    // (zoomed in on a planet, Back zooms out first)
+    arcade: () => [{ label: 'Back', act: () => arcadeZoom.target && !arcadeZoom.out ? zoomOut() : backToTitle() }],
     custom: () => [
       ...CUSTOM_PARTS.map(c => ({ label: c.name, act: by => showPause(c.view, 0, null, by) })),
       { label: 'Back', act: () => backToTitle() },
@@ -1938,7 +1939,7 @@
     // (the Store and Necklaces show the bag or look of the pug that opened them)
     if ((store || neck) && by !== undefined && joined[by]) storeBy = by;
     if (!joined[storeBy]) storeBy = kbBy();
-    ovTitle.textContent = arcade ? 'The Arcade' : store ? 'Store' : part ? part.name : custom ? 'Customize' : 'Paused';
+    ovTitle.textContent = arcade ? (arcadeZoom.target && !arcadeZoom.out ? arcadeZoom.target.name : 'The Arcade') : store ? 'Store' : part ? part.name : custom ? 'Customize' : 'Paused';
     // (Necklaces keeps a line for what was just put on, and with 2-4 pugs, whose look it is)
     ovText.hidden = arcade || (custom && !neck);
     ovText.textContent = note || (store
@@ -1966,6 +1967,7 @@
     // (the Store opens at the start of its row of cards)
     if (opening) { storeCol = 0; storeScroll.scrollLeft = 0; }
     if (neck && was !== view) lookScroll.scrollLeft = 0;   // (a Customize section opens at its first card)
+    if (arcade && was !== view) { arcadeZoom = { target: null, p: 0, out: false }; ovTitle.textContent = 'The Arcade'; }   // (and The Arcade zoomed out)
     if (store) shelfArrows();
     markSel(true);
   }
@@ -2112,6 +2114,7 @@
   }, { passive: false });
   function chooseSel(by) { if (phase === 'paused' && menuEntries[menuSel]) menuEntries[menuSel].act(by || 0); }
   function menuBack() {
+    if (pauseView === 'arcade' && arcadeZoom.target && !arcadeZoom.out) return zoomOut();   // (Esc or B zooms out first)
     const part = CUSTOM_PARTS.findIndex(c => c.view === pauseView);
     if (part >= 0) showPause('custom', part);   // (from Suits, Hats or Necklaces back to Customize)
     else if (pauseView === 'store') storeBack(); else resumeGame();
@@ -3605,6 +3608,42 @@
   const spaceBg = document.createElement('canvas');
   let spaceBgReady = false, spaceT = 0;
   const NIGHT_Y = 64;   // the dark night top of the main menu's sky (where its stars are): a click there goes to The Arcade
+  // The Arcade's planets (and moon), each with its name, where it is, its size, its colours (light, mid, dark),
+  // its stripes and its ring. Clicking one zooms in on it and shows its name; clicking again (or Back or Esc)
+  // zooms back out.
+  const SPACE_PLANETS = [
+    { name: 'Saturn', x: 70, y: 122, r: 24, cols: ['#ffd9a0', '#e8a05a', '#a8743a'], stripe: '#c8742f', ring: [42, 10] },
+    { name: 'Mars', x: 192, y: 66, r: 10, cols: ['#ff8a6a', '#e8282f', '#a8141f'] },
+    { name: 'Earth', x: 182, y: 196, r: 18, cols: ['#9fb4ff', '#2f5bff', '#1d2f8c'] },
+    { name: 'The Moon', x: 214, y: 172, r: 6, cols: ['#eef0f6', '#b4b8c8', '#7f8396'] },
+    { name: 'Pluto', x: 32, y: 222, r: 7, cols: ['#d8a6e8', '#9c5ab8', '#5a2c7a'], stripe: '#7a3c9a' },
+  ];
+  // the zoom: which planet, how far in (p, 0 to 1 over half a second) and whether it is heading back out
+  let arcadeZoom = { target: null, p: 0, out: false };
+  const ZOOM_FRAMES = 30;
+  // (how much a planet is blown up so it, ring and all, is about 60% of the screen across, at most 8 times)
+  const zoomOf = p => clamp(0.6 * PW / (2 * (p.ring ? p.ring[0] : p.r)), 1, 8);
+  // the planet under a click (the small ones first, so the Moon wins over Earth; Saturn counts its ring)
+  function planetAt(e) {
+    const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * PW, y = (e.clientY - r.top) / r.height * PH;
+    return [...SPACE_PLANETS].sort((a, b) => a.r - b.r).find(p => Math.hypot(x - p.x, y - p.y) <= p.r + 3 ||
+      (p.ring && Math.abs(x - p.x) <= p.ring[0] + 2 && Math.abs(y - p.y) <= p.ring[1] + 2));
+  }
+  function zoomTo(p) { arcadeZoom = { target: p, p: 0, out: false }; ovTitle.textContent = p.name; sfx.tick(); }
+  function zoomOut() { if (!arcadeZoom.target || arcadeZoom.out) return; arcadeZoom.out = true; ovTitle.textContent = 'The Arcade'; sfx.tick(); }
+  // a click in The Arcade: on a planet zooms in on it; anywhere while zoomed in zooms back out
+  ov.addEventListener('click', e => {
+    if (!(fromTitle && pauseView === 'arcade') || e.target.closest('button')) return;
+    if (arcadeZoom.target && !arcadeZoom.out) { zoomOut(); return; }
+    const p = planetAt(e);
+    if (p) zoomTo(p);
+  });
+  // (the mouse pointer turns into a hand over a planet)
+  ov.addEventListener('pointermove', e => {
+    if (!(fromTitle && pauseView === 'arcade')) { if (ov.style.cursor) ov.style.cursor = ''; return; }
+    const c = arcadeZoom.target || (!e.target.closest('button') && planetAt(e)) ? 'pointer' : '';
+    if (ov.style.cursor !== c) ov.style.cursor = c;
+  });
   function buildSpaceBg() {
     spaceBg.width = PW; spaceBg.height = PH;
     const c = spaceBg.getContext('2d');
@@ -3636,20 +3675,33 @@
         for (const d of [0, 2]) dot(col, Math.round(cx + Math.cos(t) * (rx - d)), Math.round(cy + Math.sin(t) * (ry - d / 4)));
       }
     };
-    ring(70, 122, 42, 10, '#d9a066', false);
-    ball(70, 122, 24, ['#ffd9a0', '#e8a05a', '#a8743a'], '#c8742f');
-    ring(70, 122, 42, 10, '#f4e9a8', true);
-    ball(192, 66, 10, ['#ff8a6a', '#e8282f', '#a8141f']);
-    ball(182, 196, 18, ['#9fb4ff', '#2f5bff', '#1d2f8c']);
+    for (const p of SPACE_PLANETS) {
+      if (p.ring) ring(p.x, p.y, p.ring[0], p.ring[1], '#d9a066', false);
+      ball(p.x, p.y, p.r, p.cols, p.stripe);
+      if (p.ring) ring(p.x, p.y, p.ring[0], p.ring[1], '#f4e9a8', true);
+    }
     // (the blue planet's green land)
     for (const [x, y, w, h] of [[172, 186, 6, 3], [170, 189, 4, 4], [184, 198, 7, 3], [186, 201, 4, 3], [176, 205, 3, 2]]) dot('#2f8f66', x, y, w, h);
-    ball(214, 172, 6, ['#eef0f6', '#b4b8c8', '#7f8396']);
     for (const [x, y] of [[212, 170], [216, 174], [213, 175]]) dot('#7f8396', x, y);   // (the moon's craters)
-    ball(32, 222, 7, ['#d8a6e8', '#9c5ab8', '#5a2c7a'], '#7a3c9a');
   }
   function drawSpaceScene() {
     if (!spaceBgReady) { buildSpaceBg(); spaceBgReady = true; }
     spaceT++;
+    // zoomed in on a planet (or on the way in or out): the scene blown up round it, the planet sliding to the
+    // middle as it grows (eased in and out); no twinkles or shooting star meanwhile
+    const z = arcadeZoom;
+    if (z.target) {
+      z.p = clamp(z.p + (z.out ? -1 : 1) / ZOOM_FRAMES, 0, 1);
+      if (z.out && z.p === 0) z.target = null;
+    }
+    if (z.target) {
+      const e = z.p * z.p * (3 - 2 * z.p), p = z.target, k = 1 + (zoomOf(p) - 1) * e;
+      const cx = PW / 2 + (p.x - PW / 2) * e, cy = PH / 2 + (p.y - PH / 2) * e;
+      ctx.fillStyle = '#05061a'; ctx.fillRect(0, 0, PW, PH);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(spaceBg, cx - PW / 2 / k, cy - PH / 2 / k, PW / k, PH / k, 0, 0, PW, PH);
+      return;
+    }
     ctx.drawImage(spaceBg, 0, 0);
     // twinkling stars
     for (let i = 0; i < 30; i++) {
