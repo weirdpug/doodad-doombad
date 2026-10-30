@@ -690,6 +690,17 @@
     burrito_walk2: [...BURRITO_TOP, "...OO.....OO.."],
   });
   SPRITES.burrito_pet = SPRITES.burrito_walk1;
+  // Human (Customize > Pets): a little person with brown hair, a green shirt, navy trousers and black shoes,
+  // facing right (flipped for left), one arm reaching forward. He walks behind his pug always holding a leash
+  // to its neck (drawLeash: the hand is the arm's last two pixels, row 8). walk2 has his legs apart; walk1 is
+  // also how he stands, and his picture on the Pets card.
+  const HUMAN_TOP = ["...NNNN...", "..NNNNNN..", "..NNSSSS..", "..NSSSKS..", "...SSSSS..", "....SSS...", "...2222...",
+    "..222222..", "..222222SS", "..2222....", "..2222....", "..2222....", "..nnnn....", "..nnnn...."];
+  Object.assign(SPRITES, {
+    human_walk1: [...HUMAN_TOP, "..n..n....", "..n..n....", "..n..n....", ".KK..KK..."],
+    human_walk2: [...HUMAN_TOP, ".n....n...", ".n....n...", "n......n..", "KK.....KK."],
+  });
+  SPRITES.human_pet = SPRITES.human_walk1;
   // Underwear (Customize > Suits): white briefs with a blue waistband. The big pair is its picture on the
   // Suits card. The rest go over the pug like the sunglasses (same anchor and flip): side on, they cover the
   // pug's hips and the tops of its back legs; climbing (seen from behind) the curly tail pokes out over the
@@ -1014,10 +1025,12 @@
   const NECKLACES = [{ key: 'alpha', name: 'Alpha Necklace', what: 'the Alpha Necklace', alt: 'A gold chain with a gold dollar sign on it' },
     { key: 'tie', name: "President Pug's Tie", what: "President Pug's tie", alt: "President Pug's blue tie with a navy knot" }];
   // (kind: how a pet goes along with its pug: 'fly' above and behind its head, 'walk' behind it on its floor;
-  // farts: now and then it farts, a green cloud and a raspberry; hops: a walker that bounces as it goes)
+  // farts: now and then it farts, a green cloud and a raspberry; hops: a walker that bounces as it goes;
+  // leash: it holds a leash to its pug's neck, and walks first in line, right behind the pug)
   const PETS = [{ key: 'turd', name: 'Turd the Bird', alt: 'A small brown bird', kind: 'fly' },
     { key: 'joe', name: 'Donkey Joe', alt: 'A blue donkey', kind: 'walk', farts: true },
-    { key: 'burrito', name: 'Baby Burrito', alt: 'A little burrito with big eyes', kind: 'walk', hops: true }];
+    { key: 'burrito', name: 'Baby Burrito', alt: 'A little burrito with big eyes', kind: 'walk', hops: true },
+    { key: 'human', name: 'Human', alt: 'A little person holding a leash', kind: 'walk', leash: true }];
   // the Customize sections with things to choose: which of a pug's looks each sets, its things, the
   // button's words while it isn't / is chosen, and what the screen says after
   const LOOK_SECTIONS = {
@@ -2911,7 +2924,9 @@
     P.pets = P.pets || {};
     for (const k of Object.keys(P.pets)) if (!pets.some(pet => pet.key === k)) delete P.pets[k];
     let walkers = 0, fliers = 0;
-    for (const pet of pets) movePet(P, pet, pet.kind === 'walk' ? walkers++ : fliers++);
+    // (a pet on a leash goes first, so the leash runs straight to the pug, not over the other pets)
+    const order = [...pets.filter(pet => pet.leash), ...pets.filter(pet => !pet.leash)];
+    for (const pet of order) movePet(P, pet, pet.kind === 'walk' ? walkers++ : fliers++);
   }
   // (n: how many pets of the same kind are ahead of this one in the line)
   function movePet(P, pet, n) {
@@ -2948,11 +2963,28 @@
         // (a hopper bounces up to 3 pixels off its floor as it goes)
         const lift = pet.hops && b.moving ? Math.round(Math.abs(Math.sin(b.step / 5)) * 3) : 0;
         blitFeet(pet.key + (b.moving && Math.floor(b.step / 8) % 2 ? '_walk2' : '_walk1'), px(b.x), Math.round(b.y / 2) - lift, b.face < 0);
+        if (pet.leash) drawLeash(P, b);
         continue;
       }
       const s = sprite(pet.key + '_fly' + (Math.floor(frame / 6) % 2 + 1), b.face < 0);
       if (s) ctx.drawImage(s, px(b.x) - (s.width >> 1), Math.round(b.y / 2) - (s.height >> 1));
     }
+  }
+  // The Human's leash: a red line from his reaching hand to a red collar knot at his pug's neck, sagging a
+  // little in the middle (more the further apart they are). Side on the neck is where the head meets the
+  // body; climbing (seen from behind) it is the back of the neck.
+  function drawLeash(P, b) {
+    const X = clamp(px(P.x), 8, PW - 8), Y = Math.round(P.y / 2), climb = P.state === 'climb';
+    const nx = climb ? X : X + (P.face < 0 ? 1 : -2), ny = Y - (climb ? 9 : 6);
+    const hx = clamp(px(b.x), 5, PW - 5) + (b.face < 0 ? -5 : 4), hy = Math.round(b.y / 2) - 10;
+    const mx = (hx + nx) / 2, my = Math.max(hy, ny) + 2 + Math.abs(hx - nx) / 6;
+    const n = Math.max(8, Math.ceil(Math.hypot(hx - nx, hy - ny) * 1.5));
+    ctx.fillStyle = PAL.R;
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, u = 1 - t;
+      ctx.fillRect(Math.round(u * u * hx + 2 * u * t * mx + t * t * nx), Math.round(u * u * hy + 2 * u * t * my + t * t * ny), 1, 1);
+    }
+    ctx.fillRect(nx - 1, ny - 1, 2, 2);   // (the collar's knot)
   }
   function step() {
     if (coinBarOpen) return;   // (everything waits while the coin bar is open)
