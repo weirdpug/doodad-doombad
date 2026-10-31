@@ -1478,6 +1478,7 @@
   //   ZER0      every pug's coins go back to 0 (zeroCoins), on any screen
   //   C0/\/\E   ("come") calls the alien mother ship into The Arcade (codeCome); on the main menu, up into space first
   //   EXP       blows up all the mother ship's tiny ships at once, and so the mother ship (codeExp), in The Arcade
+  //   L0CK      locks again everything that had to be unlocked (Zorp the Alien), keeping what you start with (relock)
   // A code's first key still does its usual job if it is a game key (B barks, ZER0's Z jumps), but once a
   // code has begun, its next keys only type the code: the coin code's S doesn't also climb down or pick a
   // menu choice, the skip code's X makes no tacos. A key that doesn't fit, or nothing typed for 25 seconds,
@@ -1485,9 +1486,18 @@
   const CODES = [{ code: 'C0!NS', at: 0, run: () => openCoinBar() }, { code: 'B0O/\\/\\', at: 0, run: () => codeBoom() },
     { code: '|_!FE', at: 0, run: () => toggleSafe() }, { code: '/\\/EXT', at: 0, run: () => skipLevel() },
     { code: 'ZER0', at: 0, run: () => zeroCoins() }, { code: 'C0/\\/\\E', at: 0, run: () => codeCome() },
-    { code: 'EXP', at: 0, run: () => codeExp() }];
+    { code: 'EXP', at: 0, run: () => codeExp() }, { code: 'L0CK', at: 0, run: () => relock() }];
   // The zero code (the user asked for one to reset their coins): every pug's coins are set to 0 and saved.
   // Store things already bought are kept.
+  // (the lock code, the user asked 2026-10-31: every unlock forgotten, and a pet that is locked again goes home)
+  function relock() {
+    for (const k of Object.keys(unlocks)) delete unlocks[k];
+    try { localStorage.removeItem(UNLOCKS_KEY); } catch (e) {}
+    for (const l of looks) l.pets = l.pets.filter(k => { const pet = PETS.find(x => x.key === k); return pet && !(pet.locked && pet.locked()); });
+    saveLooks(); sfx.nope();
+    toast('Everything you unlocked is locked again', '#ff3e6c');
+    if (phase === 'paused' && LOOK_SECTIONS[pauseView]) renderLooks();
+  }
   function zeroCoins() {
     coins = [0, 0, 0, 0]; saveCoins(); updateHud(true); sfx.tick();
     toast('All coins reset to 0', '#ffcc3d');
