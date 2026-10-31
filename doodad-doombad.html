@@ -872,6 +872,10 @@
   {
     const ALIEN2 = ['.........VVVV.........', '........VPVVPV........', '.......VVQPPQVV.......', '.......VPWKKWPV.......', '......VVPPQQPPVV......'];
     Object.assign(SPRITES, { ufo2_0: [...ALIEN2, ...SPRITES.ufo_0.slice(5)], ufo2_1: [...ALIEN2, ...SPRITES.ufo_1.slice(5)] });
+    // the third, hiding beside the second (the user asked 2026-10-31): an orange alien with three eyes and a toothy
+    // grin, and the lights round its rim blink cyan and green
+    const ALIEN3 = ['.........VVVV.........', '........VWVVVV........', '.......VVFKKFVV.......', '.......VKFFFFKV.......', '......VVFFWWFFVV......'];
+    Object.assign(SPRITES, { ufo3_0: [...ALIEN3, ...SPRITES.ufo_0.slice(5).map(r => r.replace(/Y/g, 'C'))], ufo3_1: [...ALIEN3, ...SPRITES.ufo_1.slice(5).map(r => r.replace(/M/g, 'g'))] });
   }
   // The alien mother ship (The Arcade, once every planet's spaceship is blown up): a giant saucer, more than
   // twice the little one, with a big glass dome holding three green aliens, a grey hull, a row of lights that
@@ -2044,7 +2048,7 @@
     // (the Store opens at the start of its row of cards)
     if (opening) { storeCol = 0; storeScroll.scrollLeft = 0; }
     if (neck && was !== view) lookScroll.scrollLeft = 0;   // (a Customize section opens at its first card)
-    if (arcade && was !== view) { arcadeZoom = { target: null, p: 0, out: false, ship: null }; ovTitle.textContent = 'The Arcade'; for (const pl of SPACE_PLANETS) pl.shipGone = pl.ship2Gone = false; }   // (and The Arcade zoomed out)
+    if (arcade && was !== view) { arcadeZoom = { target: null, p: 0, out: false, ship: null }; ovTitle.textContent = 'The Arcade'; for (const pl of SPACE_PLANETS) { pl.shipGone = false; pl.deepGone = []; } }   // (and The Arcade zoomed out)
     if (store) shelfArrows();
     markSel(true);
   }
@@ -2191,7 +2195,7 @@
   }, { passive: false });
   function chooseSel(by) { if (phase === 'paused' && menuEntries[menuSel]) menuEntries[menuSel].act(by || 0); }
   function menuBack() {
-    if (pauseView === 'arcade' && onShip2()) return ship2Out();
+    if (pauseView === 'arcade' && deepLive()) return deepOut();
     if (pauseView === 'arcade' && onShip()) return shipOut();   // (Esc or B zooms out of the spaceship first,
     if (pauseView === 'arcade' && arcadeZoom.target && !arcadeZoom.out) return zoomOut();   // then out of the planet)
     const part = CUSTOM_PARTS.findIndex(c => c.view === pauseView);
@@ -3697,9 +3701,11 @@
     // (dot: a tiny green pixel beside the planet, only there once you have zoomed in on it, that turns into an alien
     // spaceship when clicked; the user asked for one by Saturn, then by every planet. Each sits just off its planet,
     // inside the zoomed-in view)
-    // (dot2: Saturn's alien spaceship has a tiny green pixel of its own beside it, zoomed all the way in on the ship:
-    // where, in screen pixels from the ship's middle; the user asked 2026-10-31)
-    { name: 'Saturn', x: 70, y: 122, r: 24, cols: ['#ffd9a0', '#e8a05a', '#a8743a'], stripe: '#c8742f', ring: [42, 10], dot: [117, 116], dot2: [46, -14] },
+    // (deep: the spaceships hiding inside one another at Saturn, the user asked 2026-10-31: zoomed all the way in on
+    // its alien spaceship, a tiny green pixel beside it is the second (off: where, in screen pixels from the ship's
+    // middle; spr: its picture), and zoomed in on that, another green pixel beside it is the third)
+    { name: 'Saturn', x: 70, y: 122, r: 24, cols: ['#ffd9a0', '#e8a05a', '#a8743a'], stripe: '#c8742f', ring: [42, 10], dot: [117, 116],
+      deep: [{ off: [46, -14], spr: 'ufo2' }, { off: [-46, 12], spr: 'ufo3' }] },
     { name: 'Mars', x: 192, y: 66, r: 10, cols: ['#ff8a6a', '#e8282f', '#a8141f'], dot: [206, 54] },
     { name: 'Earth', x: 182, y: 196, r: 18, cols: ['#9fb4ff', '#2f5bff', '#1d2f8c'], game: 'banana', dot: [157, 208] },
     { name: 'The Moon', x: 214, y: 172, r: 6, cols: ['#eef0f6', '#b4b8c8', '#7f8396'], dot: [204, 163] },
@@ -3723,21 +3729,22 @@
   }
   // (zooming in or out redoes The Arcade's screen: its title, and Play shown or gone)
   function zoomTo(p) { arcadeZoom = { target: p, p: 0, out: false, ship: null }; showPause('arcade', 0); sfx.tick(); }
-  function zoomOut() { if (!arcadeZoom.target || arcadeZoom.out) return; arcadeZoom.out = true; arcadeZoom.ship = arcadeZoom.ship2 = null; showPause('arcade', 0); sfx.tick(); }
+  function zoomOut() { if (!arcadeZoom.target || arcadeZoom.out) return; arcadeZoom.out = true; arcadeZoom.ship = arcadeZoom.deep = null; showPause('arcade', 0); sfx.tick(); }
   // (zoomed in on the spaceship, or on the way)
   const onShip = () => !!(arcadeZoom.ship && !arcadeZoom.ship.out);
   function shipIn() { arcadeZoom.ship = { p: 0, out: false }; showPause('arcade', 0); sfx.ufo(); }
-  function shipOut() { if (!onShip()) return; arcadeZoom.ship.out = true; arcadeZoom.ship2 = null; showPause('arcade', 0); sfx.tick(); }
-  // (ship2: Saturn's second spaceship, zoomed into from the green pixel beside the first, the same way; clicking
-  // the ship blows it up too, anywhere else zooms back out to the first)
-  const onShip2 = () => !!(arcadeZoom.ship2 && !arcadeZoom.ship2.out);
-  function ship2In() { arcadeZoom.ship2 = { p: 0, out: false }; showPause('arcade', 0); sfx.ufo(); }
-  function ship2Out() { if (!onShip2()) return; arcadeZoom.ship2.out = true; showPause('arcade', 0); sfx.tick(); }
-  let dot2At = null;   // (where the second green pixel was drawn on screen this frame, for clicks)
-  function onDot2(e) {
-    if (!dot2At) return false;
+  function shipOut() { if (!onShip()) return; arcadeZoom.ship.out = true; arcadeZoom.deep = null; showPause('arcade', 0); sfx.tick(); }
+  // (deep: Saturn's spaceships hiding inside one another, each zoomed into from the green pixel beside the one
+  // before, the same way: each level is a { p, out } on arcadeZoom.deep. Clicking the deepest ship blows it up too,
+  // anywhere else zooms back out a level. Levels still zooming out sit on top, so the live ones come first.)
+  const deepLive = () => (arcadeZoom.deep || []).filter(lv => !lv.out).length;
+  function deepIn() { arcadeZoom.deep = (arcadeZoom.deep || []).slice(0, deepLive()).concat({ p: 0, out: false }); showPause('arcade', 0); sfx.ufo(); }
+  function deepOut() { const n = deepLive(); if (!n) return; arcadeZoom.deep.length = n; arcadeZoom.deep[n - 1].out = true; showPause('arcade', 0); sfx.tick(); }
+  let deepDotAt = null;   // (where the next green pixel was drawn on screen this frame, for clicks)
+  function onDeepDot(e) {
+    if (!deepDotAt) return false;
     const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * PW, y = (e.clientY - r.top) / r.height * PH;
-    return Math.hypot(x - dot2At[0], y - dot2At[1]) <= 8;
+    return Math.hypot(x - deepDotAt[0], y - deepDotAt[1]) <= 8;
   }
   // whether a click is on a zoomed-in planet's green pixel (a generous 8 pixels round it: it is tiny)
   // Zoomed all the way in on the spaceship, clicking the ship itself blows it up: the same explosion as Bruno's
@@ -3749,25 +3756,26 @@
     const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * PW, y = (e.clientY - r.top) / r.height * PH;
     return Math.abs(x - PW / 2) <= 11 * SHIP_SCALE + 2 && Math.abs(y - PH / 2) <= 6 * SHIP_SCALE + 2;
   }
-  // (second: it is Saturn's second spaceship blowing up, the same way, the user asked 2026-10-31: afterwards the
-  // view is back on the first spaceship, and the second one and its green pixel are gone until The Arcade is opened
-  // again)
-  let shipBoomSecond = false;
-  function explodeShip(second) {
+  // (level: it is one of Saturn's deeper spaceships blowing up (1 the second, 2 the third), the same way, the user
+  // asked 2026-10-31: afterwards the view is back on the ship before it, and this one and its green pixel are gone
+  // until The Arcade is opened again)
+  let shipBoomLevel = 0;
+  function explodeShip(level) {
     sfx.boom(); boomPic.hidden = false; ov.hidden = true;
-    phase = 'boom'; shipBoomT = BOOM_PIC_FRAMES; shipBoomSecond = !!second;
+    phase = 'boom'; shipBoomT = BOOM_PIC_FRAMES; shipBoomLevel = level || 0;
   }
   function endShipBoom() {
     boomPic.hidden = true;
-    if (shipBoomSecond) {
-      shipBoomSecond = false;
-      if (arcadeZoom.target) arcadeZoom.target.ship2Gone = true;
-      arcadeZoom.ship2 = null;
+    if (shipBoomLevel) {
+      const p = arcadeZoom.target;
+      if (p) (p.deepGone = p.deepGone || [])[shipBoomLevel - 1] = true;
+      if (arcadeZoom.deep) arcadeZoom.deep.length = shipBoomLevel - 1;
+      shipBoomLevel = 0;
       phase = 'paused'; showPause('arcade', 0);
       return;
     }
     if (arcadeZoom.target) arcadeZoom.target.shipGone = true;
-    arcadeZoom.ship = arcadeZoom.ship2 = null;
+    arcadeZoom.ship = arcadeZoom.deep = null;
     // every planet's spaceship blown up: straight back out to space, and in comes the mother ship
     if (mother.state === 'gone' && SPACE_PLANETS.every(p => p.mother || p.shipGone)) {
       startMotherEntrance();
@@ -3979,7 +3987,7 @@
   const mbRand = n => { const x = Math.sin(n * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); };   // (the same "random" every time)
   function startMotherBoom() {
     mother = { state: 'exploding', t: 0, booms: mother.booms };   // (the last tiny ship's explosion still going off)
-    if (arcadeZoom.target) { arcadeZoom.out = true; arcadeZoom.ship = arcadeZoom.ship2 = null; }
+    if (arcadeZoom.target) { arcadeZoom.out = true; arcadeZoom.ship = arcadeZoom.deep = null; }
     phase = 'mboom'; ov.hidden = true;
   }
   function motherBoomTick() {
@@ -4135,9 +4143,10 @@
   ov.addEventListener('click', e => {
     // (nothing while a spaceship explodes: the phase is 'boom' then)
     if (phase !== 'paused' || !(fromTitle && pauseView === 'arcade') || e.target.closest('button')) return;
-    if (onShip2()) { if (arcadeZoom.ship2.p === 1 && onShipSprite(e)) explodeShip(true); else ship2Out(); return; }
+    const n = deepLive();
+    if (n) { if (onDeepDot(e)) deepIn(); else if (arcadeZoom.deep[n - 1].p === 1 && onShipSprite(e)) explodeShip(n); else deepOut(); return; }
     if (onShip()) {
-      if (onDot2(e)) ship2In(); else if (arcadeZoom.ship.p === 1 && onShipSprite(e)) explodeShip(); else shipOut();
+      if (onDeepDot(e)) deepIn(); else if (arcadeZoom.ship.p === 1 && onShipSprite(e)) explodeShip(); else shipOut();
       return;
     }
     if (!arcadeZoom.ship && fleetHit(e)) return;   // (one of the mother ship's tiny ships: blown up)
@@ -4222,7 +4231,7 @@
   function drawSpaceScene() {
     if (!spaceBgReady) { buildSpaceBg(); spaceBgReady = true; }
     spaceT++;
-    dot2At = null;
+    deepDotAt = null;
     if (mother.state === 'coming') motherTick();
     if (mother.fleet) fleetTick();
     if (mother.state === 'exploding') motherBoomTick();
@@ -4242,16 +4251,25 @@
       if (sh) { sh.p = clamp(sh.p + (sh.out ? -1 : 1) / ZOOM_FRAMES, 0, 1); if (sh.out && sh.p === 0) z.ship = null; }
       const se = z.ship ? z.ship.p * z.ship.p * (3 - 2 * z.ship.p) : 0;
       if (se) { k *= 1 + (SHIP_ZOOM - 1) * se; cx += (p.dot[0] - cx) * se; cy += (p.dot[1] - cy) * se; }
-      // on into the second spaceship (Saturn's): everything so far blown up 5 times more round the first ship's
-      // green pixel (at2), which slides to the middle (f2) and grows into it
-      if (!z.ship) z.ship2 = null;
-      const s2 = z.ship2;
-      if (s2) { s2.p = clamp(s2.p + (s2.out ? -1 : 1) / ZOOM_FRAMES, 0, 1); if (s2.out && s2.p === 0) z.ship2 = null; }
-      const e2 = z.ship2 && p.dot2 ? z.ship2.p * z.ship2.p * (3 - 2 * z.ship2.p) : 0;
-      const at2 = p.dot2 && [(p.dot[0] + 0.5 - (cx - PW / 2 / k)) * k + p.dot2[0], (p.dot[1] + 0.5 - (cy - PH / 2 / k)) * k + p.dot2[1]];
-      const f2 = e2 ? [at2[0] + (PW / 2 - at2[0]) * e2, at2[1] + (PH / 2 - at2[1]) * e2] : null;
+      // on into the spaceships hiding inside one another (Saturn's deep ones): each level blows everything so far up
+      // 5 times more round its green pixel (at: beside the ship before it), which slides to the middle (f) and grows
+      // into the next ship
+      if (!z.ship || !p.deep) z.deep = null;
+      const deep = z.deep || [];
+      for (const lv of deep) lv.p = clamp(lv.p + (lv.out ? -1 : 1) / ZOOM_FRAMES, 0, 1);
+      while (deep.length && deep[deep.length - 1].out && deep[deep.length - 1].p === 0) deep.pop();
+      const mid1 = p.dot && [(p.dot[0] + 0.5 - (cx - PW / 2 / k)) * k, (p.dot[1] + 0.5 - (cy - PH / 2 / k)) * k];   // (the first ship's middle)
+      const lvls = [];
+      deep.forEach((lv, i) => {
+        const e = lv.p * lv.p * (3 - 2 * lv.p), c = i ? lvls[i - 1].f : mid1, off = p.deep[i].off, at = [c[0] + off[0], c[1] + off[1]];
+        lvls.push({ e, at, f: [at[0] + (PW / 2 - at[0]) * e, at[1] + (PH / 2 - at[1]) * e] });
+      });
       ctx.fillStyle = '#05061a'; ctx.fillRect(0, 0, PW, PH);
-      if (e2) { const S2 = 1 + (SHIP_ZOOM - 1) * e2; ctx.save(); ctx.translate(f2[0], f2[1]); ctx.scale(S2, S2); ctx.translate(-at2[0], -at2[1]); }
+      // (the deepest level's zoom goes on first: canvas transforms apply outermost first)
+      for (let i = lvls.length - 1; i >= 0; i--) {
+        const L = lvls[i], S = 1 + (SHIP_ZOOM - 1) * L.e;
+        ctx.save(); ctx.translate(L.f[0], L.f[1]); ctx.scale(S, S); ctx.translate(-L.at[0], -L.at[1]);
+      }
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(spaceBg, cx - PW / 2 / k, cy - PH / 2 / k, PW / k, PH / k, 0, 0, PW, PH);
       drawMother(k, cx - PW / 2 / k, cy - PH / 2 / k);
@@ -4265,18 +4283,21 @@
         if (ufo && ufo.width * sz > d) {
           ctx.drawImage(ufo, Math.round(mx - ufo.width * sz / 2), Math.round(my - ufo.height * sz / 2), Math.round(ufo.width * sz), Math.round(ufo.height * sz));
         } else { ctx.fillStyle = '#5fd068'; ctx.fillRect(Math.round(mx - 1), Math.round(my - 1), d, d); }
-        // (and beside the ship, once all the way in on it, Saturn's next little green pixel: 2 pixels square too)
-        if (p.dot2 && !p.ship2Gone && z.ship && z.ship.p === 1 && !z.ship.out && !z.ship2) {
-          ctx.fillStyle = '#5fd068'; ctx.fillRect(Math.round(at2[0] - 1), Math.round(at2[1] - 1), d, d);
-          dot2At = at2;
-        }
       }
-      // (the second spaceship, on top and unscaled: just the pixel, 2 square, until the ship is bigger than that)
-      if (e2) {
+      // (each deeper ship on top of the level before, in its own frame: just the pixel, 2 square, until the ship is
+      // bigger than that)
+      lvls.forEach((L, i) => {
         ctx.restore();
-        const u2 = sprite(Math.floor(spaceT / 12) % 2 ? 'ufo2_1' : 'ufo2_0'), sz2 = SHIP_SCALE * e2;
-        if (u2 && u2.width * sz2 > 2) ctx.drawImage(u2, Math.round(f2[0] - u2.width * sz2 / 2), Math.round(f2[1] - u2.height * sz2 / 2), Math.round(u2.width * sz2), Math.round(u2.height * sz2));
-        else { ctx.fillStyle = '#5fd068'; ctx.fillRect(Math.round(f2[0] - 1), Math.round(f2[1] - 1), 2, 2); }
+        const u = sprite(p.deep[i].spr + (Math.floor(spaceT / 12) % 2 ? '_1' : '_0')), sz = SHIP_SCALE * L.e;
+        if (u && u.width * sz > 2) ctx.drawImage(u, Math.round(L.f[0] - u.width * sz / 2), Math.round(L.f[1] - u.height * sz / 2), Math.round(u.width * sz), Math.round(u.height * sz));
+        else { ctx.fillStyle = '#5fd068'; ctx.fillRect(Math.round(L.f[0] - 1), Math.round(L.f[1] - 1), 2, 2); }
+      });
+      // (and beside the deepest ship, once all the way in on it, the next little green pixel, 2 pixels square too)
+      const j = lvls.length, holder = j ? deep[j - 1] : z.ship, next = p.deep && p.deep[j];
+      if (next && mid1 && !p.shipGone && !(p.deepGone && p.deepGone[j]) && holder && holder.p === 1 && !holder.out && z.p === 1 && !z.out) {
+        const c = j ? lvls[j - 1].f : mid1;
+        deepDotAt = [c[0] + next.off[0], c[1] + next.off[1]];
+        ctx.fillStyle = '#5fd068'; ctx.fillRect(Math.round(deepDotAt[0] - 1), Math.round(deepDotAt[1] - 1), 2, 2);
       }
       return;
     }
