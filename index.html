@@ -1368,6 +1368,8 @@
     swish: () => tone(900, 0.09, 'sawtooth', 0.025, -650),   // a sword swung (the Colosseum)
     slash: () => { tone(1400, 0.05, 'square', 0.04, -900); tone(160, 0.14, 'square', 0.06, -90, 0.02); },   // ...and landing a hit
     fight: () => [523, 659, 784].forEach((f, i) => tone(f, 0.12, 'square', 0.05, 0, i * 0.08)),   // ...and FIGHT!
+    // a patch of grass dying: a crisp crunch, a softer one just after, and a little tone drooping down
+    crunch: () => { noise(0.07, 0.3, 8000, 3000); noise(0.12, 0.18, 3500, 700, 0.05); tone(620, 0.22, 'triangle', 0.06, -360, 0.04); },
     poof: () => { noise(0.35, 0.16, 2500, 300); tone(300, 0.12, 'sine', 0.05, 200); },   // a cloud poofing away (the main menu)
     pop: () => { tone(320, 0.12, 'square', 0.05, -260); tone(140, 0.18, 'sawtooth', 0.05, -90, 0.02); },   // ...and one blown up
     recall: () => [0, 0.08, 0.16, 0.24].forEach((d, i) => tone(900 - i * 150, 0.1, 'sine', 0.04, -200, d)),   // ...and they are called back in
@@ -1883,7 +1885,9 @@
     if (phase === 'title' && !e.target.closest('button')) {
       const i = cloudAt(e);
       if (i >= 0) { poofCloud(i); return; }
-      if (performance.now() - cloudTapT < 600) return;
+      const g = tuftAt(e);
+      if (g >= 0) { killTuft(g); return; }
+      if (performance.now() - titleTapT < 600) return;
     }
     if (phase === 'title' && !e.target.closest('button') && inNightSky(e)) { scrollSky(1, kbBy()); return; }
     if (phase !== 'paused' && !e.target.closest('.titlebtns .alt')) startClicked();
@@ -3696,6 +3700,13 @@
   // the hilltop, and the castle's base sunk a little into it (the hill curves away at the sides, so the castle
   // sits lower than the top: its towers stand in the grass, with no gap under them)
   const HILL_Y = 128, CASTLE_Y = 144;
+  // the grass tufts and little flowers on the meadow (the same every time: a fixed pattern, kept off the path)
+  const TITLE_TUFTS = [];
+  for (let i = 0; i < 90; i++) {
+    const x = (i * 53) % PW, y = 170 + 6 + (i * 37) % (PH - 170 - 8);
+    if (Math.abs(x - 120) < 8 + (y - CASTLE_Y) * 0.34) continue;
+    TITLE_TUFTS.push(i % 5 === 0 ? { x, y, flower: ['#ff7ab8', '#ffcc3d', '#ffffff'][i % 3] } : { x, y });
+  }
   function buildTitleBg() {
     titleBg.width = PW; titleBg.height = PH;
     const c = titleBg.getContext('2d');
@@ -3734,11 +3745,9 @@
       rect('#a8743a', Math.round(120 - half) - 1, y, Math.round(half * 2) + 2, 1);
       rect('#d9a066', Math.round(120 - half), y, Math.round(half * 2), 1);
     }
-    // grass tufts and little flowers on the meadow (the same every time: a fixed pattern)
-    for (let i = 0; i < 90; i++) {
-      const x = (i * 53) % PW, y = H0 + 6 + (i * 37) % (PH - H0 - 8);
-      if (Math.abs(x - 120) < 8 + (y - CASTLE_Y) * 0.34) continue;   // (not on the path)
-      if (i % 5 === 0) { rect(['#ff7ab8', '#ffcc3d', '#ffffff'][i % 3], x, y, 1, 1); rect('#5fc88f', x, y + 1, 1, 1); }
+    // grass tufts and little flowers on the meadow
+    for (const { x, y, flower } of TITLE_TUFTS) {
+      if (flower) { rect(flower, x, y, 1, 1); rect('#5fc88f', x, y + 1, 1, 1); }
       else { rect('#5fc88f', x, y, 1, 2); rect('#5fc88f', x + 1, y + 1, 1, 1); }
     }
     // ---- the castle ----
@@ -3786,10 +3795,10 @@
   const FLAGS = [[120, CASTLE_Y - 81], [72, CASTLE_Y - 75], [168, CASTLE_Y - 75]];
   // The main menu's clouds: where cloud i is now (w: its width; lap: how many times it has drifted round). A click on
   // one poofs it away (the user asked 2026-10-31): a puff of smoke and a soft poof, and it stays gone until it has
-  // drifted off the right edge and comes round again. (cloudGone: the lap each cloud was poofed on; cloudTapT: when,
+  // drifted off the right edge and comes round again. (cloudGone: the lap each cloud was poofed on; titleTapT: when,
   // so the click that comes with the same tap doesn't start the game)
   const CLOUD_POOF = 22;
-  let cloudGone = [-1, -1, -1], cloudPoofs = [], cloudTapT = -1e9;
+  let cloudGone = [-1, -1, -1], cloudPoofs = [], titleTapT = -1e9;
   function titleCloud(i) {
     const w = 26 + i * 8, s = frame * (0.12 + i * 0.05) + i * 97;
     return { x: Math.round((s % (PW + w)) - w), y: 70 + i * 18, w, lap: Math.floor(s / (PW + w)) };
@@ -3804,9 +3813,32 @@
     }
     return -1;
   }
+  // A click on a little patch of grass on the meadow kills it (the user asked 2026-10-31): it yellows, then flops over
+  // brown and dry, with a crunch, a few dry bits falling off and a droopy little tone. It stays dead until the game
+  // is loaded again. (deadTufts: which, and how far through wilting each is)
+  let deadTufts = [], tuftBits = [];
+  function tuftAt(e) {
+    const pt = e.touches ? e.touches[0] : e, r = cv.getBoundingClientRect();
+    if (!pt || !r.height) return -1;
+    const x = (pt.clientX - r.left) / r.width * PW, y = (pt.clientY - r.top) / r.height * PH;
+    let best = -1, bd = 6;
+    TITLE_TUFTS.forEach((g, i) => {
+      if (g.flower || deadTufts.some(d => d.i === i)) return;
+      const d = Math.hypot(g.x + 1 - x, g.y + 1 - y);
+      if (d < bd) { bd = d; best = i; }
+    });
+    return best;
+  }
+  function killTuft(i) {
+    const g = TITLE_TUFTS[i];
+    deadTufts.push({ i, t: 0 }); titleTapT = performance.now();
+    for (let j = 0; j < 3; j++) tuftBits.push({ x: g.x + j * 0.5, y: g.y, vx: (j - 1) * 0.25, vy: -0.6 - j * 0.15, t: 18 });
+    try { initAudio(); } catch (e) {}
+    sfx.crunch();
+  }
   function poofCloud(i) {
     const c = titleCloud(i);
-    cloudGone[i] = c.lap; cloudTapT = performance.now();
+    cloudGone[i] = c.lap; titleTapT = performance.now();
     cloudPoofs.push({ x: c.x + c.w / 2, y: c.y - 1, w: c.w, col: i === 2 ? '#e8a0a8' : '#c8a6d8', t: CLOUD_POOF });
     try { initAudio(); } catch (e) {}
     sfx.poof();
@@ -3839,6 +3871,15 @@
       p.t--;
     }
     cloudPoofs = cloudPoofs.filter(p => p.t > 0);
+    // (dead grass: yellowing first, then flopped over brown)
+    for (const d of deadTufts) {
+      const g = TITLE_TUFTS[d.i], k = Math.min(1, d.t++ / 14);
+      ctx.fillStyle = '#2f8f66'; ctx.fillRect(g.x, g.y, 2, 2);
+      if (k < 1) { ctx.fillStyle = k < 0.5 ? '#b8c040' : '#c89a40'; ctx.fillRect(g.x, g.y, 1, 2); ctx.fillRect(g.x + 1, g.y + 1, 1, 1); }
+      else { ctx.fillStyle = '#8f5a2a'; ctx.fillRect(g.x, g.y + 1, 2, 1); ctx.fillStyle = '#a8743a'; ctx.fillRect(g.x + 1, g.y, 1, 1); }
+    }
+    for (const b of tuftBits) { b.x += b.vx; b.vy += 0.12; b.y += b.vy; b.t--; ctx.fillStyle = '#a8743a'; ctx.fillRect(Math.round(b.x), Math.round(b.y), 1, 1); }
+    tuftBits = tuftBits.filter(b => b.t > 0);
     // the flags on the castle roofs, waving (two frames)
     const wave = Math.floor(frame / 14) % 2;
     for (const [x, y] of FLAGS) {
