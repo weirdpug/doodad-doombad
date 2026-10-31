@@ -1279,6 +1279,7 @@
     zip: i => tone(520 + i * 35, 0.07, 'square', 0.025, 380),   // ...and out zips a tiny ship (each one a little higher)
     charge: () => { tone(160, 1.8, 'sawtooth', 0.05, 1500); tone(240, 1.8, 'square', 0.03, 1800, 0.05); },   // the mother ship whining up to blow
     aftershock: () => { tone(48, 3, 'triangle', 0.14, -18); tone(36, 3.2, 'sawtooth', 0.06, -10, 0.2); },   // ...and the long rumble after
+    pops: () => [0, 0.06, 0.12, 0.2, 0.3].forEach((d, i) => { tone(340 - i * 30, 0.12, 'square', 0.05, -260, d); tone(150 - i * 10, 0.18, 'sawtooth', 0.05, -90, d + 0.02); }),   // ...or all of them
     pop: () => { tone(320, 0.12, 'square', 0.05, -260); tone(140, 0.18, 'sawtooth', 0.05, -90, 0.02); },   // ...and one blown up
     recall: () => [0, 0.08, 0.16, 0.24].forEach((d, i) => tone(900 - i * 150, 0.1, 'sine', 0.04, -200, d)),   // ...and they are called back in
     fireFart: () => { sfx.fart(); tone(220, 0.32, 'sawtooth', 0.05, 900, 0.05); },   // ...and a spicy one: the raspberry with a fiery whoosh
@@ -1389,13 +1390,15 @@
   //   /\/EXT    skips straight to the next level (skipLevel), during a round
   //   ZER0      every pug's coins go back to 0 (zeroCoins), on any screen
   //   C0/\/\E   ("come") calls the alien mother ship into The Arcade (codeCome); on the main menu, up into space first
+  //   EXP       blows up all the mother ship's tiny ships at once, and so the mother ship (codeExp), in The Arcade
   // A code's first key still does its usual job if it is a game key (B barks, ZER0's Z jumps), but once a
   // code has begun, its next keys only type the code: the coin code's S doesn't also climb down or pick a
   // menu choice, the skip code's X makes no tacos. A key that doesn't fit, or nothing typed for 25 seconds,
   // ends it.
   const CODES = [{ code: 'C0!NS', at: 0, run: () => openCoinBar() }, { code: 'B0O/\\/\\', at: 0, run: () => codeBoom() },
     { code: '|_!FE', at: 0, run: () => toggleSafe() }, { code: '/\\/EXT', at: 0, run: () => skipLevel() },
-    { code: 'ZER0', at: 0, run: () => zeroCoins() }, { code: 'C0/\\/\\E', at: 0, run: () => codeCome() }];
+    { code: 'ZER0', at: 0, run: () => zeroCoins() }, { code: 'C0/\\/\\E', at: 0, run: () => codeCome() },
+    { code: 'EXP', at: 0, run: () => codeExp() }];
   // The zero code (the user asked for one to reset their coins): every pug's coins are set to 0 and saved.
   // Store things already bought are kept.
   function zeroCoins() {
@@ -4050,6 +4053,21 @@
     if (t > 20 && t < MB_BLAST && Math.floor(t / 8) % 2 === 0) banner('CRITICAL!', 46, 'red', 2);
     if (tb >= 0 && tb < 30) { ctx.fillStyle = `rgba(255, 255, 255, ${1 - tb / 30})`; ctx.fillRect(0, 0, PW, PH); }
     if (tb >= 130 && (tb > 180 || Math.floor(tb / 6) % 2 === 0)) { banner('THE MOTHER SHIP', 40, 'gold'); banner('IS DESTROYED!', 54, 'gold'); }
+  }
+  // The explode code (EXP, the user asked 2026-10-31): every tiny ship the mother ship has let out blows up at
+  // once, each in its tiny explosion (any still inside go up with them), and then the mother ship blows up, the
+  // same as when the last one is clicked. Only while they are out, on The Arcade's own screen (not while a
+  // spaceship explodes, or in Banana Catch).
+  function codeExp() {
+    const f = mother.fleet;
+    if (!f || phase !== 'paused' || !(fromTitle && pauseView === 'arcade')) return;
+    f.ships.forEach((sh, i) => {
+      const at = fleetAt(sh, i, f);
+      if (at) (mother.booms = mother.booms || []).push({ x: at[0], y: at[1], t: 0 });
+      sh.dead = true;
+    });
+    sfx.pops();
+    startMotherBoom();
   }
   // whether a click is on the mother ship itself, zoomed all the way in on it
   function onMotherSprite(e) {
