@@ -1271,6 +1271,7 @@
     braam: () => { tone(62, 1.8, 'sawtooth', 0.15, -12); tone(93, 1.8, 'square', 0.09, -18); tone(124, 1.4, 'sawtooth', 0.07, -25); tone(41, 2.2, 'triangle', 0.15, -5); },   // ...and BRAAAM as it arrives
     hatch: () => { tone(140, 0.16, 'square', 0.06, -60); tone(300, 0.12, 'triangle', 0.04, 200, 0.05); },   // the mother ship's hatches open
     zip: i => tone(520 + i * 35, 0.07, 'square', 0.025, 380),   // ...and out zips a tiny ship (each one a little higher)
+    pop: () => { tone(320, 0.12, 'square', 0.05, -260); tone(140, 0.18, 'sawtooth', 0.05, -90, 0.02); },   // ...and one blown up
     recall: () => [0, 0.08, 0.16, 0.24].forEach((d, i) => tone(900 - i * 150, 0.1, 'sine', 0.04, -200, d)),   // ...and they are called back in
     fireFart: () => { sfx.fart(); tone(220, 0.32, 'sawtooth', 0.05, 900, 0.05); },   // ...and a spicy one: the raspberry with a fiery whoosh
     clank: () => { tone(980, 0.05, 'square', 0.04); tone(640, 0.09, 'triangle', 0.05, 0, 0.04); },   // ...and lands on a girder
@@ -3856,6 +3857,7 @@
   }
   // where ship i is now, or null while it is inside the mother ship (not out yet, or home again)
   function fleetAt(sh, i, f) {
+    if (sh.dead) return null;   // (blown up)
     const t = f.t - sh.at;
     if (t < 0 || (!f.out && f.back < sh.at)) return null;   // (called back before it came out: it stays in)
     const spot = fleetSpot(sh, t);
@@ -3868,16 +3870,57 @@
   function fleetTick() {
     const f = mother.fleet;
     f.t++;
+    if (f.ships.every(sh => sh.dead)) { mother.fleet = null; return; }   // (all twenty blown up)
     if (f.out) { const i = f.ships.findIndex(sh => sh.at === f.t); if (i >= 0) sfx.zip(i); }
     else if (f.ships.every((sh, i) => !fleetAt(sh, i, f))) mother.fleet = null;   // (all home)
   }
   function drawFleet(k, ox, oy) {
+    fleetView = { k, ox, oy, t: spaceT };
     const f = mother.fleet, s = sprite(Math.floor(spaceT / 8) % 2 ? 'tiny_1' : 'tiny_0');
-    if (!f || !s) return;
-    f.ships.forEach((sh, i) => {
+    if (f && s) f.ships.forEach((sh, i) => {
       const at = fleetAt(sh, i, f);
       if (at) ctx.drawImage(s, Math.round((at[0] - s.width / 2 - ox) * k), Math.round((at[1] - s.height / 2 - oy) * k), Math.round(s.width * k), Math.round(s.height * k));
     });
+    if (mother.booms) mother.booms.forEach(b => drawTinyBoom(b, k, ox, oy));
+  }
+  // Clicking one of the tiny ships blows it up (the user asked 2026-10-30): a tiny explosion where it was (a
+  // flash, then sparks flying out, yellow to orange to red to grey) and a small bang, and it is gone. Once all
+  // twenty are, the mother ship can let out twenty more. (mother.booms: the explosions still going off)
+  const TINY_BOOM_FRAMES = 26;
+  let fleetView = null;   // (how the tiny ships were last drawn: the zoom, and spaceT then, for clicks)
+  // the tiny ship under a click (the nearest within a few pixels: they are small and quick), or -1
+  function fleetNear(e) {
+    const f = mother.fleet, v = fleetView;
+    if (!f || !v || v.t !== spaceT) return -1;
+    const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * PW, y = (e.clientY - r.top) / r.height * PH;
+    let best = -1, bd = Math.max(7, 5 * v.k);
+    f.ships.forEach((sh, i) => {
+      const at = fleetAt(sh, i, f);
+      if (!at) return;
+      const d = Math.hypot((at[0] - v.ox) * v.k - x, (at[1] - v.oy) * v.k - y);
+      if (d < bd) { bd = d; best = i; }
+    });
+    return best;
+  }
+  function fleetHit(e) {
+    const i = fleetNear(e), f = mother.fleet;
+    if (i < 0) return false;
+    const sh = f.ships[i], at = fleetAt(sh, i, f);
+    sh.dead = true;
+    (mother.booms = mother.booms || []).push({ x: at[0], y: at[1], t: 0 });
+    sfx.pop();
+    return true;
+  }
+  function drawTinyBoom(b, k, ox, oy) {
+    const px = Math.max(1, Math.round(k)), t = b.t;
+    const dot = (x, y, col) => { ctx.fillStyle = col; ctx.fillRect(Math.round((x - ox) * k - px / 2), Math.round((y - oy) * k - px / 2), px, px); };
+    if (t < 4) for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) dot(b.x + dx, b.y + dy, t < 2 ? '#ffffff' : '#ffe14a');
+    const cols = ['#ffffff', '#ffe14a', '#ff9a2a', '#ff3e2a', '#8a8a96'], col = cols[Math.min(cols.length - 1, Math.floor(t / 5))];
+    for (let i = 0; i < 10; i++) {
+      if (t > 18 && i % 2) continue;   // (thinning out at the end)
+      const a = i / 10 * Math.PI * 2 + i * 0.3, d = 1 + t * (0.25 + (i % 3) * 0.08);
+      dot(b.x + Math.cos(a) * d, b.y + Math.sin(a) * d, col);
+    }
   }
   // whether a click is on the mother ship itself, zoomed all the way in on it
   function onMotherSprite(e) {
@@ -3919,16 +3962,17 @@
     // (nothing while a spaceship explodes: the phase is 'boom' then)
     if (phase !== 'paused' || !(fromTitle && pauseView === 'arcade') || e.target.closest('button')) return;
     if (onShip()) { if (arcadeZoom.ship.p === 1 && onShipSprite(e)) explodeShip(); else shipOut(); return; }
+    if (!arcadeZoom.ship && fleetHit(e)) return;   // (one of the mother ship's tiny ships: blown up)
     if (!arcadeZoom.ship && onDot(e)) { shipIn(); return; }
     if (onMotherSprite(e)) { fleetClick(); return; }   // (zoomed in on the mother ship: its tiny ships)
     if (arcadeZoom.target && !arcadeZoom.out) { zoomOut(); return; }
     const p = planetAt(e);
     if (p) zoomTo(p);
   });
-  // (the mouse pointer turns into a hand over a planet)
+  // (the mouse pointer turns into a hand over a planet, or a tiny ship)
   ov.addEventListener('pointermove', e => {
     if (!(fromTitle && pauseView === 'arcade')) { if (ov.style.cursor) ov.style.cursor = ''; return; }
-    const c = arcadeZoom.target || (!e.target.closest('button') && planetAt(e)) ? 'pointer' : '';
+    const c = arcadeZoom.target || (!e.target.closest('button') && (planetAt(e) || fleetNear(e) >= 0)) ? 'pointer' : '';
     if (ov.style.cursor !== c) ov.style.cursor = c;
   });
   function buildSpaceBg() {
@@ -4002,6 +4046,7 @@
     spaceT++;
     if (mother.state === 'coming') motherTick();
     if (mother.fleet) fleetTick();
+    if (mother.booms) mother.booms = mother.booms.filter(b => ++b.t < TINY_BOOM_FRAMES);
     // zoomed in on a planet (or on the way in or out): the scene blown up round it, the planet sliding to the
     // middle as it grows (eased in and out); no twinkles or shooting star meanwhile
     const z = arcadeZoom;
