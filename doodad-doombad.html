@@ -861,6 +861,12 @@
     banana_flip: [".YYYY..", "YY..YY.", "Y....Y.", ".....NN"],
     banana_splat: ["..Y...Y..", ".YYEYYEY.", "YYYYFYYYY"],
   });
+  // The alien spaceship hiding as Saturn's green pixel in The Arcade: a grey flying saucer with a glass dome,
+  // a little green alien inside (the same green as the pixel) and lights round its rim that blink yellow and pink.
+  Object.assign(SPRITES, {
+    ufo_0: [".........VVVV.........", "........VWVVVV........", ".......VVggggVV.......", ".......VgKggKgV.......", "......VVggggggVV......", "....GGGGGGGGGGGGGG....", "..GGUUUUUUUUUUUUUUGG..", ".GUUYUUUYUUUUYUUUYUUG.", "..GGUUUUUUUUUUUUUUGG..", "....HHHHHHHHHHHHHH....", "......HH......HH......"],
+    ufo_1: [".........VVVV.........", "........VWVVVV........", ".......VVggggVV.......", ".......VgKggKgV.......", "......VVggggggVV......", "....GGGGGGGGGGGGGG....", "..GGUUUUUUUUUUUUUUGG..", ".GUUMUUUMUUUUMUUUMUUG.", "..GGUUUUUUUUUUUUUUGG..", "....HHHHHHHHHHHHHH....", "......HH......HH......"],
+  });
   /*TACO SUIT*/
   // The taco suit a pug wears with the Taco Pug equipped: one overlay per pose, the pose's own size, drawn
   // over the pug with the same feet anchor and flip ('.' lets the pug show through; the head is never covered)
@@ -1242,6 +1248,7 @@
     taco: () => [659, 831, 988, 1319, 988, 1319].forEach((f, i) => tone(f, 0.07, 'square', 0.04, 0, i * 0.065)),   // a festive taco jingle
     // Donkey Joe farts: a low sliding raspberry with a flutter of quick low pops
     fart: () => { tone(95, 0.38, 'sawtooth', 0.08, -40); [0, 0.06, 0.12, 0.19, 0.26].forEach((d, i) => tone(70 + (i % 2) * 18, 0.05, 'square', 0.05, -12, d)); },
+    ufo: () => [0, 0.1, 0.2, 0.3].forEach((d, i) => tone(i % 2 ? 880 : 620, 0.12, 'sine', 0.05, i % 2 ? -260 : 260, d)),   // woo-woo: the alien spaceship
     fireFart: () => { sfx.fart(); tone(220, 0.32, 'sawtooth', 0.05, 900, 0.05); },   // ...and a spicy one: the raspberry with a fiery whoosh
     clank: () => { tone(980, 0.05, 'square', 0.04); tone(640, 0.09, 'triangle', 0.05, 0, 0.04); },   // ...and lands on a girder
     grr: () => [110, 98, 87, 78].forEach((f, i) => tone(f, 0.14, 'sawtooth', 0.07, -12, i * 0.12)),
@@ -1940,8 +1947,9 @@
     bananaPause: () => [{ label: 'Resume', act: () => resumeGame() }, { label: 'Back', act: () => backToArcade() }],
     bananaOver: () => [{ label: 'Play again', act: by => startBanana(by) }, { label: 'Back', act: () => backToArcade() }],
     arcade: () => [
-      ...(arcadeZoom.target && !arcadeZoom.out ? [{ label: 'Play', act: by => playFromArcade(by) }] : []),
-      { label: 'Back', act: () => arcadeZoom.target && !arcadeZoom.out ? zoomOut() : backToTitle() },
+      ...(arcadeZoom.target && !arcadeZoom.out && !onShip() ? [{ label: 'Play', act: by => playFromArcade(by) }] : []),
+      // (zoomed in on the spaceship, Back zooms out to Saturn first)
+      { label: 'Back', act: () => onShip() ? shipOut() : arcadeZoom.target && !arcadeZoom.out ? zoomOut() : backToTitle() },
     ],
     custom: () => [
       ...CUSTOM_PARTS.map(c => ({ label: c.name, act: by => showPause(c.view, 0, null, by) })),
@@ -1965,7 +1973,7 @@
     if ((store || neck) && by !== undefined && joined[by]) storeBy = by;
     if (!joined[storeBy]) storeBy = kbBy();
     const bpause = view === 'bananaPause', bover = view === 'bananaOver';
-    ovTitle.textContent = bpause ? 'Paused' : bover ? 'Splat!' : arcade ? (arcadeZoom.target && !arcadeZoom.out ? arcadeZoom.target.name : 'The Arcade') : store ? 'Store' : part ? part.name : custom ? 'Customize' : 'Paused';
+    ovTitle.textContent = bpause ? 'Paused' : bover ? 'Splat!' : arcade ? (onShip() ? 'Alien Spaceship' : arcadeZoom.target && !arcadeZoom.out ? arcadeZoom.target.name : 'The Arcade') : store ? 'Store' : part ? part.name : custom ? 'Customize' : 'Paused';
     // (Necklaces keeps a line for what was just put on, and with 2-4 pugs, whose look it is)
     ovText.hidden = arcade || (custom && !neck);
     ovText.textContent = note || (store
@@ -1995,7 +2003,7 @@
     // (the Store opens at the start of its row of cards)
     if (opening) { storeCol = 0; storeScroll.scrollLeft = 0; }
     if (neck && was !== view) lookScroll.scrollLeft = 0;   // (a Customize section opens at its first card)
-    if (arcade && was !== view) { arcadeZoom = { target: null, p: 0, out: false }; ovTitle.textContent = 'The Arcade'; }   // (and The Arcade zoomed out)
+    if (arcade && was !== view) { arcadeZoom = { target: null, p: 0, out: false, ship: null }; ovTitle.textContent = 'The Arcade'; }   // (and The Arcade zoomed out)
     if (store) shelfArrows();
     markSel(true);
   }
@@ -2142,7 +2150,8 @@
   }, { passive: false });
   function chooseSel(by) { if (phase === 'paused' && menuEntries[menuSel]) menuEntries[menuSel].act(by || 0); }
   function menuBack() {
-    if (pauseView === 'arcade' && arcadeZoom.target && !arcadeZoom.out) return zoomOut();   // (Esc or B zooms out first)
+    if (pauseView === 'arcade' && onShip()) return shipOut();   // (Esc or B zooms out of the spaceship first,
+    if (pauseView === 'arcade' && arcadeZoom.target && !arcadeZoom.out) return zoomOut();   // then out of the planet)
     const part = CUSTOM_PARTS.findIndex(c => c.view === pauseView);
     if (part >= 0) showPause('custom', part);   // (from Suits, Hats or Necklaces back to Customize)
     else if (pauseView === 'store') storeBack(); else resumeGame();
@@ -3650,8 +3659,9 @@
     { name: 'Pluto', x: 32, y: 222, r: 7, cols: ['#d8a6e8', '#9c5ab8', '#5a2c7a'], stripe: '#7a3c9a' },
   ];
   // the zoom: which planet, how far in (p, 0 to 1 over half a second) and whether it is heading back out
-  let arcadeZoom = { target: null, p: 0, out: false };
-  const ZOOM_FRAMES = 30;
+  // (ship: the second zoom, from a planet's green pixel into the alien spaceship it really is, the same way)
+  let arcadeZoom = { target: null, p: 0, out: false, ship: null };
+  const ZOOM_FRAMES = 30, SHIP_ZOOM = 5, SHIP_SCALE = 3;   // (5 times further in; the ship shown 3 times its size)
   // (how much a planet is blown up so it, ring and all, is about 60% of the screen across, at most 8 times)
   const zoomOf = p => clamp(0.6 * PW / (2 * (p.ring ? p.ring[0] : p.r)), 1, 8);
   // the planet under a click (the small ones first, so the Moon wins over Earth; Saturn counts its ring)
@@ -3661,8 +3671,20 @@
       (p.ring && Math.abs(x - p.x) <= p.ring[0] + 2 && Math.abs(y - p.y) <= p.ring[1] + 2));
   }
   // (zooming in or out redoes The Arcade's screen: its title, and Play shown or gone)
-  function zoomTo(p) { arcadeZoom = { target: p, p: 0, out: false }; showPause('arcade', 0); sfx.tick(); }
-  function zoomOut() { if (!arcadeZoom.target || arcadeZoom.out) return; arcadeZoom.out = true; showPause('arcade', 0); sfx.tick(); }
+  function zoomTo(p) { arcadeZoom = { target: p, p: 0, out: false, ship: null }; showPause('arcade', 0); sfx.tick(); }
+  function zoomOut() { if (!arcadeZoom.target || arcadeZoom.out) return; arcadeZoom.out = true; arcadeZoom.ship = null; showPause('arcade', 0); sfx.tick(); }
+  // (zoomed in on the spaceship, or on the way)
+  const onShip = () => !!(arcadeZoom.ship && !arcadeZoom.ship.out);
+  function shipIn() { arcadeZoom.ship = { p: 0, out: false }; showPause('arcade', 0); sfx.ufo(); }
+  function shipOut() { if (!onShip()) return; arcadeZoom.ship.out = true; showPause('arcade', 0); sfx.tick(); }
+  // whether a click is on a zoomed-in planet's green pixel (a generous 8 pixels round it: it is tiny)
+  function onDot(e) {
+    const z = arcadeZoom, p = z.target;
+    if (!p || !p.dot || z.out || z.p < 1) return false;
+    const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * PW, y = (e.clientY - r.top) / r.height * PH;
+    const k = zoomOf(p), sx = (p.dot[0] - p.x) * k + PW / 2, sy = (p.dot[1] - p.y) * k + PH / 2;
+    return Math.hypot(x - sx, y - sy) <= 8;
+  }
   // A planet's Play button: a planet with its own game plays it (Earth: Banana Catch); the others start a new
   // game, the same as Start on the main menu (each is meant to get its own game later)
   function playFromArcade(by) {
@@ -3671,9 +3693,12 @@
     fromTitle = false; phase = 'title';
     startClicked();
   }
-  // a click in The Arcade: on a planet zooms in on it; anywhere while zoomed in zooms back out
+  // a click in The Arcade: on a planet zooms in on it; on Saturn's green pixel, zoomed in, it zooms on into the
+  // alien spaceship; anywhere else while zoomed in zooms back out a level
   ov.addEventListener('click', e => {
     if (!(fromTitle && pauseView === 'arcade') || e.target.closest('button')) return;
+    if (onShip()) { shipOut(); return; }
+    if (!arcadeZoom.ship && onDot(e)) { shipIn(); return; }
     if (arcadeZoom.target && !arcadeZoom.out) { zoomOut(); return; }
     const p = planetAt(e);
     if (p) zoomTo(p);
@@ -3733,7 +3758,7 @@
   let skyScroll = null;
   function scrollSky(dir, by) {
     skyScroll = { dir, t: 0, by };
-    arcadeZoom = { target: null, p: 0, out: false };
+    arcadeZoom = { target: null, p: 0, out: false, ship: null };
     releaseAll(); ov.hidden = true; fromTitle = false; phase = 'scroll';
   }
   function drawSkyScroll() {
@@ -3757,15 +3782,24 @@
       if (z.out && z.p === 0) z.target = null;
     }
     if (z.target) {
-      const e = z.p * z.p * (3 - 2 * z.p), p = z.target, k = 1 + (zoomOf(p) - 1) * e;
-      const cx = PW / 2 + (p.x - PW / 2) * e, cy = PH / 2 + (p.y - PH / 2) * e;
+      const e = z.p * z.p * (3 - 2 * z.p), p = z.target;
+      let k = 1 + (zoomOf(p) - 1) * e, cx = PW / 2 + (p.x - PW / 2) * e, cy = PH / 2 + (p.y - PH / 2) * e;
+      // on into the spaceship: further in, sliding the green pixel to the middle
+      const sh = z.ship;
+      if (sh) { sh.p = clamp(sh.p + (sh.out ? -1 : 1) / ZOOM_FRAMES, 0, 1); if (sh.out && sh.p === 0) z.ship = null; }
+      const se = z.ship ? z.ship.p * z.ship.p * (3 - 2 * z.ship.p) : 0;
+      if (se) { k *= 1 + (SHIP_ZOOM - 1) * se; cx += (p.dot[0] - cx) * se; cy += (p.dot[1] - cy) * se; }
       ctx.fillStyle = '#05061a'; ctx.fillRect(0, 0, PW, PH);
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(spaceBg, cx - PW / 2 / k, cy - PH / 2 / k, PW / k, PH / k, 0, 0, PW, PH);
-      // (the planet's little green pixel, once the zoom is nearly in: one pixel of the scene, blown up like the rest)
+      // (the planet's little green pixel, once the zoom is nearly in: one pixel of the scene, blown up like the rest;
+      // zooming into it, it grows into the alien spaceship, lights blinking, once the ship is bigger than the pixel)
       if (p.dot && z.p > 0.85 && !z.out) {
-        ctx.fillStyle = '#5fd068';
-        ctx.fillRect(Math.round((p.dot[0] - (cx - PW / 2 / k)) * k), Math.round((p.dot[1] - (cy - PH / 2 / k)) * k), Math.ceil(k), Math.ceil(k));
+        const sx = (p.dot[0] - (cx - PW / 2 / k)) * k, sy = (p.dot[1] - (cy - PH / 2 / k)) * k, d = Math.ceil(k);
+        const ufo = sprite(Math.floor(spaceT / 12) % 2 ? 'ufo_1' : 'ufo_0'), sz = SHIP_SCALE * se;
+        if (ufo && ufo.width * sz > d) {
+          ctx.drawImage(ufo, Math.round(sx + d / 2 - ufo.width * sz / 2), Math.round(sy + d / 2 - ufo.height * sz / 2), Math.round(ufo.width * sz), Math.round(ufo.height * sz));
+        } else { ctx.fillStyle = '#5fd068'; ctx.fillRect(Math.round(sx), Math.round(sy), d, d); }
       }
       return;
     }
@@ -3874,7 +3908,7 @@
   // back to The Arcade, zoomed in on Earth (showPause('arcade') starts it zoomed out, so the zoom is put back)
   function backToArcade() {
     showPause('arcade', 0);
-    arcadeZoom = { target: SPACE_PLANETS.find(p => p.game === 'banana'), p: 1, out: false };
+    arcadeZoom = { target: SPACE_PLANETS.find(p => p.game === 'banana'), p: 1, out: false, ship: null };
     showPause('arcade', 0);
   }
   // Earth in daytime: a blue sky with a sun and clouds, green hills, and the grass the pug stands on; up top,
