@@ -1727,7 +1727,7 @@
     return !!pt && r.height > 0 && (pt.clientY - r.top) / r.height * PH < NIGHT_Y;
   };
   const ovPressed = e => {
-    if (phase === 'title' && !e.target.closest('button') && inNightSky(e)) { openFromTitle('arcade', kbBy()); return; }
+    if (phase === 'title' && !e.target.closest('button') && inNightSky(e)) { scrollSky(1, kbBy()); return; }
     if (phase !== 'paused' && !e.target.closest('.titlebtns .alt')) startClicked();
   };
   ov.addEventListener('pointerdown', ovPressed);
@@ -1756,7 +1756,8 @@
   titleBtns.forEach((b, i) => { if (i) b.addEventListener('click', () => openFromTitle(TITLE_VIEWS[i], kbBy())); });
   // back to the main menu from the Store or Customize, with that one's button chosen
   // (from Customize or one of its sections, Customize is chosen)
-  const backToTitle = () => showTitle(pauseView === 'store' ? 1 : pauseView === 'arcade' ? 0 : 2);
+  // (from The Arcade the view scrolls back down to the castle first: scrollSky)
+  const backToTitle = () => pauseView === 'arcade' ? scrollSky(-1) : showTitle(pauseView === 'store' ? 1 : 2);
   // the main menu again (sel: the button to choose), from the pause menu, the Store or Customize
   function showTitle(sel) {
     fromTitle = false; phase = 'title';
@@ -3722,6 +3723,28 @@
     for (const [x, y, w, h] of [[172, 186, 6, 3], [170, 189, 4, 4], [184, 198, 7, 3], [186, 201, 4, 3], [176, 205, 3, 2]]) dot('#2f8f66', x, y, w, h);
     for (const [x, y] of [[212, 170], [216, 174], [213, 175]]) dot('#7f8396', x, y);   // (the moon's craters)
   }
+  // The sky scroll between the main menu and The Arcade: instead of cutting, the view glides up from the castle
+  // into space (dir 1), or back down from space to the castle (dir -1), over SCROLL_FRAMES (eased in and out),
+  // with space drawn right above the castle scene. Nothing else happens meanwhile: the phase is 'scroll' (which
+  // no key, click or controller acts on) and the screens' words and buttons are hidden. At the top The Arcade
+  // opens; at the bottom the main menu comes back with Start chosen.
+  const SCROLL_FRAMES = 50;
+  let skyScroll = null;
+  function scrollSky(dir, by) {
+    skyScroll = { dir, t: 0, by };
+    arcadeZoom = { target: null, p: 0, out: false };
+    releaseAll(); ov.hidden = true; fromTitle = false; phase = 'scroll';
+  }
+  function drawSkyScroll() {
+    const s = skyScroll;
+    s.t = Math.min(1, s.t + 1 / SCROLL_FRAMES);
+    const e = s.t * s.t * (3 - 2 * s.t), off = Math.round((s.dir > 0 ? e : 1 - e) * PH);
+    ctx.save(); ctx.translate(0, off); drawTitleScene(); ctx.restore();
+    ctx.save(); ctx.translate(0, off - PH); drawSpaceScene(); ctx.restore();
+    if (s.t < 1) return;
+    skyScroll = null;
+    if (s.dir > 0) { phase = 'title'; openFromTitle('arcade', s.by); } else showTitle(0);
+  }
   function drawSpaceScene() {
     if (!spaceBgReady) { buildSpaceBg(); spaceBgReady = true; }
     spaceT++;
@@ -3903,6 +3926,8 @@
     if (g.startT > 0) banner('CATCH THE BANANAS!', 120, 'gold');
   }
   function draw() {
+    // gliding between the main menu and The Arcade, both scenes
+    if (skyScroll) { drawSkyScroll(); updateHud(); return; }
     // Banana Catch (and its pause and score screens) has its own scene
     if (banana && (phase === 'mini' || (fromTitle && (pauseView === 'bananaPause' || pauseView === 'bananaOver')))) {
       drawBanana(); updateHud(); return;
