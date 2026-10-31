@@ -1877,12 +1877,15 @@
     return !!pt && r.height > 0 && (pt.clientY - r.top) / r.height * PH < NIGHT_Y;
   };
   const ovPressed = e => {
-    // (a cloud on the main menu poofs away; the rest of that same tap does nothing more)
+    // (a cloud on the main menu poofs away, and a press on the meadow kills the patch of grass nearest it, never
+    // starting the game; the rest of that same press, its touch and its click, does nothing more however long it is
+    // held: titleSwallow)
     if (phase === 'title' && !e.target.closest('button')) {
+      if (e.type === 'pointerdown') titleSwallow = false;
+      else if (titleSwallow) { if (e.type === 'click') titleSwallow = false; return; }
       const i = cloudAt(e);
-      if (i >= 0) { poofCloud(i); return; }
-      const g = tuftAt(e);
-      if (g >= 0) { killTuft(g); return; }
+      if (i >= 0) { poofCloud(i); titleSwallow = true; return; }
+      if (onMeadow(e)) { const g = tuftAt(e); if (g >= 0) killTuft(g); titleSwallow = true; return; }
       if (performance.now() - titleTapT < 600) return;
     }
     if (phase === 'title' && !e.target.closest('button') && inNightSky(e)) { scrollSky(1, kbBy()); return; }
@@ -3812,14 +3815,21 @@
   // A click on a little patch of grass on the meadow kills it (the user asked 2026-10-31): it yellows, then flops over
   // brown and dry, with a crunch, a few dry bits falling off and a droopy little tone. It stays dead until the game
   // is loaded again. (deadTufts: which, and how far through wilting each is)
-  let deadTufts = [], tuftBits = [];
-  function tuftAt(e) {
+  // (the meadow, below the hill, is all grass: a press there never starts the game, and kills the nearest live patch
+  // within 12 pixels, a flower too; the user found the patches too small to hit)
+  let deadTufts = [], tuftBits = [], titleSwallow = false;
+  const titlePoint = e => {
     const pt = e.touches ? e.touches[0] : e, r = cv.getBoundingClientRect();
-    if (!pt || !r.height) return -1;
-    const x = (pt.clientX - r.left) / r.width * PW, y = (pt.clientY - r.top) / r.height * PH;
-    let best = -1, bd = 6;
+    return pt && r.height ? [(pt.clientX - r.left) / r.width * PW, (pt.clientY - r.top) / r.height * PH] : null;
+  };
+  const onMeadow = e => { const p = titlePoint(e); return !!p && p[1] >= 170; };
+  function tuftAt(e) {
+    const p = titlePoint(e);
+    if (!p) return -1;
+    const [x, y] = p;
+    let best = -1, bd = 12;
     TITLE_TUFTS.forEach((g, i) => {
-      if (g.flower || deadTufts.some(d => d.i === i)) return;
+      if (deadTufts.some(d => d.i === i)) return;
       const d = Math.hypot(g.x + 1 - x, g.y + 1 - y);
       if (d < bd) { bd = d; best = i; }
     });
@@ -3871,7 +3881,7 @@
     for (const d of deadTufts) {
       const g = TITLE_TUFTS[d.i], k = Math.min(1, d.t++ / 14);
       ctx.fillStyle = '#2f8f66'; ctx.fillRect(g.x, g.y, 2, 2);
-      if (k < 1) { ctx.fillStyle = k < 0.5 ? '#b8c040' : '#c89a40'; ctx.fillRect(g.x, g.y, 1, 2); ctx.fillRect(g.x + 1, g.y + 1, 1, 1); }
+      if (k < 1) { ctx.fillStyle = k < 0.5 ? '#b8c040' : '#c89a40'; ctx.fillRect(g.x, g.y, 1, 2); if (!g.flower) ctx.fillRect(g.x + 1, g.y + 1, 1, 1); }
       else { ctx.fillStyle = '#8f5a2a'; ctx.fillRect(g.x, g.y + 1, 2, 1); ctx.fillStyle = '#a8743a'; ctx.fillRect(g.x + 1, g.y, 1, 1); }
     }
     for (const b of tuftBits) { b.x += b.vx; b.vy += 0.12; b.y += b.vy; b.t--; ctx.fillStyle = '#a8743a'; ctx.fillRect(Math.round(b.x), Math.round(b.y), 1, 1); }
