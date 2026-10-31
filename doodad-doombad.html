@@ -3733,7 +3733,7 @@
     // (deep: the spaceships hiding inside one another at Saturn, the user asked 2026-10-31: zoomed all the way in on
     // its alien spaceship, a tiny green pixel beside it is the second (off: where, in screen pixels from the ship's
     // middle; spr: its picture), and zoomed in on that, another green pixel beside it is the third, and so on: the
-    // fourth, and on to the tenth)
+    // fourth, and on to the tenth; after that they go on for ever, made up as they come: see deepAt)
     { name: 'Saturn', x: 70, y: 122, r: 24, cols: ['#ffd9a0', '#e8a05a', '#a8743a'], stripe: '#c8742f', ring: [42, 10], dot: [117, 116],
       deep: [{ off: [46, -14], spr: 'ufo2' }, { off: [-46, 12], spr: 'ufo3' }, { off: [44, 16], spr: 'ufo4' },
         { off: [-44, -16], spr: 'ufo5' }, { off: [6, -38], spr: 'ufo6' },
@@ -3770,6 +3770,41 @@
   // (deep: Saturn's spaceships hiding inside one another, each zoomed into from the green pixel beside the one
   // before, the same way: each level is a { p, out } on arcadeZoom.deep. Clicking the deepest ship blows it up too,
   // anywhere else zooms back out a level. Levels still zooming out sit on top, so the live ones come first.)
+  // Past the tenth, Saturn's spaceships go on for ever (the user asked 2026-10-31): each deeper one's alien is made
+  // up from its number (head colour; a shine, ears, horns or antennae; eyes; mouth; the two colours its rim lights
+  // blink), the same every time, and its green pixel goes round the ship in turn. (deepAt: a level's { off, spr },
+  // from Saturn's deep list for the first ten, then made up as they are reached)
+  const GEN_HEADS = ['g', 'P', 'F', 'a', 'B', 'c', 'Y', 'w', 'R', 'C', 'd', 'o', 't', 'L', 'S', 'O', 'M', 'm', 'i', 'f'];
+  const GEN_LIGHTS = ['Y', 'M', 'C', 'g', 'W', 'R', 'P', 'F', 'o', 'Q'];
+  const GEN_OFFS = [[46, -14], [-46, 12], [44, 16], [-44, -16], [6, -38], [-6, 38], [50, 2], [-50, -2], [34, -32], [-34, 32], [34, 32], [-34, -32]];
+  function genUfo(n) {
+    const r = k => { const x = Math.sin(n * 91.7 + k * 13.3) * 43758.5453; return x - Math.floor(x); };
+    const pick = (arr, k) => arr[Math.floor(r(k) * arr.length)];
+    // (1: head, 2: ears/horns/antennae, 3: mouth; filled in last, so a head the mouth's colour can't mix them up)
+    const head = pick(GEN_HEADS, 1), extra = pick(GEN_HEADS, 2), mouth = pick(['K', 'W', 'M', 'R', 'n', 'd'], 3);
+    const top = pick(['VWVVVV', 'V2VV2V', 'VV2VVV', '2VVVV2', 'V2VVVV'], 4);
+    const eyes = pick(['1K11K1', '1WKKW1', 'K1KK1K', 'KKKKKK', 'KK11KK', 'WK11KW', '11KK11'], 5);
+    const lips = pick(['111111', '113311', '133331', '11WW11', '131131', '1K33K1'], 6);
+    const fill = row => row.replace(/1/g, head).replace(/2/g, extra).replace(/3/g, mouth);
+    const dome = ['.........VVVV.........', '........' + top + '........', '.......VV1111VV.......', '.......V' + eyes + 'V.......', '......VV' + lips + 'VV......'].map(fill);
+    const l1 = pick(GEN_LIGHTS, 7); let l2 = pick(GEN_LIGHTS, 8); if (l2 === l1) l2 = GEN_LIGHTS[(GEN_LIGHTS.indexOf(l1) + 3) % GEN_LIGHTS.length];
+    SPRITES['ufoX' + n + '_0'] = [...dome, ...SPRITES.ufo_0.slice(5).map(row => row.replace(/Y/g, l1))];
+    SPRITES['ufoX' + n + '_1'] = [...dome, ...SPRITES.ufo_1.slice(5).map(row => row.replace(/M/g, l2))];
+  }
+  function deepAt(p, i) {
+    if (!p.deep) return null;
+    if (i < p.deep.length) return p.deep[i];
+    p.deepMore = p.deepMore || [];
+    if (!p.deepMore[i]) { genUfo(i + 2); p.deepMore[i] = { off: GEN_OFFS[i % GEN_OFFS.length], spr: 'ufoX' + (i + 2) }; }
+    return p.deepMore[i];
+  }
+  // the colour of space at a point (for the deepest zooms, where one pixel of it fills the screen)
+  let spaceBgPx = null;
+  function spaceColorAt(wx, wy) {
+    if (!spaceBgPx) spaceBgPx = spaceBg.getContext('2d').getImageData(0, 0, PW, PH).data;
+    const i = (clamp(Math.floor(wy), 0, PH - 1) * PW + clamp(Math.floor(wx), 0, PW - 1)) * 4;
+    return `rgb(${spaceBgPx[i]}, ${spaceBgPx[i + 1]}, ${spaceBgPx[i + 2]})`;
+  }
   const deepLive = () => (arcadeZoom.deep || []).filter(lv => !lv.out).length;
   function deepIn() { arcadeZoom.deep = (arcadeZoom.deep || []).slice(0, deepLive()).concat({ p: 0, out: false }); showPause('arcade', 0); sfx.ufo(); }
   function deepOut() { const n = deepLive(); if (!n) return; arcadeZoom.deep.length = n; arcadeZoom.deep[n - 1].out = true; showPause('arcade', 0); sfx.tick(); }
@@ -4296,39 +4331,51 @@
       const mid1 = p.dot && [(p.dot[0] + 0.5 - (cx - PW / 2 / k)) * k, (p.dot[1] + 0.5 - (cy - PH / 2 / k)) * k];   // (the first ship's middle)
       const lvls = [];
       deep.forEach((lv, i) => {
-        const e = lv.p * lv.p * (3 - 2 * lv.p), c = i ? lvls[i - 1].f : mid1, off = p.deep[i].off, at = [c[0] + off[0], c[1] + off[1]];
+        const e = lv.p * lv.p * (3 - 2 * lv.p), c = i ? lvls[i - 1].f : mid1, off = deepAt(p, i).off, at = [c[0] + off[0], c[1] + off[1]];
         lvls.push({ e, at, f: [at[0] + (PW / 2 - at[0]) * e, at[1] + (PH / 2 - at[1]) * e] });
       });
       ctx.fillStyle = '#05061a'; ctx.fillRect(0, 0, PW, PH);
+      // (only the last three levels are drawn: anything further out is blown up so far it is off the screen, all but
+      // the colour of space right in the middle, which fills the screen instead; it keeps the zooms from growing
+      // past what the canvas can draw)
+      const from = Math.max(0, lvls.length - 3);
+      if (from) {
+        let x = PW / 2, y = PH / 2;
+        for (let i = lvls.length - 1; i >= 0; i--) { const L = lvls[i], S = 1 + (SHIP_ZOOM - 1) * L.e; x = L.at[0] + (x - L.f[0]) / S; y = L.at[1] + (y - L.f[1]) / S; }
+        ctx.fillStyle = spaceColorAt(cx - PW / 2 / k + x / k, cy - PH / 2 / k + y / k); ctx.fillRect(0, 0, PW, PH);
+      }
       // (the deepest level's zoom goes on first: canvas transforms apply outermost first)
-      for (let i = lvls.length - 1; i >= 0; i--) {
+      for (let i = lvls.length - 1; i >= from; i--) {
         const L = lvls[i], S = 1 + (SHIP_ZOOM - 1) * L.e;
         ctx.save(); ctx.translate(L.f[0], L.f[1]); ctx.scale(S, S); ctx.translate(-L.at[0], -L.at[1]);
       }
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(spaceBg, cx - PW / 2 / k, cy - PH / 2 / k, PW / k, PH / k, 0, 0, PW, PH);
-      drawMother(k, cx - PW / 2 / k, cy - PH / 2 / k);
-      if (!se) drawFleet(k, cx - PW / 2 / k, cy - PH / 2 / k);   // (not while zooming into a spaceship)
-      // (the planet's little green pixel, once the zoom is nearly in: always just 2 pixels square on screen, however
-      // far in, so it stays hidden; zooming into it, it grows into the alien spaceship, lights blinking, once the ship
-      // is bigger than the pixel)
-      if (p.dot && !p.shipGone && z.p > 0.85 && !z.out) {
-        const mx = (p.dot[0] + 0.5 - (cx - PW / 2 / k)) * k, my = (p.dot[1] + 0.5 - (cy - PH / 2 / k)) * k, d = 2;
-        const ufo = sprite(Math.floor(spaceT / 12) % 2 ? 'ufo_1' : 'ufo_0'), sz = SHIP_SCALE * se;
-        if (ufo && ufo.width * sz > d) {
-          ctx.drawImage(ufo, Math.round(mx - ufo.width * sz / 2), Math.round(my - ufo.height * sz / 2), Math.round(ufo.width * sz), Math.round(ufo.height * sz));
-        } else { ctx.fillStyle = '#5fd068'; ctx.fillRect(Math.round(mx - 1), Math.round(my - 1), d, d); }
+      if (!from) {
+        ctx.drawImage(spaceBg, cx - PW / 2 / k, cy - PH / 2 / k, PW / k, PH / k, 0, 0, PW, PH);
+        drawMother(k, cx - PW / 2 / k, cy - PH / 2 / k);
+        if (!se) drawFleet(k, cx - PW / 2 / k, cy - PH / 2 / k);   // (not while zooming into a spaceship)
+        // (the planet's little green pixel, once the zoom is nearly in: always just 2 pixels square on screen, however
+        // far in, so it stays hidden; zooming into it, it grows into the alien spaceship, lights blinking, once the ship
+        // is bigger than the pixel)
+        if (p.dot && !p.shipGone && z.p > 0.85 && !z.out) {
+          const mx = (p.dot[0] + 0.5 - (cx - PW / 2 / k)) * k, my = (p.dot[1] + 0.5 - (cy - PH / 2 / k)) * k, d = 2;
+          const ufo = sprite(Math.floor(spaceT / 12) % 2 ? 'ufo_1' : 'ufo_0'), sz = SHIP_SCALE * se;
+          if (ufo && ufo.width * sz > d) {
+            ctx.drawImage(ufo, Math.round(mx - ufo.width * sz / 2), Math.round(my - ufo.height * sz / 2), Math.round(ufo.width * sz), Math.round(ufo.height * sz));
+          } else { ctx.fillStyle = '#5fd068'; ctx.fillRect(Math.round(mx - 1), Math.round(my - 1), d, d); }
+        }
       }
       // (each deeper ship on top of the level before, in its own frame: just the pixel, 2 square, until the ship is
       // bigger than that)
       lvls.forEach((L, i) => {
+        if (i < from) return;
         ctx.restore();
-        const u = sprite(p.deep[i].spr + (Math.floor(spaceT / 12) % 2 ? '_1' : '_0')), sz = SHIP_SCALE * L.e;
+        const u = sprite(deepAt(p, i).spr + (Math.floor(spaceT / 12) % 2 ? '_1' : '_0')), sz = SHIP_SCALE * L.e;
         if (u && u.width * sz > 2) ctx.drawImage(u, Math.round(L.f[0] - u.width * sz / 2), Math.round(L.f[1] - u.height * sz / 2), Math.round(u.width * sz), Math.round(u.height * sz));
         else { ctx.fillStyle = '#5fd068'; ctx.fillRect(Math.round(L.f[0] - 1), Math.round(L.f[1] - 1), 2, 2); }
       });
       // (and beside the deepest ship, once all the way in on it, the next little green pixel, 2 pixels square too)
-      const j = lvls.length, holder = j ? deep[j - 1] : z.ship, next = p.deep && p.deep[j];
+      const j = lvls.length, holder = j ? deep[j - 1] : z.ship, next = deepAt(p, j);
       if (next && mid1 && !p.shipGone && !(p.deepGone && p.deepGone[j]) && holder && holder.p === 1 && !holder.out && z.p === 1 && !z.out) {
         const c = j ? lvls[j - 1].f : mid1;
         deepDotAt = [c[0] + next.off[0], c[1] + next.off[1]];
