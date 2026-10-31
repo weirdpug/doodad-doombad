@@ -3792,10 +3792,13 @@
   const BANANA_GROUND = 262, BANANA_BRUNO_Y = 66, BANANA_SPEED = 2, BANANA_BEST_KEY = 'doodad-doombad-banana-best';
   const bananaBg = document.createElement('canvas');
   let banana = null, bananaBgReady = false, padHeld = [{}, {}, {}, {}];
-  // the frames between Bruno's throws, the bananas' gravity, and Bruno's walking speed, all by the score
-  const bananaGap = s => Math.max(38, 100 - s * 3);
-  // (the user asked for slower bananas: half the gravity to start with, and at most 0.05)
-  const bananaGravity = s => Math.min(0.02 + s * 0.0008, 0.05);
+  // The bananas get faster the longer a round goes on (the user asked for that, 2026-10-30): by t, the frames
+  // played since the get-ready banner, Bruno throws more often, the bananas fall harder (starting as slow as
+  // the user asked for, 0.02, up to 0.06 after about a minute) and Bruno walks quicker. A "FASTER!" flashes
+  // every 20 seconds.
+  const bananaGap = t => Math.max(36, Math.round(100 - t / 60 * 1.1));
+  const bananaGravity = t => Math.min(0.02 + t / 60 * 0.0006, 0.06);
+  const brunoWalk = t => 0.6 + Math.min(t / 60, 60) * 0.015;
   // the bowl on the pug's head: its middle (over the head, which is off to the side the pug faces), half its
   // width, and the line a banana has to fall through to land in it
   // (the bowl is 14 pixels across, made a bit bigger at the user's request: a banana anywhere over it counts)
@@ -3804,17 +3807,17 @@
     let best = 0;
     try { best = Math.max(0, Math.floor(+localStorage.getItem(BANANA_BEST_KEY)) || 0); } catch (e) {}
     banana = { id: joined[by] ? by : 0, x: PW / 2, face: 1, anim: 0, moving: false, score: 0, best, items: [], plus: [],
-      bruno: { x: PW / 2, dir: 1, throwT: 50, holdT: 0 }, lastTarget: PW / 2, lost: 0, splat: null, startT: 100 };
+      bruno: { x: PW / 2, dir: 1, throwT: 50, holdT: 0 }, lastTarget: PW / 2, lost: 0, splat: null, startT: 100, time: 0, fasterT: 0 };
     try { initAudio(); } catch (e) {}
     releaseAll(); fromTitle = true; phase = 'mini'; hideOverlay();
   }
   function throwBanana() {
-    const g = banana, b = g.bruno, gr = bananaGravity(g.score), y0 = BANANA_BRUNO_Y - 34;
+    const g = banana, b = g.bruno, gr = bananaGravity(g.time), y0 = BANANA_BRUNO_Y - 34;
     // (tossed up just 14 pixels above his hands before it falls, so a slow banana stays on screen)
     const vy = -Math.sqrt(2 * gr * 14);
     // (it lands where the pug can get to in time from where the last one lands)
     const T = (-vy + Math.sqrt(vy * vy + 2 * gr * (bowlSpan().top - y0))) / gr;
-    const reach = BANANA_SPEED * bananaGap(g.score) * 0.7;
+    const reach = BANANA_SPEED * bananaGap(g.time) * 0.7;
     const target = clamp(g.lastTarget + (Math.random() * 2 - 1) * reach, 14, PW - 14);
     g.lastTarget = target;
     // (each banana keeps the gravity it was thrown with, so a catch raising the score never changes where one lands)
@@ -3828,6 +3831,8 @@
   function stepBanana() {
     const g = banana, b = g.bruno;
     if (g.startT > 0) g.startT--;   // (a moment to get ready while the banner shows)
+    else if (!g.lost && ++g.time % 1200 === 0) g.fasterT = 60;   // (the clock the bananas speed up by)
+    if (g.fasterT > 0) g.fasterT--;
     if (!g.lost) {
       // the pug: any keyboard or controller moves it
       const held = k => keys[k] || padHeld.some(h => h && h[k]);
@@ -3837,9 +3842,9 @@
       // Bruno walks back and forth, and stops to wind up each throw (holding the banana up) before it flies
       if (b.holdT > 0) { if (--b.holdT === 0) throwBanana(); }
       else {
-        b.x += b.dir * (0.6 + Math.min(g.score, 40) * 0.02);
+        b.x += b.dir * brunoWalk(g.time);
         if (b.x < 30 || b.x > PW - 30) { b.dir = -b.dir; b.x = clamp(b.x, 30, PW - 30); }
-        if (g.startT === 0 && --b.throwT <= 0) { b.holdT = 14; b.throwT = bananaGap(g.score); }
+        if (g.startT === 0 && --b.throwT <= 0) { b.holdT = 14; b.throwT = bananaGap(g.time); }
       }
     }
     // the bananas fall: into the bowl is a point, onto the floor is the end
@@ -3928,6 +3933,7 @@
     drawText('BANANAS ' + g.score, 6, 6, 'gold');
     drawText('BEST ' + Math.max(g.best, g.score), 6, 16);
     if (g.startT > 0) banner('CATCH THE BANANAS!', 120, 'gold');
+    else if (g.fasterT > 0 && frame % 8 < 6) banner('FASTER!', 120, 'gold');
   }
   function draw() {
     // gliding between the main menu and The Arcade, both scenes
