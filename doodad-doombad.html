@@ -3651,12 +3651,14 @@
   // its stripes and its ring. Clicking one zooms in on it and shows its name; clicking again (or Back or Esc)
   // zooms back out.
   const SPACE_PLANETS = [
-    // (dot: a tiny green pixel beside the planet, only there once you have zoomed in on it; the user asked for one by Saturn)
+    // (dot: a tiny green pixel beside the planet, only there once you have zoomed in on it, that turns into an alien
+    // spaceship when clicked; the user asked for one by Saturn, then by every planet. Each sits just off its planet,
+    // inside the zoomed-in view)
     { name: 'Saturn', x: 70, y: 122, r: 24, cols: ['#ffd9a0', '#e8a05a', '#a8743a'], stripe: '#c8742f', ring: [42, 10], dot: [117, 116] },
-    { name: 'Mars', x: 192, y: 66, r: 10, cols: ['#ff8a6a', '#e8282f', '#a8141f'] },
-    { name: 'Earth', x: 182, y: 196, r: 18, cols: ['#9fb4ff', '#2f5bff', '#1d2f8c'], game: 'banana' },
-    { name: 'The Moon', x: 214, y: 172, r: 6, cols: ['#eef0f6', '#b4b8c8', '#7f8396'] },
-    { name: 'Pluto', x: 32, y: 222, r: 7, cols: ['#d8a6e8', '#9c5ab8', '#5a2c7a'], stripe: '#7a3c9a' },
+    { name: 'Mars', x: 192, y: 66, r: 10, cols: ['#ff8a6a', '#e8282f', '#a8141f'], dot: [206, 54] },
+    { name: 'Earth', x: 182, y: 196, r: 18, cols: ['#9fb4ff', '#2f5bff', '#1d2f8c'], game: 'banana', dot: [157, 208] },
+    { name: 'The Moon', x: 214, y: 172, r: 6, cols: ['#eef0f6', '#b4b8c8', '#7f8396'], dot: [204, 163] },
+    { name: 'Pluto', x: 32, y: 222, r: 7, cols: ['#d8a6e8', '#9c5ab8', '#5a2c7a'], stripe: '#7a3c9a', dot: [43, 214] },
   ];
   // the zoom: which planet, how far in (p, 0 to 1 over half a second) and whether it is heading back out
   // (ship: the second zoom, from a planet's green pixel into the alien spaceship it really is, the same way)
@@ -3682,7 +3684,7 @@
     const z = arcadeZoom, p = z.target;
     if (!p || !p.dot || z.out || z.p < 1) return false;
     const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * PW, y = (e.clientY - r.top) / r.height * PH;
-    const k = zoomOf(p), sx = (p.dot[0] - p.x) * k + PW / 2, sy = (p.dot[1] - p.y) * k + PH / 2;
+    const k = zoomOf(p), sx = (p.dot[0] + 0.5 - p.x) * k + PW / 2, sy = (p.dot[1] + 0.5 - p.y) * k + PH / 2;
     return Math.hypot(x - sx, y - sy) <= 8;
   }
   // A planet's Play button: a planet with its own game plays it (Earth: Banana Catch); the others start a new
@@ -3792,14 +3794,15 @@
       ctx.fillStyle = '#05061a'; ctx.fillRect(0, 0, PW, PH);
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(spaceBg, cx - PW / 2 / k, cy - PH / 2 / k, PW / k, PH / k, 0, 0, PW, PH);
-      // (the planet's little green pixel, once the zoom is nearly in: one pixel of the scene, blown up like the rest;
-      // zooming into it, it grows into the alien spaceship, lights blinking, once the ship is bigger than the pixel)
+      // (the planet's little green pixel, once the zoom is nearly in: always just 2 pixels square on screen, however
+      // far in, so it stays hidden; zooming into it, it grows into the alien spaceship, lights blinking, once the ship
+      // is bigger than the pixel)
       if (p.dot && z.p > 0.85 && !z.out) {
-        const sx = (p.dot[0] - (cx - PW / 2 / k)) * k, sy = (p.dot[1] - (cy - PH / 2 / k)) * k, d = Math.ceil(k);
+        const mx = (p.dot[0] + 0.5 - (cx - PW / 2 / k)) * k, my = (p.dot[1] + 0.5 - (cy - PH / 2 / k)) * k, d = 2;
         const ufo = sprite(Math.floor(spaceT / 12) % 2 ? 'ufo_1' : 'ufo_0'), sz = SHIP_SCALE * se;
         if (ufo && ufo.width * sz > d) {
-          ctx.drawImage(ufo, Math.round(sx + d / 2 - ufo.width * sz / 2), Math.round(sy + d / 2 - ufo.height * sz / 2), Math.round(ufo.width * sz), Math.round(ufo.height * sz));
-        } else { ctx.fillStyle = '#5fd068'; ctx.fillRect(Math.round(sx), Math.round(sy), d, d); }
+          ctx.drawImage(ufo, Math.round(mx - ufo.width * sz / 2), Math.round(my - ufo.height * sz / 2), Math.round(ufo.width * sz), Math.round(ufo.height * sz));
+        } else { ctx.fillStyle = '#5fd068'; ctx.fillRect(Math.round(mx - 1), Math.round(my - 1), d, d); }
       }
       return;
     }
