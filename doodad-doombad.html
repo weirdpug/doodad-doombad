@@ -3701,14 +3701,15 @@
   }
   // ---------- the main menu ----------
   // The start screen is the main menu, outside at sunset: a starry sky fading to orange at the horizon,
-  // purple mountains, and a pixel castle on a green hill (two towers and a tall keep with pointed pink roofs,
-  // glowing windows and a gate), grass and flowers in front with a dirt path up to the gate. The still parts
-  // are drawn once into titleBg; drifting clouds, twinkling stars and waving flags go on top every frame.
+  // purple mountains, and a pixel castle on a green hill (the user's own design: two towers with green pointed
+  // roofs and a battlemented wall with a wooden door between, in a moat with a drawbridge), grass and flowers in front
+  // with a dirt path up to it. The still parts are drawn once into titleBg; drifting clouds, twinkling stars and the
+  // moat's glints go on top every frame.
   const titleBg = document.createElement('canvas');
   let titleBgReady = false;
   // the hilltop, and the castle's base sunk a little into it (the hill curves away at the sides, so the castle
   // sits lower than the top: its towers stand in the grass, with no gap under them)
-  const HILL_Y = 128, CASTLE_Y = 144;
+  const HILL_Y = 128, CASTLE_Y = 150;
   // the grass tufts and little flowers on the meadow (the same every time: a fixed pattern, kept off the path)
   const TITLE_TUFTS = [];
   for (let i = 0; i < 90; i++) {
@@ -3759,49 +3760,60 @@
       if (flower) { rect(flower, x, y, 1, 1); rect('#5fc88f', x, y + 1, 1, 1); }
       else { rect('#5fc88f', x, y, 1, 2); rect('#5fc88f', x + 1, y + 1, 1, 1); }
     }
-    // ---- the castle ----
-    const stone = '#8a92b4', mid = '#6a7090', dark = '#4e5370', deep = '#36363f';
-    // a stone block: light face with a darker right edge, mortar lines every 5 rows (staggered joints)
-    const block = (x, y, w, h) => {
-      rect(stone, x, y, w, h);
-      rect(mid, x + w - 2, y, 2, h);
-      for (let r = y + 4; r < y + h; r += 5) {
-        rect(dark, x, r, w, 1);
-        for (let j = x + ((r / 5) % 2 ? 2 : 5); j < x + w - 1; j += 6) rect(dark, j, r - 4, 1, 4);
-      }
-    };
-    // battlements along a top edge
-    const merlons = (x, y, w) => { for (let j = x; j < x + w; j += 5) block(j, y - 4, 3, 4); };
-    // a pointed roof: a pink triangle with a darker right half
-    const roof = (cx, base, w, h) => {
-      for (let r = 0; r < h; r++) {
-        const half = Math.round((w / 2) * (r + 1) / h);
-        rect('#d9586e', cx - half, base - h + r, half, 1);
-        rect('#9c2c55', cx, base - h + r, half, 1);
-      }
-      rect('#ff7ab8', cx - 1, base - h - 1, 2, 1);
-    };
-    const win = (x, y, h) => { rect(deep, x - 1, y - 1, 4, h + 2); rect('#ffcc3d', x, y, 2, h); rect('#fff2b0', x, y, 1, 1); };
-    // the curtain wall with its gate
-    block(78, CASTLE_Y - 24, 84, 24); merlons(78, CASTLE_Y - 24, 84);
-    // the tall keep behind the gate
-    block(104, CASTLE_Y - 50, 32, 26); merlons(104, CASTLE_Y - 50, 32);
-    roof(120, CASTLE_Y - 54, 34, 20);
-    win(110, CASTLE_Y - 45, 4); win(127, CASTLE_Y - 45, 4); win(118, CASTLE_Y - 36, 5);
-    // the two side towers
-    block(62, CASTLE_Y - 46, 20, 46); roof(72, CASTLE_Y - 50, 22, 18);
-    block(158, CASTLE_Y - 46, 20, 46); roof(168, CASTLE_Y - 50, 22, 18);
-    win(70, CASTLE_Y - 38, 4); win(70, CASTLE_Y - 23, 4); win(166, CASTLE_Y - 38, 4); win(166, CASTLE_Y - 23, 4);
-    // the gate: a dark arch with a portcullis
-    for (let y = 0; y < 18; y++) {
-      const inset = y < 4 ? [4, 2, 1, 0][y] : 0;
-      rect('#11132a', 112 + inset, CASTLE_Y - 18 + y, 16 - inset * 2, 1);
+    // ---- the moat: water all round the castle's island (its far side hidden behind the castle), lighter ripples on
+    // it and a darker bank, never above the hilltop; and a wooden drawbridge across it from the door to the path ----
+    const MX = 120, MY = CASTLE_Y + 2, hillTop = x => Math.round(HILL_Y + Math.max(0, ((x - 120) / 96) ** 2) * 34);
+    for (let y = MY - 12; y <= MY + 12; y++) for (let x = MX - 63; x <= MX + 63; x++) {
+      const o = ((x - MX) / 62) ** 2 + ((y - MY) / 11) ** 2, i = ((x - MX) / 53) ** 2 + ((y - MY) / 6) ** 2;
+      if (o > 1 || i < 1 || y <= hillTop(x)) continue;
+      rect(o > 0.86 ? '#1d2f8c' : (x * 7 + y * 13) % 11 === 0 ? '#5fb4ff' : '#2f5bff', x, y, 1, 1);
     }
-    for (let x = 114; x < 128; x += 3) rect(deep, x, CASTLE_Y - 14, 1, 14);
-    rect(deep, 112, CASTLE_Y - 9, 16, 1);
+    rect('#5a3c22', 108, CASTLE_Y, 24, MY + 12 - CASTLE_Y);   // (the drawbridge: dark edges, planks across)
+    rect('#a8743a', 109, CASTLE_Y, 22, MY + 12 - CASTLE_Y);
+    for (let y = CASTLE_Y + 2; y < MY + 12; y += 3) rect('#6e4a2a', 109, y, 22, 1);
+    // ---- the castle: the user's own drawing (2026-10-31), in pixels: two tall towers with green pointed roofs, a
+    // battlemented wall between them with an arched wooden door, all grey bricks with black outlines ----
+    const ink = '#14141a', brick = '#b0b0b4', mortar = '#4a4a52';
+    // grey bricks: rows 4 pixels high (3 of brick, 1 of mortar) counted up from the castle's base, so the towers' and
+    // the wall's rows line up, with joints every 8 pixels, staggered row by row
+    const bricks = (x, y, w, h) => {
+      for (let yy = y; yy < y + h; yy++) {
+        const k = CASTLE_Y - 1 - yy;
+        if (k % 4 === 3) { rect(mortar, x, yy, w, 1); continue; }
+        rect(brick, x, yy, w, 1);
+        const off = Math.floor(k / 4) % 2 ? 4 : 0;
+        for (let j = x; j < x + w; j++) if ((j + off) % 8 === 0) rect(mortar, j, yy, 1, 1);
+      }
+    };
+    const outline = (x, y, w, h) => { rect(ink, x - 1, y - 1, w + 2, 1); rect(ink, x - 1, y, 1, h); rect(ink, x + w, y, 1, h); };
+    // the wall, with its battlements (merlons 4 wide with gaps of 3, outlined, the sky showing between)
+    const WL = 90, WR = 150, WT = CASTLE_Y - 42, TL = WL - 16, TR = WR, TT = CASTLE_Y - 54;
+    bricks(WL, WT, WR - WL, CASTLE_Y - WT);
+    rect(ink, WL, WT - 1, WR - WL, 1);
+    for (let j = WL + 1; j + 4 <= WR; j += 7) { bricks(j, WT - 5, 4, 4); rect(ink, j - 1, WT - 6, 6, 1); rect(ink, j - 1, WT - 5, 1, 4); rect(ink, j + 4, WT - 5, 1, 4); }
+    // the arched wooden door: brown planks with dark seams
+    const DL = 109, DW = 22, DT = CASTLE_Y - 21;
+    for (let y = DT; y < CASTLE_Y; y++) {
+      const r = y - DT, inset = r < 5 ? [6, 3, 2, 1, 0][r] : 0;
+      rect('#87604a', DL + inset, y, DW - inset * 2, 1);
+    }
+    for (const x of [DL + 5, DL + 11, DL + 16]) rect('#1e140e', x, DT + (x === DL + 11 ? 0 : 2), 1, CASTLE_Y - DT - (x === DL + 11 ? 0 : 2));
+    for (const [x, y, w] of [[DL + 5, DT + 6, 6], [DL + 11, DT + 11, 5], [DL + 1, DT + 13, 4], [DL + 5, DT + 16, 6], [DL + 16, DT + 15, 5]]) rect('#1e140e', x, y, w, 1);
+    // the two towers, and their green roofs: a thick black bar along each roof's base, outlined triangles
+    for (const x of [TL, TR]) {
+      bricks(x, TT, 16, CASTLE_Y - TT); outline(x, TT, 16, CASTLE_Y - TT);
+      const cx = x + 8, h = 16, w = 26, base = TT - 3;
+      for (let r = 0; r < h; r++) {
+        const half = Math.max(1, Math.round((w / 2) * (r + 1) / h));
+        rect(ink, cx - half - 1, base - h + r, half * 2 + 2, 1);
+        if (half > 1) rect('#068c22', cx - half + 1, base - h + r, half * 2 - 2, 1);
+      }
+      rect(ink, cx - w / 2 - 2, base, w + 4, 2);
+    }
+    rect(ink, TL - 1, CASTLE_Y, TR + 17 - TL, 1);   // (the black line along the castle's foot)
   }
-  // the flagpoles on the three roofs (their tips), for the waving flags
-  const FLAGS = [[120, CASTLE_Y - 81], [72, CASTLE_Y - 75], [168, CASTLE_Y - 75]];
+  // glints on the moat: a few spots on the near side that catch the light in turn
+  const MOAT_GLINTS = [[72, 154], [84, 157], [96, 159], [104, 160], [138, 160], [146, 159], [158, 157], [168, 154], [62, 151], [178, 151]];
   // The main menu's clouds: where cloud i is now (w: its width; lap: how many times it has drifted round). A click on
   // one poofs it away (the user asked 2026-10-31): a puff of smoke and a soft poof, and it stays gone until it has
   // drifted off the right edge and comes round again. (cloudGone: the lap each cloud was poofed on; titleTapT: when,
@@ -3990,13 +4002,9 @@
     for (const g of groundPatches) { ctx.fillStyle = g.t < 7 ? '#a8b040' : '#b8903a'; for (const [x, y] of g.px) ctx.fillRect(x, y, 1, 1); }
     for (const b of tuftBits) { b.x += b.vx; b.vy += 0.12; b.y += b.vy; b.t--; ctx.fillStyle = '#a8743a'; ctx.fillRect(Math.round(b.x), Math.round(b.y), 1, 1); }
     tuftBits = tuftBits.filter(b => b.t > 0);
-    // the flags on the castle roofs, waving (two frames)
-    const wave = Math.floor(frame / 14) % 2;
-    for (const [x, y] of FLAGS) {
-      ctx.fillStyle = '#36363f'; ctx.fillRect(x, y, 1, 7);
-      ctx.fillStyle = '#ff3e6c'; ctx.fillRect(x + 1, y, 5, 2); ctx.fillRect(x + 1, y + 2, wave ? 4 : 6, 1);
-      ctx.fillStyle = '#ffcc3d'; ctx.fillRect(x + 1, y, 1, 1);
-    }
+    // (the moat glinting, a spot at a time)
+    ctx.fillStyle = '#9fd8ff';
+    MOAT_GLINTS.forEach(([x, y], i) => { if (Math.floor(frame / 18 + i * 3) % 7 === 0) ctx.fillRect(x, y, 2, 1); });
     drawFireworks();
   }
   // ----- The Arcade: out in space, reached by clicking the night sky on the main menu -----
