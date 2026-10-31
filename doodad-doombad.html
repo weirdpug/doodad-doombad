@@ -1120,10 +1120,11 @@
       put: (who, n) => `${who} is wearing ${n.what}!`, took: (who, n) => `${who} took off ${n.what}.` },
     necklaces: { slot: 'necklace', list: NECKLACES, pic: 'necklace', off: 'Wear', on: 'Take off',
       put: (who, n) => `${who} is wearing ${n.what}!`, took: (who, n) => `${who} took off ${n.what}.` },
-    // (max: things that can be chosen together, up to that many at once; the slot is then a list)
-    pets: { slot: 'pets', list: PETS, pic: 'pet', off: 'Bring', on: 'Send home', max: 3,
+    // (max: things that can be chosen together, up to that many at once; the slot is then a list. Pets have no
+    // limit: as many as you like, the user asked 2026-10-31, after 3 at a time)
+    pets: { slot: 'pets', list: PETS, pic: 'pet', off: 'Bring', on: 'Send home', max: Infinity,
       put: (who, n) => `${n.name} is following ${who}!`, took: (who, n) => `${who} sent ${n.name} home.`,
-      full: who => `${who} already has 3 pets! Send one home first.` },
+      full: who => `${who} can't bring any more pets! Send one home first.` },
   };
   function loadLooks() {
     const l = [0, 1, 2, 3].map(() => ({ suit: '', hat: '', necklace: '', pets: [] }));
@@ -2075,7 +2076,7 @@
     ovText.textContent = note || (store
       ? (multi() ? `${LOOK[storeBy].name}'s bag. Each pug pays with its own coins!` : 'Buy things, then equip them!')
       : neck ? [multi() ? `${LOOK[storeBy].name}'s ${part.name.toLowerCase()}` : '',
-        LOOK_SECTIONS[view].max ? `Bring up to ${LOOK_SECTIONS[view].max} at a time!` : ''].filter(Boolean).join('. ')
+        LOOK_SECTIONS[view].max ? (isFinite(LOOK_SECTIONS[view].max) ? `Bring up to ${LOOK_SECTIONS[view].max} at a time!` : 'Bring as many as you like!') : ''].filter(Boolean).join('. ')
       : view === 'arenaPause' ? 'The Colosseum. Swing your sword: the last pug standing wins!'
       : view === 'arenaOver' ? arenaWords().text
       : bpause ? 'Banana Catch. Catch every banana in your bowl!'
