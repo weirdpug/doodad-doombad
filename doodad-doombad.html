@@ -3690,7 +3690,9 @@
     // (dot: a tiny green pixel beside the planet, only there once you have zoomed in on it, that turns into an alien
     // spaceship when clicked; the user asked for one by Saturn, then by every planet. Each sits just off its planet,
     // inside the zoomed-in view)
-    { name: 'Saturn', x: 70, y: 122, r: 24, cols: ['#ffd9a0', '#e8a05a', '#a8743a'], stripe: '#c8742f', ring: [42, 10], dot: [117, 116] },
+    // (dot2: Saturn's alien spaceship has a tiny green pixel of its own beside it, zoomed all the way in on the ship:
+    // where, in screen pixels from the ship's middle; the user asked 2026-10-31)
+    { name: 'Saturn', x: 70, y: 122, r: 24, cols: ['#ffd9a0', '#e8a05a', '#a8743a'], stripe: '#c8742f', ring: [42, 10], dot: [117, 116], dot2: [46, -14] },
     { name: 'Mars', x: 192, y: 66, r: 10, cols: ['#ff8a6a', '#e8282f', '#a8141f'], dot: [206, 54] },
     { name: 'Earth', x: 182, y: 196, r: 18, cols: ['#9fb4ff', '#2f5bff', '#1d2f8c'], game: 'banana', dot: [157, 208] },
     { name: 'The Moon', x: 214, y: 172, r: 6, cols: ['#eef0f6', '#b4b8c8', '#7f8396'], dot: [204, 163] },
@@ -4220,6 +4222,8 @@
         if (ufo && ufo.width * sz > d) {
           ctx.drawImage(ufo, Math.round(mx - ufo.width * sz / 2), Math.round(my - ufo.height * sz / 2), Math.round(ufo.width * sz), Math.round(ufo.height * sz));
         } else { ctx.fillStyle = '#5fd068'; ctx.fillRect(Math.round(mx - 1), Math.round(my - 1), d, d); }
+        // (and beside the ship, once all the way in on it, Saturn's next little green pixel: 2 pixels square too)
+        if (p.dot2 && z.ship && z.ship.p === 1 && !z.ship.out) { ctx.fillStyle = '#5fd068'; ctx.fillRect(Math.round(mx + p.dot2[0] - 1), Math.round(my + p.dot2[1] - 1), d, d); }
       }
       return;
     }
