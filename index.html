@@ -871,7 +871,20 @@
     ufo_0: [".........VVVV.........", "........VWVVVV........", ".......VVggggVV.......", ".......VgKggKgV.......", "......VVggggggVV......", "....GGGGGGGGGGGGGG....", "..GGUUUUUUUUUUUUUUGG..", ".GUUYUUUYUUUUYUUUYUUG.", "..GGUUUUUUUUUUUUUUGG..", "....HHHHHHHHHHHHHH....", "......HH......HH......"],
     ufo_1: [".........VVVV.........", "........VWVVVV........", ".......VVggggVV.......", ".......VgKggKgV.......", "......VVggggggVV......", "....GGGGGGGGGGGGGG....", "..GGUUUUUUUUUUUUUUGG..", ".GUUMUUUMUUUUMUUUMUUG.", "..GGUUUUUUUUUUUUUUGG..", "....HHHHHHHHHHHHHH....", "......HH......HH......"],
   });
+  // The alien mother ship (The Arcade, once every planet's spaceship is blown up): a giant saucer, more than
+  // twice the little one, with a big glass dome holding three green aliens, a grey hull, a row of lights that
+  // blink yellow and pink, and cyan ports underneath. (Built from spans: [first, last, colour] on each row.)
+  const spanRow = (w, parts) => { const r = Array(w).fill('.'); for (const [a, b, ch] of parts) for (let i = a; i <= b; i++) r[i] = ch; return r.join(''); };
+  const motherRows = light => [
+    [[19, 28, 'V']], [[17, 30, 'V'], [19, 20, 'W']], [[16, 31, 'V'], [19, 20, 'g'], [23, 24, 'g'], [27, 28, 'g']],
+    [[15, 32, 'V'], [19, 20, 'g'], [23, 24, 'g'], [27, 28, 'g'], [19, 19, 'K'], [24, 24, 'K'], [28, 28, 'K']],
+    [[10, 37, 'G']], [[5, 42, 'U'], [5, 5, 'G'], [42, 42, 'G']], [[2, 45, 'U'], [2, 3, 'G'], [44, 45, 'G']],
+    [[0, 47, 'U'], [0, 0, 'G'], [47, 47, 'G'], ...[4, 10, 16, 22, 25, 31, 37, 43].map(x => [x, x, light])],
+    [[1, 46, 'U']], [[3, 44, 'H']], [[8, 39, 'k']], [[14, 33, 'k'], [17, 18, 'C'], [23, 24, 'C'], [29, 30, 'C']], [[19, 28, 'k']],
+  ].map(parts => spanRow(48, parts));
+  Object.assign(SPRITES, { mother_0: motherRows('Y'), mother_1: motherRows('M') });
   /*TACO SUIT*/
+
   // The taco suit a pug wears with the Taco Pug equipped: one overlay per pose, the pose's own size, drawn
   // over the pug with the same feet anchor and flip ('.' lets the pug show through; the head is never covered)
   const TACO_SUIT = {
@@ -1253,6 +1266,7 @@
     // Donkey Joe farts: a low sliding raspberry with a flutter of quick low pops
     fart: () => { tone(95, 0.38, 'sawtooth', 0.08, -40); [0, 0.06, 0.12, 0.19, 0.26].forEach((d, i) => tone(70 + (i % 2) * 18, 0.05, 'square', 0.05, -12, d)); },
     ufo: () => [0, 0.1, 0.2, 0.3].forEach((d, i) => tone(i % 2 ? 880 : 620, 0.12, 'sine', 0.05, i % 2 ? -260 : 260, d)),   // woo-woo: the alien spaceship
+    mother: () => [0, 0.16, 0.32, 0.48, 0.64, 0.8].forEach((d, i) => tone(i % 2 ? 170 : 120, 0.22, 'sawtooth', 0.05, i % 2 ? -40 : 40, d)),   // the mother ship's deep hum as it arrives
     fireFart: () => { sfx.fart(); tone(220, 0.32, 'sawtooth', 0.05, 900, 0.05); },   // ...and a spicy one: the raspberry with a fiery whoosh
     clank: () => { tone(980, 0.05, 'square', 0.04); tone(640, 0.09, 'triangle', 0.05, 0, 0.04); },   // ...and lands on a girder
     grr: () => [110, 98, 87, 78].forEach((f, i) => tone(f, 0.14, 'sawtooth', 0.07, -12, i * 0.12)),
@@ -3666,6 +3680,9 @@
     { name: 'Earth', x: 182, y: 196, r: 18, cols: ['#9fb4ff', '#2f5bff', '#1d2f8c'], game: 'banana', dot: [157, 208] },
     { name: 'The Moon', x: 214, y: 172, r: 6, cols: ['#eef0f6', '#b4b8c8', '#7f8396'], dot: [204, 163] },
     { name: 'Pluto', x: 32, y: 222, r: 7, cols: ['#d8a6e8', '#9c5ab8', '#5a2c7a'], stripe: '#7a3c9a', dot: [43, 214] },
+    // the alien mother ship: not a planet, but it works like one once it has come (mother: see drawMother)
+    // (drawn 1.5 times its sprite's size, 72 pixels across, so it really is giant: r is half that)
+    { name: 'Mother Ship', x: 120, y: 176, r: 36, mother: true, dot: [162, 160] },
   ];
   // the zoom: which planet, how far in (p, 0 to 1 over half a second) and whether it is heading back out
   // (ship: the second zoom, from a planet's green pixel into the alien spaceship it really is, the same way)
@@ -3676,7 +3693,7 @@
   // the planet under a click (the small ones first, so the Moon wins over Earth; Saturn counts its ring)
   function planetAt(e) {
     const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * PW, y = (e.clientY - r.top) / r.height * PH;
-    return [...SPACE_PLANETS].sort((a, b) => a.r - b.r).find(p => Math.hypot(x - p.x, y - p.y) <= p.r + 3 ||
+    return [...SPACE_PLANETS].filter(p => !p.mother || mother.state === 'here').sort((a, b) => a.r - b.r).find(p => Math.hypot(x - p.x, y - p.y) <= p.r + 3 ||
       (p.ring && Math.abs(x - p.x) <= p.ring[0] + 2 && Math.abs(y - p.y) <= p.ring[1] + 2));
   }
   // (zooming in or out redoes The Arcade's screen: its title, and Play shown or gone)
@@ -3704,7 +3721,30 @@
     boomPic.hidden = true;
     if (arcadeZoom.target) arcadeZoom.target.shipGone = true;
     arcadeZoom.ship = null;
+    // every planet's spaceship blown up: straight back out to space, and in comes the mother ship
+    if (mother.state === 'gone' && SPACE_PLANETS.every(p => p.mother || p.shipGone)) {
+      arcadeZoom = { target: null, p: 0, out: false, ship: null };
+      mother = { state: 'coming', t: 0 };
+      sfx.mother();
+    }
     phase = 'paused'; showPause('arcade', 0);
+  }
+  // The mother ship: 'gone' until every planet's spaceship is blown up, then 'coming' (flying in from off the top
+  // right over MOTHER_FRAMES, eased) and then 'here', bobbing gently, for the rest of the visit and every visit
+  // after until the page is reloaded. It is drawn over space like the planets would be, zoomed with the view.
+  let mother = { state: 'gone', t: 0 };
+  const MOTHER_FRAMES = 150, MOTHER_SCALE = 1.5;
+  function drawMother(k, ox, oy) {
+    if (mother.state === 'gone') return;
+    const m = SPACE_PLANETS.find(p => p.mother), s = sprite(Math.floor(spaceT / 14) % 2 ? 'mother_1' : 'mother_0');
+    if (!s) return;
+    let x = m.x, y = m.y;
+    if (mother.state === 'coming') {
+      const t = mother.t / MOTHER_FRAMES, e = t * t * (3 - 2 * t);
+      x = 290 + (m.x - 290) * e; y = -30 + (m.y + 30) * e;
+    } else y += Math.round(Math.sin(spaceT / 20));
+    const w = s.width * MOTHER_SCALE, h = s.height * MOTHER_SCALE;
+    ctx.drawImage(s, Math.round((x - w / 2 - ox) * k), Math.round((y - h / 2 - oy) * k), Math.round(w * k), Math.round(h * k));
   }
   function onDot(e) {
     const z = arcadeZoom, p = z.target;
@@ -3770,6 +3810,7 @@
       }
     };
     for (const p of SPACE_PLANETS) {
+      if (p.mother) continue;   // (the mother ship is drawn over space when it comes: drawMother)
       if (p.ring) ring(p.x, p.y, p.ring[0], p.ring[1], '#d9a066', false);
       ball(p.x, p.y, p.r, p.cols, p.stripe);
       if (p.ring) ring(p.x, p.y, p.ring[0], p.ring[1], '#f4e9a8', true);
@@ -3803,6 +3844,7 @@
   function drawSpaceScene() {
     if (!spaceBgReady) { buildSpaceBg(); spaceBgReady = true; }
     spaceT++;
+    if (mother.state === 'coming' && ++mother.t >= MOTHER_FRAMES) mother.state = 'here';
     // zoomed in on a planet (or on the way in or out): the scene blown up round it, the planet sliding to the
     // middle as it grows (eased in and out); no twinkles or shooting star meanwhile
     const z = arcadeZoom;
@@ -3821,6 +3863,7 @@
       ctx.fillStyle = '#05061a'; ctx.fillRect(0, 0, PW, PH);
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(spaceBg, cx - PW / 2 / k, cy - PH / 2 / k, PW / k, PH / k, 0, 0, PW, PH);
+      drawMother(k, cx - PW / 2 / k, cy - PH / 2 / k);
       // (the planet's little green pixel, once the zoom is nearly in: always just 2 pixels square on screen, however
       // far in, so it stays hidden; zooming into it, it grows into the alien spaceship, lights blinking, once the ship
       // is bigger than the pixel)
@@ -3845,6 +3888,7 @@
       const sx = 230 - t * 5, sy = 18 + t * 2;
       for (let k = 0; k < 8; k++) { ctx.fillStyle = k < 2 ? '#ffffff' : k < 5 ? '#9fb4ff' : '#4a5a9a'; ctx.fillRect(sx + k * 2, sy - k, 1, 1); }
     }
+    drawMother(1, 0, 0);
   }
   // ----- Earth's mini-game: Banana Catch (Play on Earth in The Arcade) -----
   // The pug that pressed Play stands on the grass wearing a bowl on its head, and Big Bruno walks back and forth
