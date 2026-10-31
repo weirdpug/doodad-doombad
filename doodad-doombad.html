@@ -2044,7 +2044,7 @@
     // (the Store opens at the start of its row of cards)
     if (opening) { storeCol = 0; storeScroll.scrollLeft = 0; }
     if (neck && was !== view) lookScroll.scrollLeft = 0;   // (a Customize section opens at its first card)
-    if (arcade && was !== view) { arcadeZoom = { target: null, p: 0, out: false, ship: null }; ovTitle.textContent = 'The Arcade'; for (const pl of SPACE_PLANETS) pl.shipGone = false; }   // (and The Arcade zoomed out)
+    if (arcade && was !== view) { arcadeZoom = { target: null, p: 0, out: false, ship: null }; ovTitle.textContent = 'The Arcade'; for (const pl of SPACE_PLANETS) pl.shipGone = pl.ship2Gone = false; }   // (and The Arcade zoomed out)
     if (store) shelfArrows();
     markSel(true);
   }
@@ -3728,8 +3728,8 @@
   const onShip = () => !!(arcadeZoom.ship && !arcadeZoom.ship.out);
   function shipIn() { arcadeZoom.ship = { p: 0, out: false }; showPause('arcade', 0); sfx.ufo(); }
   function shipOut() { if (!onShip()) return; arcadeZoom.ship.out = true; arcadeZoom.ship2 = null; showPause('arcade', 0); sfx.tick(); }
-  // (ship2: Saturn's second spaceship, zoomed into from the green pixel beside the first, the same way; any click
-  // there zooms back out to the first)
+  // (ship2: Saturn's second spaceship, zoomed into from the green pixel beside the first, the same way; clicking
+  // the ship blows it up too, anywhere else zooms back out to the first)
   const onShip2 = () => !!(arcadeZoom.ship2 && !arcadeZoom.ship2.out);
   function ship2In() { arcadeZoom.ship2 = { p: 0, out: false }; showPause('arcade', 0); sfx.ufo(); }
   function ship2Out() { if (!onShip2()) return; arcadeZoom.ship2.out = true; showPause('arcade', 0); sfx.tick(); }
@@ -3749,12 +3749,23 @@
     const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * PW, y = (e.clientY - r.top) / r.height * PH;
     return Math.abs(x - PW / 2) <= 11 * SHIP_SCALE + 2 && Math.abs(y - PH / 2) <= 6 * SHIP_SCALE + 2;
   }
-  function explodeShip() {
+  // (second: it is Saturn's second spaceship blowing up, the same way, the user asked 2026-10-31: afterwards the
+  // view is back on the first spaceship, and the second one and its green pixel are gone until The Arcade is opened
+  // again)
+  let shipBoomSecond = false;
+  function explodeShip(second) {
     sfx.boom(); boomPic.hidden = false; ov.hidden = true;
-    phase = 'boom'; shipBoomT = BOOM_PIC_FRAMES;
+    phase = 'boom'; shipBoomT = BOOM_PIC_FRAMES; shipBoomSecond = !!second;
   }
   function endShipBoom() {
     boomPic.hidden = true;
+    if (shipBoomSecond) {
+      shipBoomSecond = false;
+      if (arcadeZoom.target) arcadeZoom.target.ship2Gone = true;
+      arcadeZoom.ship2 = null;
+      phase = 'paused'; showPause('arcade', 0);
+      return;
+    }
     if (arcadeZoom.target) arcadeZoom.target.shipGone = true;
     arcadeZoom.ship = arcadeZoom.ship2 = null;
     // every planet's spaceship blown up: straight back out to space, and in comes the mother ship
@@ -4124,7 +4135,7 @@
   ov.addEventListener('click', e => {
     // (nothing while a spaceship explodes: the phase is 'boom' then)
     if (phase !== 'paused' || !(fromTitle && pauseView === 'arcade') || e.target.closest('button')) return;
-    if (onShip2()) { ship2Out(); return; }
+    if (onShip2()) { if (arcadeZoom.ship2.p === 1 && onShipSprite(e)) explodeShip(true); else ship2Out(); return; }
     if (onShip()) {
       if (onDot2(e)) ship2In(); else if (arcadeZoom.ship.p === 1 && onShipSprite(e)) explodeShip(); else shipOut();
       return;
@@ -4255,7 +4266,7 @@
           ctx.drawImage(ufo, Math.round(mx - ufo.width * sz / 2), Math.round(my - ufo.height * sz / 2), Math.round(ufo.width * sz), Math.round(ufo.height * sz));
         } else { ctx.fillStyle = '#5fd068'; ctx.fillRect(Math.round(mx - 1), Math.round(my - 1), d, d); }
         // (and beside the ship, once all the way in on it, Saturn's next little green pixel: 2 pixels square too)
-        if (p.dot2 && z.ship && z.ship.p === 1 && !z.ship.out && !z.ship2) {
+        if (p.dot2 && !p.ship2Gone && z.ship && z.ship.p === 1 && !z.ship.out && !z.ship2) {
           ctx.fillStyle = '#5fd068'; ctx.fillRect(Math.round(at2[0] - 1), Math.round(at2[1] - 1), d, d);
           dot2At = at2;
         }
