@@ -1366,6 +1366,8 @@
     fight: () => [523, 659, 784].forEach((f, i) => tone(f, 0.12, 'square', 0.05, 0, i * 0.08)),   // ...and FIGHT!
     // a patch of grass dying: a crisp crunch, a softer one just after, and a little tone drooping down
     crunch: () => { noise(0.07, 0.3, 8000, 3000); noise(0.12, 0.18, 3500, 700, 0.05); tone(620, 0.22, 'triangle', 0.06, -360, 0.04); },
+    whistle: dur => tone(700, dur, 'sine', 0.03, 900),   // a firework rocket whistling up (the main menu)
+    bang: () => { noise(0.5, 0.35, 5000, 200); tone(120, 0.25, 'sine', 0.2, -70); [0.22, 0.29, 0.35, 0.42, 0.5, 0.57].forEach(d => noise(0.04, 0.08, 9000, 4000, d)); },   // ...and bursting, then crackling
     poof: () => { noise(0.35, 0.16, 2500, 300); tone(300, 0.12, 'sine', 0.05, 200); },   // a cloud poofing away (the main menu)
     pop: () => { tone(320, 0.12, 'square', 0.05, -260); tone(140, 0.18, 'sawtooth', 0.05, -90, 0.02); },   // ...and one blown up
     recall: () => [0, 0.08, 0.16, 0.24].forEach((d, i) => tone(900 - i * 150, 0.1, 'sine', 0.04, -200, d)),   // ...and they are called back in
@@ -1877,21 +1879,25 @@
     return !!pt && r.height > 0 && (pt.clientY - r.top) / r.height * PH < NIGHT_Y;
   };
   const ovPressed = e => {
-    // (a cloud on the main menu poofs away, and a press on the meadow kills the patch of grass nearest it, never
-    // starting the game; the rest of that same press, its touch and its click, does nothing more however long it is
-    // held: titleSwallow)
+    // (on the main menu a press anywhere but the night sky never starts the game (only Start does): above the
+    // ground it sets off a firework right there, and a cloud poofs away; on the ground the grass there dies. The rest
+    // of that same press, its touch and its click, does nothing more however long it is held: titleSwallow)
     if (phase === 'title' && !e.target.closest('button')) {
       if (e.type === 'pointerdown') titleSwallow = false;
-      else if (titleSwallow) { if (e.type === 'click') titleSwallow = false; return; }
-      const i = cloudAt(e);
-      if (i >= 0) { poofCloud(i); titleSwallow = true; return; }
-      if (onMeadow(e)) {
-        const g = tuftAt(e), ground = killGround(e);
-        if (g >= 0) killTuft(g);
-        else if (ground) { titleTapT = performance.now(); try { initAudio(); } catch (err) {} sfx.crunch(); }
-        titleSwallow = true; return;
+      else if (titleSwallow || performance.now() - titleTapT < 600) { if (e.type === 'click') titleSwallow = false; return; }
+      if (!inNightSky(e)) {
+        const p = titlePoint(e);
+        if (p && p[1] < floorY(p[0])) launchFirework(p);
+        const i = cloudAt(e);
+        if (i >= 0) poofCloud(i);
+        else if (onMeadow(e)) {
+          const g = tuftAt(e), ground = killGround(e);
+          if (g >= 0) killTuft(g);
+          else if (ground) { try { initAudio(); } catch (err) {} sfx.crunch(); }
+        }
+        titleSwallow = true; titleTapT = performance.now();
+        return;
       }
-      if (performance.now() - titleTapT < 600) return;
     }
     if (phase === 'title' && !e.target.closest('button') && inNightSky(e)) { scrollSky(1, kbBy()); return; }
     if (phase !== 'paused' && !e.target.closest('.titlebtns .alt')) startClicked();
@@ -3886,6 +3892,58 @@
     try { initAudio(); } catch (e) {}
     sfx.poof();
   }
+  // Fireworks (the user asked 2026-10-31): a click on the main menu anywhere above the ground but its night sky
+  // (which goes to The Arcade) sends a rocket up from the bottom, whistling and trailing sparks, to burst in a shower
+  // of colour exactly where you clicked, with a bang and a crackle. Below the ground (the hill and the meadow: the
+  // user asked for none there) the grass dies as before. (rockets: on the way up; sparks: what they burst into)
+  const FW_COLS = [['#ff3e6c', '#ff7ab8'], ['#ffcc3d', '#fff2b0'], ['#39d4e6', '#9fb4ff'], ['#5fd068', '#c8ffb0'], ['#c88aff', '#ffffff'], ['#ff8a1f', '#ffcc3d']];
+  let rockets = [], sparks = [];
+  // (the top of the ground at x: the green hill under the castle, or the meadow)
+  const floorY = x => Math.min(Math.round(HILL_Y + Math.max(0, ((x - 120) / 96) ** 2) * 34), 170);
+  function launchFirework([tx, ty]) {
+    if (rockets.length > 12) return;
+    const sx = clamp(tx + (Math.random() * 2 - 1) * 24, 4, PW - 4), sy = PH + 4;
+    const T = Math.round(18 + Math.hypot(tx - sx, ty - sy) / 8);
+    rockets.push({ sx, sy, tx, ty, t: 0, T, col: FW_COLS[Math.floor(Math.random() * FW_COLS.length)] });
+    try { initAudio(); } catch (e) {}
+    sfx.whistle(T / 60);
+  }
+  function burstFirework(r) {
+    const n = 48;
+    for (let i = 0; i < n; i++) {
+      const a = i / n * Math.PI * 2 + Math.random() * 0.2, v = 0.7 + Math.random() * 1.6, t = 40 + Math.floor(Math.random() * 20);
+      sparks.push({ x: r.tx, y: r.ty, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t, life: t, col: r.col[i % 2], crackle: Math.random() < 0.3 });
+    }
+    sparks.push({ x: r.tx, y: r.ty, vx: 0, vy: 0, t: 4, flash: true });
+    sfx.bang();
+  }
+  function drawFireworks() {
+    for (const r of rockets) {
+      r.t++;
+      // (quick off the ground, slowing near the top; the trail fades from white to orange behind it)
+      for (let k = 5; k >= 0; k--) {
+        const u = Math.max(0, (r.t - k * 1.5) / r.T), e = 1 - (1 - u) * (1 - u);
+        ctx.globalAlpha = 1 - k / 6;
+        ctx.fillStyle = k === 0 ? '#ffffff' : k < 3 ? '#ffcc3d' : '#ff8a1f';
+        ctx.fillRect(Math.round(r.sx + (r.tx - r.sx) * e), Math.round(r.sy + (r.ty - r.sy) * e), 1, 1);
+      }
+      ctx.globalAlpha = 1;
+      if (r.t >= r.T) { r.done = true; burstFirework(r); }
+    }
+    rockets = rockets.filter(r => !r.done);
+    for (const p of sparks) {
+      p.t--;
+      if (p.flash) { ctx.fillStyle = '#ffffff'; ctx.fillRect(Math.round(p.x) - 2, Math.round(p.y) - 2, 5, 5); continue; }
+      p.vx *= 0.96; p.vy = p.vy * 0.96 + 0.035; p.x += p.vx; p.y += p.vy;
+      if (p.crackle && p.t < 18 && (frame + p.t) % 3 === 0) continue;   // (some twinkle as they die out)
+      ctx.globalAlpha = Math.min(1, p.t / 20);
+      ctx.fillStyle = p.col;
+      const sz = p.life - p.t < 8 ? 2 : 1;   // (big and bright just after the burst)
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), sz, sz);
+    }
+    ctx.globalAlpha = 1;
+    sparks = sparks.filter(p => p.t > 0);
+  }
   function drawTitleScene() {
     if (!titleBgReady) { buildTitleBg(); titleBgReady = true; }
     ctx.drawImage(titleBg, 0, 0);
@@ -3939,6 +3997,7 @@
       ctx.fillStyle = '#ff3e6c'; ctx.fillRect(x + 1, y, 5, 2); ctx.fillRect(x + 1, y + 2, wave ? 4 : 6, 1);
       ctx.fillStyle = '#ffcc3d'; ctx.fillRect(x + 1, y, 1, 1);
     }
+    drawFireworks();
   }
   // ----- The Arcade: out in space, reached by clicking the night sky on the main menu -----
   // A deep sky with a faint nebula, lots of stars and planets hanging in it (built once, like the castle
