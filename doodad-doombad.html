@@ -884,6 +884,10 @@
     // white horns, wide-set eyes and a navy mouth, and the lights round its rim blink pink and yellow
     const ALIEN5 = ['.........VVVV.........', '........VWVVWV........', '.......VVBBBBVV.......', '.......VWKBBWKV.......', '......VVBBnnBBVV......'];
     Object.assign(SPRITES, { ufo5_0: [...ALIEN5, ...SPRITES.ufo_0.slice(5).map(r => r.replace(/Y/g, 'P'))], ufo5_1: [...ALIEN5, ...SPRITES.ufo_1.slice(5).map(r => r.replace(/M/g, 'Y'))] });
+    // the sixth, hiding beside the fifth's (the blue one; the user asked 2026-10-31): a pale grey alien with big
+    // black eyes, and the lights round its rim blink green and white
+    const ALIEN6 = ['.........VVVV.........', '........VWVVVV........', '.......VVccccVV.......', '.......VKKccKKV.......', '......VVccccccVV......'];
+    Object.assign(SPRITES, { ufo6_0: [...ALIEN6, ...SPRITES.ufo_0.slice(5).map(r => r.replace(/Y/g, 'g'))], ufo6_1: [...ALIEN6, ...SPRITES.ufo_1.slice(5).map(r => r.replace(/M/g, 'W'))] });
   }
   // The alien mother ship (The Arcade, once every planet's spaceship is blown up): a giant saucer, more than
   // twice the little one, with a big glass dome holding three green aliens, a grey hull, a row of lights that
@@ -3712,10 +3716,10 @@
     // (deep: the spaceships hiding inside one another at Saturn, the user asked 2026-10-31: zoomed all the way in on
     // its alien spaceship, a tiny green pixel beside it is the second (off: where, in screen pixels from the ship's
     // middle; spr: its picture), and zoomed in on that, another green pixel beside it is the third, and so on: the
-    // fourth, the fifth)
+    // fourth, the fifth, the sixth)
     { name: 'Saturn', x: 70, y: 122, r: 24, cols: ['#ffd9a0', '#e8a05a', '#a8743a'], stripe: '#c8742f', ring: [42, 10], dot: [117, 116],
       deep: [{ off: [46, -14], spr: 'ufo2' }, { off: [-46, 12], spr: 'ufo3' }, { off: [44, 16], spr: 'ufo4' },
-        { off: [-44, -16], spr: 'ufo5' }] },
+        { off: [-44, -16], spr: 'ufo5' }, { off: [6, -38], spr: 'ufo6' }] },
     { name: 'Mars', x: 192, y: 66, r: 10, cols: ['#ff8a6a', '#e8282f', '#a8141f'], dot: [206, 54] },
     { name: 'Earth', x: 182, y: 196, r: 18, cols: ['#9fb4ff', '#2f5bff', '#1d2f8c'], game: 'banana', dot: [157, 208] },
     { name: 'The Moon', x: 214, y: 172, r: 6, cols: ['#eef0f6', '#b4b8c8', '#7f8396'], dot: [204, 163] },
