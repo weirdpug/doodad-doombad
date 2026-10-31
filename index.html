@@ -3900,14 +3900,15 @@
   // of colour exactly where you clicked, with a bang and a crackle. Below the ground (the hill and the meadow: the
   // user asked for none there) the grass dies as before. (rockets: on the way up; sparks: what they burst into)
   const FW_COLS = [['#ff3e6c', '#ff7ab8'], ['#ffcc3d', '#fff2b0'], ['#39d4e6', '#9fb4ff'], ['#5fd068', '#c8ffb0'], ['#c88aff', '#ffffff'], ['#ff8a1f', '#ffcc3d']];
-  let rockets = [], sparks = [];
+  // (each firework is the next colour pair in turn, so no two in a row are the same colour: the user asked)
+  let rockets = [], sparks = [], fwNext = 0;
   // (the top of the ground at x: the green hill under the castle, or the meadow)
   const floorY = x => Math.min(Math.round(HILL_Y + Math.max(0, ((x - 120) / 96) ** 2) * 34), 170);
   function launchFirework([tx, ty]) {
     if (rockets.length > 12) return;
     const sx = clamp(tx + (Math.random() * 2 - 1) * 24, 4, PW - 4), sy = PH + 4;
     const T = Math.round(18 + Math.hypot(tx - sx, ty - sy) / 8);
-    rockets.push({ sx, sy, tx, ty, t: 0, T, col: FW_COLS[Math.floor(Math.random() * FW_COLS.length)] });
+    rockets.push({ sx, sy, tx, ty, t: 0, T, col: FW_COLS[fwNext++ % FW_COLS.length] });
     try { initAudio(); } catch (e) {}
     sfx.whistle(T / 60);
   }
