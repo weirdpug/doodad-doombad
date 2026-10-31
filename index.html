@@ -1884,16 +1884,15 @@
   };
   const ovPressed = e => {
     // (on the main menu a press anywhere but the night sky never starts the game (only Start does): above the
-    // ground it sets off a firework right there, and a cloud poofs away; on the ground the grass there dies. The rest
+    // ground it sets off a firework right there, or a cloud poofs away; on the ground the grass there dies. The rest
     // of that same press, its touch and its click, does nothing more however long it is held: titleSwallow)
     if (phase === 'title' && !e.target.closest('button')) {
       if (e.type === 'pointerdown') titleSwallow = false;
       else if (titleSwallow || performance.now() - titleTapT < 600) { if (e.type === 'click') titleSwallow = false; return; }
       if (!inNightSky(e)) {
-        const p = titlePoint(e);
-        if (p && p[1] < floorY(p[0])) launchFirework(p);
-        const i = cloudAt(e);
-        if (i >= 0) poofCloud(i);
+        const p = titlePoint(e), i = cloudAt(e);
+        if (i >= 0) poofCloud(i);   // (a cloud just poofs: no firework, the user asked)
+        else if (p && p[1] < floorY(p[0])) launchFirework(p);
         else if (onMeadow(e)) {
           const g = tuftAt(e), ground = killGround(e);
           if (g >= 0) killTuft(g);
