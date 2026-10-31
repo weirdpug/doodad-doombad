@@ -1460,6 +1460,8 @@
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (coinBarOpen) return coinBarKey(e);
     if (secretCode(e)) return;
+    // gliding to or from The Arcade, or a spaceship exploding: keys do nothing
+    if (phase === 'scroll' || phase === 'boom') { if (keyMap[e.code]) e.preventDefault(); return; }
     // Banana Catch: the arrows (or A/D) move and Esc or P pauses; nothing else does anything
     if (phase === 'mini') {
       const km = keyMap[e.code];
@@ -2003,7 +2005,7 @@
     // (the Store opens at the start of its row of cards)
     if (opening) { storeCol = 0; storeScroll.scrollLeft = 0; }
     if (neck && was !== view) lookScroll.scrollLeft = 0;   // (a Customize section opens at its first card)
-    if (arcade && was !== view) { arcadeZoom = { target: null, p: 0, out: false, ship: null }; ovTitle.textContent = 'The Arcade'; }   // (and The Arcade zoomed out)
+    if (arcade && was !== view) { arcadeZoom = { target: null, p: 0, out: false, ship: null }; ovTitle.textContent = 'The Arcade'; for (const pl of SPACE_PLANETS) pl.shipGone = false; }   // (and The Arcade zoomed out)
     if (store) shelfArrows();
     markSel(true);
   }
@@ -3095,6 +3097,7 @@
     } else if (phase === 'title') {
       updateApe(); updateBarrels(); barrels = barrels.filter(b => !b.dead);
     } else if (phase === 'mini') stepBanana();
+    else if (phase === 'boom' && --shipBoomT <= 0) endShipBoom();   // (the spaceship's explosion picture, 5 seconds)
     // pets fly along with their pugs while a level plays and during the level-clear banner
     if (phase === 'play' || phase === 'win') for (const p of players) movePets(p);
     if (drumFlare > 0) drumFlare--;
@@ -3680,9 +3683,28 @@
   function shipIn() { arcadeZoom.ship = { p: 0, out: false }; showPause('arcade', 0); sfx.ufo(); }
   function shipOut() { if (!onShip()) return; arcadeZoom.ship.out = true; showPause('arcade', 0); sfx.tick(); }
   // whether a click is on a zoomed-in planet's green pixel (a generous 8 pixels round it: it is tiny)
+  // Zoomed all the way in on the spaceship, clicking the ship itself blows it up: the same explosion as Bruno's
+  // "an explosion explodes" (the boom and the mushroom-cloud picture, up for 5 seconds; phase 'boom' meanwhile, which
+  // no key, click or controller acts on). Then the view is back on the planet, and that planet's ship is gone until
+  // The Arcade is opened again.
+  let shipBoomT = 0;
+  function onShipSprite(e) {
+    const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * PW, y = (e.clientY - r.top) / r.height * PH;
+    return Math.abs(x - PW / 2) <= 11 * SHIP_SCALE + 2 && Math.abs(y - PH / 2) <= 6 * SHIP_SCALE + 2;
+  }
+  function explodeShip() {
+    sfx.boom(); boomPic.hidden = false; ov.hidden = true;
+    phase = 'boom'; shipBoomT = BOOM_PIC_FRAMES;
+  }
+  function endShipBoom() {
+    boomPic.hidden = true;
+    if (arcadeZoom.target) arcadeZoom.target.shipGone = true;
+    arcadeZoom.ship = null;
+    phase = 'paused'; showPause('arcade', 0);
+  }
   function onDot(e) {
     const z = arcadeZoom, p = z.target;
-    if (!p || !p.dot || z.out || z.p < 1) return false;
+    if (!p || !p.dot || p.shipGone || z.out || z.p < 1) return false;
     const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * PW, y = (e.clientY - r.top) / r.height * PH;
     const k = zoomOf(p), sx = (p.dot[0] + 0.5 - p.x) * k + PW / 2, sy = (p.dot[1] + 0.5 - p.y) * k + PH / 2;
     return Math.hypot(x - sx, y - sy) <= 8;
@@ -3698,8 +3720,9 @@
   // a click in The Arcade: on a planet zooms in on it; on Saturn's green pixel, zoomed in, it zooms on into the
   // alien spaceship; anywhere else while zoomed in zooms back out a level
   ov.addEventListener('click', e => {
-    if (!(fromTitle && pauseView === 'arcade') || e.target.closest('button')) return;
-    if (onShip()) { shipOut(); return; }
+    // (nothing while a spaceship explodes: the phase is 'boom' then)
+    if (phase !== 'paused' || !(fromTitle && pauseView === 'arcade') || e.target.closest('button')) return;
+    if (onShip()) { if (arcadeZoom.ship.p === 1 && onShipSprite(e)) explodeShip(); else shipOut(); return; }
     if (!arcadeZoom.ship && onDot(e)) { shipIn(); return; }
     if (arcadeZoom.target && !arcadeZoom.out) { zoomOut(); return; }
     const p = planetAt(e);
@@ -3797,7 +3820,7 @@
       // (the planet's little green pixel, once the zoom is nearly in: always just 2 pixels square on screen, however
       // far in, so it stays hidden; zooming into it, it grows into the alien spaceship, lights blinking, once the ship
       // is bigger than the pixel)
-      if (p.dot && z.p > 0.85 && !z.out) {
+      if (p.dot && !p.shipGone && z.p > 0.85 && !z.out) {
         const mx = (p.dot[0] + 0.5 - (cx - PW / 2 / k)) * k, my = (p.dot[1] + 0.5 - (cy - PH / 2 / k)) * k, d = 2;
         const ufo = sprite(Math.floor(spaceT / 12) % 2 ? 'ufo_1' : 'ufo_0'), sz = SHIP_SCALE * se;
         if (ufo && ufo.width * sz > d) {
