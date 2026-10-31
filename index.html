@@ -707,6 +707,14 @@
     human_walk2: [...HUMAN_TOP, ".n....n...", ".n....n...", "n......n..", "KK.....KK."],
   });
   SPRITES.human_pet = SPRITES.human_walk1;
+  // Zorp the Alien (a pet unlocked by blowing up the mother ship): a little green alien with big black eyes and two
+  // antennae, riding a tiny flying saucer whose lights blink yellow and pink; locked, its card shows its shadow
+  Object.assign(SPRITES, {
+    zorp_fly1: ['..g.....g..', '...g...g...', '...ggggg...', '..gKKgKKg..', '..ggggggg..', '...ggggg...', '.GGUUUUUGG.', 'GUUYUUUYUUG', '.GGHHHHHGG.'],
+    zorp_fly2: ['...g...g...', '...g...g...', '...ggggg...', '..gKKgKKg..', '..ggggggg..', '...ggggg...', '.GGUUUUUGG.', 'GUUMUUUMUUG', '.GGHHHHHGG.'],
+  });
+  SPRITES.zorp_pet = SPRITES.zorp_fly1;
+  Object.assign(SWAPS, { shadow: { g: 'k', K: 'k', G: 'k', U: 'k', Y: 'k', M: 'k', H: 'k' } });
   // Underwear (Customize > Suits): white briefs with a blue waistband. The big pair is its picture on the
   // Suits card. The rest go over the pug like the sunglasses (same anchor and flip): side on, they cover the
   // pug's hips and the tops of its back legs; climbing (seen from behind) the curly tail pokes out over the
@@ -1111,10 +1119,22 @@
   // (kind: how a pet goes along with its pug: 'fly' above and behind its head, 'walk' behind it on its floor;
   // farts: now and then it farts, a green cloud and a raspberry; hops: a walker that bounces as it goes;
   // leash: it holds a leash to its pug's neck, and walks first in line, right behind the pug)
+  // Things unlocked by doing something in the game, saved in the browser for every pug (alien: Zorp the Alien, for
+  // blowing up the mother ship; the user asked 2026-10-31). unlock() says whether it was new.
+  const UNLOCKS_KEY = 'doodad-doombad-unlocks';
+  const unlocks = (() => { try { const u = JSON.parse(localStorage.getItem(UNLOCKS_KEY)); return u && typeof u === 'object' ? u : {}; } catch (e) { return {}; } })();
+  function unlock(what) {
+    if (unlocks[what]) return false;
+    unlocks[what] = true;
+    try { localStorage.setItem(UNLOCKS_KEY, JSON.stringify(unlocks)); } catch (e) {}
+    return true;
+  }
+  // (locked: a pet that has to be unlocked first; until then its card shows its shadow, ??? and Locked)
   const PETS = [{ key: 'turd', name: 'Turd the Bird', alt: 'A small brown bird', kind: 'fly' },
     { key: 'joe', name: 'Donkey Joe', alt: 'A blue donkey', kind: 'walk', farts: true },
     { key: 'burrito', name: 'Baby Burrito', alt: 'A little burrito with big eyes', kind: 'walk', hops: true },
-    { key: 'human', name: 'Human', alt: 'A little person holding a leash', kind: 'walk', leash: true }];
+    { key: 'human', name: 'Human', alt: 'A little person holding a leash', kind: 'walk', leash: true },
+    { key: 'zorp', name: 'Zorp the Alien', alt: 'A little green alien in a tiny flying saucer', kind: 'fly', locked: () => !unlocks.alien }];
   // the Customize sections with things to choose: which of a pug's looks each sets, its things, the
   // button's words while it isn't / is chosen, and what the screen says after
   const LOOK_SECTIONS = {
@@ -2007,28 +2027,32 @@
       const s = sprite(n.key + '_' + sec.pic);
       // (a small pet's picture is drawn bigger, as big as fits the card)
       if (s) { img.src = s.toDataURL(); img.style.setProperty('--w', s.width * (sec.slot === 'pets' ? Math.max(1, Math.floor(18 / s.height)) : 1)); }
+      n.picUrl = img.src;
+      if (n.locked) n.lockUrl = sprite(n.key + '_' + sec.pic, false, 'shadow').toDataURL();
     } catch (e) {}
     pic.append(img);
     name.textContent = n.name;
     wear.type = 'button'; wear.className = 'equip wear';
     card.append(pic, name, wear);
     lookItems.append(card);
-    n.card = card; n.wearBtn = wear; n.view = view;
+    n.card = card; n.wearBtn = wear; n.view = view; n.img = img; n.nameEl = name;
   }
   function renderLooks() {
     for (const sec of Object.values(LOOK_SECTIONS)) for (const n of sec.list) {
-      const on = lookOn(storeBy, sec, n.key);
-      n.wearBtn.textContent = on ? sec.on : sec.off;
-      n.wearBtn.setAttribute('aria-label', `${on ? sec.on : sec.off} ${n.name}`);
+      const on = lookOn(storeBy, sec, n.key), locked = !!(n.locked && n.locked());
+      n.wearBtn.textContent = locked ? 'Locked' : on ? sec.on : sec.off;
+      n.wearBtn.setAttribute('aria-label', locked ? 'Locked pet' : `${on ? sec.on : sec.off} ${n.name}`);
+      if (n.lockUrl) { const src = locked ? n.lockUrl : n.picUrl; if (n.img.src !== src) n.img.src = src; n.nameEl.textContent = locked ? '???' : n.name; }
       n.wearBtn.classList.toggle('on', on);
       n.card.hidden = n.view !== pauseView;
     }
   }
   // Wear (or Bring) chooses the thing, in place of any other in its section (pets join the ones already
-  // brought, up to 3); Take off (Send home) unchooses it
+  // brought, any number of them); Take off (Send home) unchooses it
   function wearLook(n, by) {
     const sec = LOOK_SECTIONS[n.view];
     if (phase !== 'paused' || pauseView !== n.view) return;
+    if (n.locked && n.locked()) { ovText.textContent = 'Locked! Blow up the mother ship to unlock this pet.'; sfx.nope(); return; }
     const id = joined[by] ? by : 0, name = LOOK[id].name, on = lookOn(id, sec, n.key);
     storeBy = id;
     if (sec.max) {
@@ -3100,10 +3124,10 @@
   // its pug spicy (Spicy equipped), the farts are flaming: spicy flames instead of the cloud, and a whoosh.
   const FART_T = 45;   // frames a fart cloud lasts
   const fartWait = () => 240 + Math.floor(Math.random() * 300);
-  // A pug can bring up to 3 pets. They line up behind it in the order they were brought: each walker a
+  // A pug can bring any number of pets. They line up behind it in the order they were brought: each walker a
   // little further back than the one before, each flier further back and a little higher (P.pets holds where
   // each one is, by its key).
-  const petsOf = P => looks[P.id].pets.map(k => PETS.find(x => x.key === k)).filter(Boolean);
+  const petsOf = P => looks[P.id].pets.map(k => PETS.find(x => x.key === k)).filter(pet => pet && !(pet.locked && pet.locked()));
   function movePets(P) {
     if (P.state === 'out') return;
     const pets = petsOf(P);
@@ -4177,6 +4201,8 @@
       });
     }
     if (mother.debris) for (const d of mother.debris) { d.x += d.vx; d.y += d.vy; d.vx *= 0.993; d.vy *= 0.993; }
+    // (blowing it up unlocks a pet, the first time: Zorp the Alien)
+    if (t === MB_BLAST + 140 && unlock('alien')) { toast('You unlocked a pet: Zorp the Alien!', '#5fd068'); sfx.coin(); }
     if (t >= MB_END) { mother = { state: 'gone', t: 0 }; phase = 'paused'; showPause('arcade', 0); }
   }
   // the ship during its meltdown: shuddering, lights flashing red, flickering white faster and faster near the end
