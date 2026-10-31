@@ -3815,14 +3815,22 @@
   // A click on a little patch of grass on the meadow kills it (the user asked 2026-10-31): it yellows, then flops over
   // brown and dry, with a crunch, a few dry bits falling off and a droopy little tone. It stays dead until the game
   // is loaded again. (deadTufts: which, and how far through wilting each is)
-  // (the meadow, below the hill, is all grass: a press there never starts the game, and kills the nearest live patch
-  // within 12 pixels, a flower too; the user found the patches too small to hit)
+  // (the meadow, and the hill under the castle, is all grass: a press there never starts the game, and kills the
+  // nearest live patch within 12 pixels, a flower too; the user found the patches too small to hit)
   let deadTufts = [], tuftBits = [], titleSwallow = false;
   const titlePoint = e => {
     const pt = e.touches ? e.touches[0] : e, r = cv.getBoundingClientRect();
     return pt && r.height ? [(pt.clientX - r.left) / r.width * PW, (pt.clientY - r.top) / r.height * PH] : null;
   };
-  const onMeadow = e => { const p = titlePoint(e); return !!p && p[1] >= 170; };
+  // (the green hill round the castle is grass too, the user asked: a press on a green pixel of it counts)
+  const onMeadow = e => {
+    const p = titlePoint(e);
+    if (!p) return false;
+    if (p[1] >= 170) return true;
+    if (!titleBgReady) return false;
+    const [r, g, b] = titleBg.getContext('2d').getImageData(clamp(Math.floor(p[0]), 0, PW - 1), clamp(Math.floor(p[1]), 0, PH - 1), 1, 1).data;
+    return (r === 0x2f && g === 0x8f && b === 0x66) || (r === 0x5f && g === 0xc8 && b === 0x8f);
+  };
   function tuftAt(e) {
     const p = titlePoint(e);
     if (!p) return -1;
