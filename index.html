@@ -883,6 +883,9 @@
     [[1, 46, 'U']], [[3, 44, 'H']], [[8, 39, 'k']], [[14, 33, 'k'], [17, 18, 'C'], [23, 24, 'C'], [29, 30, 'C']], [[19, 28, 'k']],
   ].map(parts => spanRow(48, parts));
   Object.assign(SPRITES, { mother_0: motherRows('Y'), mother_1: motherRows('M') });
+  // its tiny ships (twenty of them, let out when it is clicked): a little grey saucer with a glass dome, no alien,
+  // lights blinking yellow and pink and cyan ports underneath
+  Object.assign(SPRITES, { tiny_0: ['..VVV..', 'GUYUMUG', '.kCkCk.'], tiny_1: ['..VVV..', 'GUMUYUG', '.kCkCk.'] });
   /*TACO SUIT*/
 
   // The taco suit a pug wears with the Taco Pug equipped: one overlay per pose, the pose's own size, drawn
@@ -1270,6 +1273,9 @@
     alarm: () => { tone(880, 0.14, 'square', 0.05); tone(620, 0.14, 'square', 0.05, 0, 0.16); },   // the mother ship's WARNING
     portal: () => { tone(50, 2.2, 'sawtooth', 0.08, 25); tone(75, 2.2, 'triangle', 0.06, -15, 0.1); },   // its portal tearing open
     braam: () => { tone(62, 1.8, 'sawtooth', 0.15, -12); tone(93, 1.8, 'square', 0.09, -18); tone(124, 1.4, 'sawtooth', 0.07, -25); tone(41, 2.2, 'triangle', 0.15, -5); },   // ...and BRAAAM as it arrives
+    hatch: () => { tone(140, 0.16, 'square', 0.06, -60); tone(300, 0.12, 'triangle', 0.04, 200, 0.05); },   // the mother ship's hatches open
+    zip: i => tone(520 + i * 35, 0.07, 'square', 0.025, 380),   // ...and out zips a tiny ship (each one a little higher)
+    recall: () => [0, 0.08, 0.16, 0.24].forEach((d, i) => tone(900 - i * 150, 0.1, 'sine', 0.04, -200, d)),   // ...and they are called back in
     fireFart: () => { sfx.fart(); tone(220, 0.32, 'sawtooth', 0.05, 900, 0.05); },   // ...and a spicy one: the raspberry with a fiery whoosh
     clank: () => { tone(980, 0.05, 'square', 0.04); tone(640, 0.09, 'triangle', 0.05, 0, 0.04); },   // ...and lands on a girder
     grr: () => [110, 98, 87, 78].forEach((f, i) => tone(f, 0.14, 'sawtooth', 0.07, -12, i * 0.12)),
@@ -3833,6 +3839,68 @@
     const w = s.width * sc, h = s.height * sc;
     ctx.drawImage(s, Math.round((x - w / 2 - ox) * k), Math.round((y - h / 2 - oy) * k), Math.round(w * k), Math.round(h * k));
   }
+  // The mother ship's tiny ships (the user asked 2026-10-30): zoomed in on the mother ship, clicking it lets twenty
+  // tiny ships out of the three ports underneath, one after another; each drops out, then swoops off on a loop of
+  // its own round the mother ship (some figure-eights), all over space. Clicking it again calls them back in, and
+  // once they are all home it can let them out again. (mother.fleet: where they are; it goes when the mother ship
+  // does, back at the main menu)
+  const FLEET_SIZE = 20, FLEET_GAP = 5, FLEET_JOIN = 36, FLEET_HOME = 40, FLEET_PORTS = [-15, 0, 15];
+  // (a ship's port, just under the mother ship, bobbing with it)
+  function fleetPort(sh) {
+    const m = SPACE_PLANETS.find(p => p.mother);
+    return [m.x + sh.port, m.y + Math.round(Math.sin(spaceT / 20)) + 12.5];
+  }
+  // where a ship is t frames after it came out: falling out of its port, then easing onto its loop
+  function fleetSpot(sh, t) {
+    const m = SPACE_PLANETS.find(p => p.mother), [px, py] = fleetPort(sh), dy = py + Math.min(t, 10) * 1.2;
+    const a = sh.ph + sh.w * t;
+    const lx = m.x + sh.ax * Math.cos(a), ly = m.y + 6 + sh.ay * (sh.eight ? Math.sin(2 * a) : Math.sin(a)) + 6 * Math.sin(3 * a);
+    const u = clamp((t - 6) / FLEET_JOIN, 0, 1), e = u * u * (3 - 2 * u);
+    return [px + (lx - px) * e, dy + (ly - dy) * e];
+  }
+  // where ship i is now, or null while it is inside the mother ship (not out yet, or home again)
+  function fleetAt(sh, i, f) {
+    const t = f.t - sh.at;
+    if (t < 0 || (!f.out && f.back < sh.at)) return null;   // (called back before it came out: it stays in)
+    const spot = fleetSpot(sh, t);
+    if (f.out) return spot;
+    const u = clamp((f.t - f.back - i * 2) / FLEET_HOME, 0, 1);
+    if (u >= 1) return null;
+    const e = u * u * (3 - 2 * u), port = fleetPort(sh);
+    return [spot[0] + (port[0] - spot[0]) * e, spot[1] + (port[1] - spot[1]) * e];
+  }
+  function fleetTick() {
+    const f = mother.fleet;
+    f.t++;
+    if (f.out) { const i = f.ships.findIndex(sh => sh.at === f.t); if (i >= 0) sfx.zip(i); }
+    else if (f.ships.every((sh, i) => !fleetAt(sh, i, f))) mother.fleet = null;   // (all home)
+  }
+  function drawFleet(k, ox, oy) {
+    const f = mother.fleet, s = sprite(Math.floor(spaceT / 8) % 2 ? 'tiny_1' : 'tiny_0');
+    if (!f || !s) return;
+    f.ships.forEach((sh, i) => {
+      const at = fleetAt(sh, i, f);
+      if (at) ctx.drawImage(s, Math.round((at[0] - s.width / 2 - ox) * k), Math.round((at[1] - s.height / 2 - oy) * k), Math.round(s.width * k), Math.round(s.height * k));
+    });
+  }
+  // whether a click is on the mother ship itself, zoomed all the way in on it
+  function onMotherSprite(e) {
+    const z = arcadeZoom;
+    if (!z.target || !z.target.mother || z.out || z.p < 1 || z.ship) return false;
+    const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * PW, y = (e.clientY - r.top) / r.height * PH;
+    const k = zoomOf(z.target) * MOTHER_SCALE;
+    return Math.abs(x - PW / 2) <= 24 * k + 2 && Math.abs(y - PH / 2) <= 6.5 * k + 3;
+  }
+  // let the ships out, or call them back in (while they are still coming home, a click does nothing)
+  function fleetClick() {
+    const f = mother.fleet;
+    if (!f) {
+      mother.fleet = { out: true, t: 0, back: 0, ships: Array.from({ length: FLEET_SIZE }, (_, i) => ({
+        at: 1 + i * FLEET_GAP, port: FLEET_PORTS[i % 3], ax: 44 + (i * 37) % 62, ay: 22 + (i * 23) % 70,
+        w: (0.011 + (i % 5) * 0.0028) * (i % 2 ? 1 : -1), ph: i * 2.4, eight: i % 3 === 0 })) };
+      sfx.hatch();
+    } else if (f.out) { f.out = false; f.back = f.t; sfx.recall(); }
+  }
   function onDot(e) {
     const z = arcadeZoom, p = z.target;
     if (!p || !p.dot || p.shipGone || z.out || z.p < 1) return false;
@@ -3849,12 +3917,14 @@
     startClicked();
   }
   // a click in The Arcade: on a planet zooms in on it; on Saturn's green pixel, zoomed in, it zooms on into the
-  // alien spaceship; anywhere else while zoomed in zooms back out a level
+  // alien spaceship; on the mother ship, zoomed in, it lets its tiny ships out (or calls them in); anywhere else
+  // while zoomed in zooms back out a level
   ov.addEventListener('click', e => {
     // (nothing while a spaceship explodes: the phase is 'boom' then)
     if (phase !== 'paused' || !(fromTitle && pauseView === 'arcade') || e.target.closest('button')) return;
     if (onShip()) { if (arcadeZoom.ship.p === 1 && onShipSprite(e)) explodeShip(); else shipOut(); return; }
     if (!arcadeZoom.ship && onDot(e)) { shipIn(); return; }
+    if (onMotherSprite(e)) { fleetClick(); return; }   // (zoomed in on the mother ship: its tiny ships)
     if (arcadeZoom.target && !arcadeZoom.out) { zoomOut(); return; }
     const p = planetAt(e);
     if (p) zoomTo(p);
@@ -3935,6 +4005,7 @@
     if (!spaceBgReady) { buildSpaceBg(); spaceBgReady = true; }
     spaceT++;
     if (mother.state === 'coming') motherTick();
+    if (mother.fleet) fleetTick();
     // zoomed in on a planet (or on the way in or out): the scene blown up round it, the planet sliding to the
     // middle as it grows (eased in and out); no twinkles or shooting star meanwhile
     const z = arcadeZoom;
@@ -3954,6 +4025,7 @@
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(spaceBg, cx - PW / 2 / k, cy - PH / 2 / k, PW / k, PH / k, 0, 0, PW, PH);
       drawMother(k, cx - PW / 2 / k, cy - PH / 2 / k);
+      if (!se) drawFleet(k, cx - PW / 2 / k, cy - PH / 2 / k);   // (not while zooming into a spaceship)
       // (the planet's little green pixel, once the zoom is nearly in: always just 2 pixels square on screen, however
       // far in, so it stays hidden; zooming into it, it grows into the alien spaceship, lights blinking, once the ship
       // is bigger than the pixel)
@@ -3986,6 +4058,7 @@
     }
     if (mother.state === 'coming') drawArrivalBack();
     drawMother(1, 0, 0);
+    drawFleet(1, 0, 0);
     if (shake) ctx.restore();
     if (mother.state === 'coming') drawArrivalFront();
   }
