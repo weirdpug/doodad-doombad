@@ -1787,6 +1787,7 @@
   // the main menu again (sel: the button to choose), from the pause menu, the Store or Customize
   function showTitle(sel) {
     fromTitle = false; phase = 'title';
+    mother = { state: 'gone', t: 0 };   // (back on the main menu, the mother ship has gone: the user asked for that)
     ov.classList.remove('menu-mode', 'arcade-mode'); ov.classList.add('title-mode');
     ovTitle.innerHTML = 'Doodad<br>Doombad'; startBtn.textContent = 'Start'; startBtn.hidden = false;
     menuEl.hidden = menuHint.hidden = coinList.hidden = storeShelf.hidden = lookShelf.hidden = true;
@@ -3731,7 +3732,7 @@
     phase = 'paused'; showPause('arcade', 0);
   }
   // The mother ship: 'gone' until every planet's spaceship is blown up, then 'coming' (its grand entrance) and then
-  // 'here', bobbing gently, for the rest of the visit and every visit after until the page is reloaded. It is
+  // 'here', bobbing gently, until the main menu comes back (then it has gone again: showTitle). It is
   // drawn over space like the planets would be, zoomed with the view, 2.5 times its sprite's size (120 pixels
   // across: half the screen; the user asked for it bigger).
   // Its grand entrance (MOTHER_FRAMES, 7.5 seconds; nothing else can happen meanwhile: phase 'arrive'; the user
