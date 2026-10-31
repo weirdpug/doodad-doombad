@@ -1372,6 +1372,8 @@
     crunch: () => { noise(0.07, 0.3, 8000, 3000); noise(0.12, 0.18, 3500, 700, 0.05); tone(620, 0.22, 'triangle', 0.06, -360, 0.04); },
     whistle: dur => tone(700, dur, 'sine', 0.03, 900),   // a firework rocket whistling up (the main menu)
     bang: () => { noise(0.5, 0.35, 5000, 200); tone(120, 0.25, 'sine', 0.2, -70); [0.22, 0.29, 0.35, 0.42, 0.5, 0.57].forEach(d => noise(0.04, 0.08, 9000, 4000, d)); },   // ...and bursting, then crackling
+    bloop: () => { tone(260, 0.14, 'sine', 0.08, 520); noise(0.12, 0.08, 2500, 600); },   // a fish leaping out of the moat (the main menu)
+    splash: () => { noise(0.3, 0.14, 3500, 300); tone(520, 0.1, 'sine', 0.04, -300); },   // ...and diving back in
     poof: () => { noise(0.35, 0.16, 2500, 300); tone(300, 0.12, 'sine', 0.05, 200); },   // a cloud poofing away (the main menu)
     pop: () => { tone(320, 0.12, 'square', 0.05, -260); tone(140, 0.18, 'sawtooth', 0.05, -90, 0.02); },   // ...and one blown up
     recall: () => [0, 0.08, 0.16, 0.24].forEach((d, i) => tone(900 - i * 150, 0.1, 'sine', 0.04, -200, d)),   // ...and they are called back in
@@ -1892,6 +1894,7 @@
       if (!inNightSky(e)) {
         const p = titlePoint(e), i = cloudAt(e);
         if (i >= 0) poofCloud(i);   // (a cloud just poofs: no firework, the user asked)
+        else if (p && moatNear(p)) leapFish(moatNear(p));   // (the moat: a fish leaps out)
         else if (p && p[1] < floorY(p[0])) launchFirework(p);
         else if (onMeadow(e)) {
           const g = tuftAt(e), ground = killGround(e);
@@ -3960,6 +3963,62 @@
     ctx.globalAlpha = 1;
     sparks = sparks.filter(p => p.t > 0);
   }
+  // Fish in the moat (the user asked 2026-10-31): a click on the water makes a little orange fish leap out right
+  // there, arcing up and diving back in a little way along, with a bloop, splashes and a ripple each time it goes
+  // through the water. (fishes: the ones in the air; drops: the splashes and ripples)
+  Object.assign(SPRITES, { fish: ['..FFFF.F', '.FKFFYFF', '.FFFFYFF', '..FFFF.F'] });   // (facing left)
+  let fishes = [], drops = [];
+  const MOAT_COLS = ['2f5bff', '5fb4ff', '1d2f8c'];
+  function onMoat([x, y]) {
+    if (!titleBgReady) return false;
+    const d = titleBg.getContext('2d').getImageData(clamp(Math.floor(x), 0, PW - 1), clamp(Math.floor(y), 0, PH - 1), 1, 1).data;
+    return MOAT_COLS.includes([d[0], d[1], d[2]].map(v => v.toString(16).padStart(2, '0')).join(''));
+  }
+  // the water nearest a click, within 3 pixels (the moat is thin), or null
+  function moatNear([x, y]) {
+    let best = null, bd = 3.5;
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+      const d = Math.hypot(dx, dy);
+      if (d < bd && onMoat([x + dx, y + dy])) { bd = d; best = [Math.floor(x) + dx + 0.5, Math.floor(y) + dy + 0.5]; }
+    }
+    return best;
+  }
+  function leapFish([x, y]) {
+    if (fishes.length > 6) return;
+    // (it dives back in a little way along, on whichever side there is water)
+    let dir = Math.random() < 0.5 ? -1 : 1, dx = dir * (8 + Math.random() * 6);
+    if (!onMoat([x + dx, y])) { dir = -dir; dx = -dx; if (!onMoat([x + dx, y])) dx = 0; }
+    fishes.push({ x0: x, y0: y, dx, dir, h: 14 + Math.random() * 8, t: 0, T: 36 });
+    splash(x, y);
+    try { initAudio(); } catch (e) {}
+    sfx.bloop();
+  }
+  function splash(x, y) {
+    for (let i = 0; i < 6; i++) drops.push({ x, y, vx: (i - 2.5) * 0.35, vy: -1 - Math.random() * 0.8, t: 16, col: i % 2 ? '#ffffff' : '#9fd8ff' });
+    drops.push({ x, y, ring: true, t: 12 });
+  }
+  function drawFish() {
+    for (const f of fishes) {
+      const u = ++f.t / f.T, x = f.x0 + f.dx * u, y = f.y0 - f.h * 4 * u * (1 - u);
+      const vy = -f.h * 4 * (1 - 2 * u) / f.T, vx = Math.max(Math.abs(f.dx), 4) / f.T, s = sprite('fish', f.dir > 0);
+      // (tipped nose-up on the way up and nose-down on the way down)
+      if (s) { ctx.save(); ctx.translate(Math.round(x), Math.round(y)); ctx.rotate(Math.atan2(vy, vx) * (f.dir > 0 ? 1 : -1)); ctx.drawImage(s, -4, -2); ctx.restore(); }
+      if (f.t >= f.T) { f.done = true; splash(f.x0 + f.dx, f.y0); sfx.splash(); }
+    }
+    fishes = fishes.filter(f => !f.done);
+    for (const d of drops) {
+      d.t--;
+      if (d.ring) {
+        const r = (12 - d.t) * 0.8 + 2;
+        ctx.fillStyle = '#9fd8ff';
+        for (let a = 0; a < 12; a++) { const an = a / 12 * Math.PI * 2; ctx.fillRect(Math.round(d.x + Math.cos(an) * r), Math.round(d.y + Math.sin(an) * r * 0.35), 1, 1); }
+        continue;
+      }
+      d.vy += 0.15; d.x += d.vx; d.y += d.vy;
+      ctx.fillStyle = d.col; ctx.fillRect(Math.round(d.x), Math.round(d.y), 1, 1);
+    }
+    drops = drops.filter(d => d.t > 0);
+  }
   function drawTitleScene() {
     if (!titleBgReady) { buildTitleBg(); titleBgReady = true; }
     ctx.drawImage(titleBg, 0, 0);
@@ -4009,6 +4068,7 @@
     // (the moat glinting, a spot at a time)
     ctx.fillStyle = '#9fd8ff';
     MOAT_GLINTS.forEach(([x, y], i) => { if (Math.floor(frame / 18 + i * 3) % 7 === 0) ctx.fillRect(x, y, 2, 1); });
+    drawFish();
     drawFireworks();
   }
   // ----- The Arcade: out in space, reached by clicking the night sky on the main menu -----
