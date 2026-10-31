@@ -3838,7 +3838,8 @@
   }
   // The mother ship's tiny ships (the user asked 2026-10-30): zoomed in on the mother ship, clicking it lets twenty
   // tiny ships out of the three ports underneath, one after another; each drops out, then swoops off on a loop of
-  // its own round the mother ship (some figure-eights), all over space. Clicking it again calls them back in, and
+  // its own round the mother ship (some figure-eights), all over space (at half the speed they first had: the user
+  // asked for them slower). Clicking it again calls them back in, and
   // once they are all home it can let them out again. (mother.fleet: where they are; it goes when the mother ship
   // does, back at the main menu)
   const FLEET_SIZE = 20, FLEET_GAP = 5, FLEET_JOIN = 36, FLEET_HOME = 40, FLEET_PORTS = [-15, 0, 15];
@@ -3936,7 +3937,7 @@
     if (!f) {
       mother.fleet = { out: true, t: 0, back: 0, ships: Array.from({ length: FLEET_SIZE }, (_, i) => ({
         at: 1 + i * FLEET_GAP, port: FLEET_PORTS[i % 3], ax: 44 + (i * 37) % 62, ay: 22 + (i * 23) % 70,
-        w: (0.011 + (i % 5) * 0.0028) * (i % 2 ? 1 : -1), ph: i * 2.4, eight: i % 3 === 0 })) };
+        w: (0.0055 + (i % 5) * 0.0014) * (i % 2 ? 1 : -1), ph: i * 2.4, eight: i % 3 === 0 })) };
       sfx.hatch();
     } else if (f.out) { f.out = false; f.back = f.t; sfx.recall(); }
   }
