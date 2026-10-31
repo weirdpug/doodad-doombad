@@ -1232,6 +1232,7 @@
     toast(`${LOOK[id].name} joined!`, LOOK[id].hex);
     showControllerHelp(); updateHud(true);
     if (phase === 'paused' && pauseView === 'store') renderStore();   // the Store lists the new pug's coins too
+    if (arena && fromTitle) arena.prev[id] = { jump: true, down: true, atk: true };   // (the press that joined isn't also a jump)
   }
   // Pop-up messages over the top of the game screen (they also show over the start and pause screens)
   const toastBox = document.getElementById('toasts');
@@ -1251,6 +1252,8 @@
     players = players.filter(p => p.id !== id);
     showControllerHelp(); updateHud(true);
     // (in the Store opened from the main menu no game is running: it just shows the pugs still here)
+    // (in the Colosseum its pug fights on for the computer, and the fight pauses to say so)
+    if (arena && fromTitle && phase === 'mini') { pauseArena(`Player 's controller disconnected. Press A on a controller to bring them back.`); return; }
     if (fromTitle) { if (phase === 'paused') showPause(pauseView, menuSel); return; }
     if (phase === 'play' || phase === 'paused' || phase === 'win') {
       // if everyone left was sitting out, the team is out: that costs a heart and the level restarts
@@ -1550,8 +1553,11 @@
     // X or Enter also swings the sword)
     if (phase === 'mini') {
       const km = keyMap[e.code];
+      const swing = arena && (e.code === 'KeyX' || e.key === 'Enter');
+      // (in the Colosseum a keyboard that hasn't joined yet joins as the next player, as in the main game)
+      if (arena && (km || swing) && !e.repeat) claimKeyboard(true);
       if (km) { e.preventDefault(); keys[km] = true; }
-      if (arena && (e.code === 'KeyX' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); arena.kbAtk = true; }
+      if (swing && !e.repeat) { e.preventDefault(); arena.kbAtk = true; }
       if ((e.key === 'Escape' || e.key === 'p' || e.key === 'P') && !e.repeat) pauseMini();
       return;
     }
@@ -1623,7 +1629,7 @@
   addEventListener('blur', releaseAll);
 
   // the touch buttons count as the keyboard: the same pug, and they join the same way its keys do
-  document.getElementById('barkBtn').addEventListener('pointerdown', e => { e.preventDefault(); initAudio(); if (phase === 'mini' && arena) { arena.kbAtk = true; return; } if (claimKeyboard(true) === true) doBark(pById(kbSlot)); });
+  document.getElementById('barkBtn').addEventListener('pointerdown', e => { e.preventDefault(); initAudio(); if (phase === 'mini' && arena) { if (claimKeyboard(true)) arena.kbAtk = true; return; } if (claimKeyboard(true) === true) doBark(pById(kbSlot)); });
   document.querySelectorAll('.pad button[data-k]').forEach(btn => {
     const k = btn.dataset.k;
     const on = e => {
@@ -1668,6 +1674,7 @@
       // Player 1's pug stays: the keyboard (if it isn't already another player's) or any controller can take
       // it over. During the level-clear banner, the pause waits for the next level to start.
       else if ((phase === 'play' || phase === 'paused') && !fromTitle) p1Lost();
+      else if (phase === 'mini' && arena && !arena.result) pauseArena("Player 1's controller disconnected. Press a key, or A on a controller, to take Player 1 back.");
       else if (phase === 'win') p1LostAtWin = true;
     }
     if (pads.length !== padCount) { padCount = pads.length; showControllerHelp(); }
@@ -2293,7 +2300,8 @@
     if (phase !== 'paused') return;
     if (fromTitle && pauseView === 'bananaPause') { releaseAll(); phase = 'mini'; hideOverlay(); return; }
     if (fromTitle && pauseView === 'bananaOver') return backToArcade();
-    if (fromTitle && pauseView === 'arenaPause') { releaseAll(); phase = 'mini'; hideOverlay(); return; }
+    // (the key or button that picked Resume counts as already held, so it doesn't also jump or swing)
+    if (fromTitle && pauseView === 'arenaPause') { releaseAll(); arenaHeld(); phase = 'mini'; hideOverlay(); return; }
     if (fromTitle && pauseView === 'arenaOver') return backFromArena();
     if (fromTitle) return backToTitle();   // (the Store or Customize opened from the main menu goes back there)
     releaseAll(); phase = 'play'; hideOverlay();
@@ -2313,7 +2321,7 @@
   }
   function togglePause() { if (phase === 'play') pauseGame(); else if (phase === 'paused') resumeGame(); }
   document.addEventListener('visibilitychange', () => { if (document.hidden && phase === 'play') pauseGame(); else if (document.hidden && phase === 'mini') pauseMini(); }, sig);
-  document.getElementById('pauseBtn').addEventListener('pointerdown', e => { e.preventDefault(); initAudio(); togglePause(); });
+  document.getElementById('pauseBtn').addEventListener('pointerdown', e => { e.preventDefault(); initAudio(); if (phase === 'mini') pauseMini(); else togglePause(); });
 
   // ---------- clicking Big Bruno ----------
   // On the team's last heart, a click (or tap) on Bruno sends him rolling down as a giant ball.
@@ -4592,7 +4600,7 @@
     else if (g.fasterT > 0 && frame % 8 < 6) banner('FASTER!', 120, 'gold');
   }
   // ----- The mother ship's game: the Colosseum (Play on the mother ship in The Arcade; the user asked 2026-10-31) -----
-  // Four pugs in a stone arena, each with a sword, each out to knock the others out: three hearts apiece, a sword
+  // Four pugs in a stone arena, each with a sword, each out to knock the others out: five hearts apiece, a sword
   // hit takes one (and knocks the pug back, blinking and safe for a moment), and the last pug standing wins. Every
   // pug in the game is played by its own player (its controller, and the keyboard for the keyboard's pug); the rest
   // are the computer's. Left/Right walk, Up/Space/Z (a controller's A) jump, Down drops through a ledge, X or Enter
@@ -4600,21 +4608,26 @@
   // (Played from The Arcade like Banana Catch, in its phase 'mini': fromTitle stays on, and Back goes to The Arcade,
   // zoomed in on the mother ship.)
   const ARENA_GROUND = 250, ARENA_LEDGES = [[30, 90, 196], [150, 210, 196], [90, 150, 150]];   // ledges: [left, right, top]
-  const ARENA_X = [40, 92, 148, 200], ARENA_HP = 3, ARENA_SWING = 16;   // (where each pug starts; a swing's frames)
+  const ARENA_X = [40, 92, 148, 200], ARENA_HP = 5, ARENA_SWING = 16;   // (where each pug starts; hearts, 5 at the user's request; a swing's frames)
   const arenaBg = document.createElement('canvas');
   let arena = null, arenaBgReady = false;
   function startArena(by) {
     banana = null;
     arena = { startT: 110, fightT: 0, result: null, endT: 0, kbAtk: false, prev: [{}, {}, {}, {}], sparks: [],
       pugs: [0, 1, 2, 3].map(i => ({ id: i, cpu: !joined[i], x: ARENA_X[i], y: ARENA_GROUND, vx: 0, vy: 0, kx: 0, ground: true,
-        face: i < 2 ? 1 : -1, hp: ARENA_HP, hurtT: 0, swingT: 0, hitIds: [], cool: 0, anim: 0, moving: false, dropT: 0, ko: false, out: false, spin: 0 })) };
+        face: i < 2 ? 1 : -1, hp: ARENA_HP, hurtT: 0, swingT: 0, hitIds: [], cool: 0, anim: 0, moving: false, dropT: 0, ko: false, out: false, spin: 0, climbT: 0, climbX: 0 })) };
     try { initAudio(); } catch (e) {}
     releaseAll(); fromTitle = true; phase = 'mini'; hideOverlay();
   }
-  function pauseArena() {
+  function pauseArena(note) {
     if (phase !== 'mini' || !arena || arena.result) return;
-    releaseAll(); phase = 'paused'; showPause('arenaPause', 0);
+    releaseAll(); phase = 'paused'; showPause('arenaPause', 0, note);
   }
+  // every pug's buttons count as held, so only a fresh press after this jumps, drops or swings
+  function arenaHeld() { if (arena) { arena.prev = [0, 1, 2, 3].map(() => ({ jump: true, down: true, atk: true })); arena.kbAtk = false; } }
+  // whether a player drives pug id: its controller, or the keyboard (the keyboard drives Player 1's pug until it
+  // joins as someone else, unless a controller has Player 1); a pug nobody drives fights for the computer
+  const arenaDriven = id => joined[id] && (ownerOf(id) !== undefined || kbSlot === id || (id === 0 && kbSlot === null));
   const pauseMini = () => arena ? pauseArena() : pauseBanana();
   // back to The Arcade, zoomed in on the mother ship
   function backFromArena() {
@@ -4625,7 +4638,7 @@
   // what a player's pug is told to do this frame: its controller, and the keyboard for the keyboard's pug (jumps,
   // drops and swings are fresh presses only, so holding a button does it once)
   function arenaInput(P) {
-    const g = arena, pad = padHeld[P.id] || {}, kb = P.id === kbBy(), prev = g.prev[P.id];
+    const g = arena, pad = padHeld[P.id] || {}, kb = kbSlot !== null ? P.id === kbSlot : P.id === 0 && ownerOf(0) === undefined, prev = g.prev[P.id];
     const held = k => !!pad[k] || (kb && keys[k]);
     const jump = !!pad.jump || (kb && (keys.jump || keys.up)), down = held('down'), atk = !!pad.bark || !!pad.toss;
     const inp = { left: held('left'), right: held('right'), jump: jump && !prev.jump, drop: down && !prev.down, swing: atk && !prev.atk };
@@ -4641,6 +4654,16 @@
     const dist = Q => Math.abs(Q.x - P.x) + Math.abs(Q.y - P.y);
     const T = foes.reduce((a, b) => dist(b) < dist(a) ? b : a), dx = T.x - P.x, dy = T.y - P.y;
     if (P.hurtT > 25) { inp[dx > 0 ? 'left' : 'right'] = true; return inp; }
+    // (in the air on the way up to a ledge, it keeps heading for the ledge)
+    if (P.ground) P.climbT = 0;
+    else if (P.climbT > 0) { P.climbT--; if (Math.abs(P.climbX - P.x) > 3) inp[P.climbX > P.x ? 'right' : 'left'] = true; return inp; }
+    // (a pug on a ledge well above: get under it and jump; one on the top ledge, out of reach from the sand, is
+    // reached from the nearer side ledge)
+    if (P.ground && dy < -50) {
+      const gx = T.y < 170 && P.y >= ARENA_GROUND ? (Math.abs(P.x - 60) < Math.abs(P.x - 180) ? 60 : 180) : T.x;
+      if (Math.abs(gx - P.x) > 16) inp[gx > P.x ? 'right' : 'left'] = true; else { inp.jump = true; P.climbX = gx; P.climbT = 60; }
+      return inp;
+    }
     if (Math.abs(dx) > 13) inp[dx > 0 ? 'right' : 'left'] = true;
     else P.face = dx >= 0 ? 1 : -1;
     if (P.ground && dy < -20 && Math.random() < 0.04) inp.jump = true;
@@ -4669,6 +4692,7 @@
         if (P.y > PH + 30) P.out = true;
         continue;
       }
+      P.cpu = !arenaDriven(P.id);
       const inp = g.startT > 0 || g.result ? {} : P.cpu ? arenaThink(P) : arenaInput(P);
       if (P.cool > 0) P.cool--;
       if (P.hurtT > 0) P.hurtT--;
@@ -4703,6 +4727,7 @@
         }
       }
     }
+    g.kbAtk = false;   // (a swing pressed when it couldn't count, during GET READY or by nobody's pug, isn't saved up)
     for (const s of g.sparks) s.t--;
     g.sparks = g.sparks.filter(s => s.t > 0);
     // the last pug standing wins (and once every player's pug is out, it's over for them)
