@@ -885,6 +885,8 @@
   Object.assign(SPRITES, { mother_0: motherRows('Y'), mother_1: motherRows('M') });
   // its tiny ships (twenty of them, let out when it is clicked): a little grey saucer with a glass dome, no alien,
   // lights blinking yellow and pink and cyan ports underneath
+  // (and, as it blows up, with its lights red, or all white for its flicker)
+  Object.assign(SPRITES, { mother_r: motherRows('R'), mother_w: motherRows('Y').map(r => r.replace(/[^.]/g, 'W')) });
   Object.assign(SPRITES, { tiny_0: ['..VVV..', 'GUYUMUG', '.kCkCk.'], tiny_1: ['..VVV..', 'GUMUYUG', '.kCkCk.'] });
   /*TACO SUIT*/
 
@@ -1275,6 +1277,8 @@
     braam: () => { tone(62, 1.8, 'sawtooth', 0.15, -12); tone(93, 1.8, 'square', 0.09, -18); tone(124, 1.4, 'sawtooth', 0.07, -25); tone(41, 2.2, 'triangle', 0.15, -5); },   // ...and BRAAAM as it arrives
     hatch: () => { tone(140, 0.16, 'square', 0.06, -60); tone(300, 0.12, 'triangle', 0.04, 200, 0.05); },   // the mother ship's hatches open
     zip: i => tone(520 + i * 35, 0.07, 'square', 0.025, 380),   // ...and out zips a tiny ship (each one a little higher)
+    charge: () => { tone(160, 1.8, 'sawtooth', 0.05, 1500); tone(240, 1.8, 'square', 0.03, 1800, 0.05); },   // the mother ship whining up to blow
+    aftershock: () => { tone(48, 3, 'triangle', 0.14, -18); tone(36, 3.2, 'sawtooth', 0.06, -10, 0.2); },   // ...and the long rumble after
     pop: () => { tone(320, 0.12, 'square', 0.05, -260); tone(140, 0.18, 'sawtooth', 0.05, -90, 0.02); },   // ...and one blown up
     recall: () => [0, 0.08, 0.16, 0.24].forEach((d, i) => tone(900 - i * 150, 0.1, 'sine', 0.04, -200, d)),   // ...and they are called back in
     fireFart: () => { sfx.fart(); tone(220, 0.32, 'sawtooth', 0.05, 900, 0.05); },   // ...and a spicy one: the raspberry with a fiery whoosh
@@ -1490,7 +1494,7 @@
     if (coinBarOpen) return coinBarKey(e);
     if (secretCode(e)) return;
     // gliding to or from The Arcade, or a spaceship exploding: keys do nothing
-    if (phase === 'scroll' || phase === 'boom' || phase === 'arrive') { if (keyMap[e.code]) e.preventDefault(); return; }
+    if (phase === 'scroll' || phase === 'boom' || phase === 'arrive' || phase === 'mboom') { if (keyMap[e.code]) e.preventDefault(); return; }
     // Banana Catch: the arrows (or A/D) move and Esc or P pauses; nothing else does anything
     if (phase === 'mini') {
       const km = keyMap[e.code];
@@ -3782,6 +3786,8 @@
   }
   // how hard everything shakes: building through the warning and while it comes, a jolt as it lands, then still
   function motherShake() {
+    // (blowing up: harder and harder to the blast, then a huge jolt dying away)
+    if (mother.state === 'exploding') { const t = mother.t; return t < MB_BLAST ? 0.4 + 2.6 * t / MB_BLAST : Math.max(0, 7 * (1 - (t - MB_BLAST) / 90)); }
     if (mother.state !== 'coming') return 0;
     const t = mother.t;
     return t < M_PORTAL ? t / M_PORTAL : t < M_ARRIVE ? 1.5 + (t - M_PORTAL) / (M_ARRIVE - M_PORTAL) : t < M_ARRIVE + 20 ? 3 * (1 - (t - M_ARRIVE) / 20) : 0;
@@ -3829,6 +3835,7 @@
   }
   function drawMother(k, ox, oy) {
     if (mother.state === 'gone') return;
+    if (mother.state === 'exploding') return drawMotherMelting(k, ox, oy);
     const m = SPACE_PLANETS.find(p => p.mother), s = sprite(Math.floor(spaceT / 14) % 2 ? 'mother_1' : 'mother_0');
     if (!s) return;
     let x = m.x, y = m.y, sc = MOTHER_SCALE;
@@ -3890,7 +3897,8 @@
   }
   // Clicking one of the tiny ships blows it up (the user asked 2026-10-30): a tiny explosion where it was (a
   // flash, then sparks flying out, yellow to orange to red to grey) and a small bang, and it is gone. Once all
-  // twenty are, the mother ship can let out twenty more. (mother.booms: the explosions still going off)
+  // twenty are, the mother ship itself blows up (see startMotherBoom). (mother.booms: the explosions still going
+  // off, the ones popping on its hull as it blows up too, s: how big)
   const TINY_BOOM_FRAMES = 26;
   let fleetView = null;   // (how the tiny ships were last drawn: the zoom, and spaceT then, for clicks)
   // the tiny ship under a click (the nearest within a few pixels: they are small and quick), or -1
@@ -3914,18 +3922,134 @@
     sh.dead = true;
     (mother.booms = mother.booms || []).push({ x: at[0], y: at[1], t: 0 });
     sfx.pop();
+    if (f.ships.every(s => s.dead)) startMotherBoom();   // (the last one: the mother ship blows up)
     return true;
   }
   function drawTinyBoom(b, k, ox, oy) {
-    const px = Math.max(1, Math.round(k)), t = b.t;
+    const px = Math.max(1, Math.round(k)), t = b.t, sc = b.s || 1, c = Math.round(sc);
     const dot = (x, y, col) => { ctx.fillStyle = col; ctx.fillRect(Math.round((x - ox) * k - px / 2), Math.round((y - oy) * k - px / 2), px, px); };
-    if (t < 4) for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) dot(b.x + dx, b.y + dy, t < 2 ? '#ffffff' : '#ffe14a');
+    if (t < 4) for (let dx = -c; dx <= c; dx++) for (let dy = -c; dy <= c; dy++) dot(b.x + dx, b.y + dy, t < 2 ? '#ffffff' : '#ffe14a');
     const cols = ['#ffffff', '#ffe14a', '#ff9a2a', '#ff3e2a', '#8a8a96'], col = cols[Math.min(cols.length - 1, Math.floor(t / 5))];
     for (let i = 0; i < 10; i++) {
       if (t > 18 && i % 2) continue;   // (thinning out at the end)
-      const a = i / 10 * Math.PI * 2 + i * 0.3, d = 1 + t * (0.25 + (i % 3) * 0.08);
+      const a = i / 10 * Math.PI * 2 + i * 0.3, d = (1 + t * (0.25 + (i % 3) * 0.08)) * sc;
       dot(b.x + Math.cos(a) * d, b.y + Math.sin(a) * d, col);
     }
+  }
+  // The mother ship blows up (the user asked 2026-10-31): blow up all twenty of the tiny ships it let out and it
+  // goes, as dramatically as it came. Nothing else can happen meanwhile (phase 'mboom', like its entrance; MB_END
+  // frames, 9 seconds), and the view zooms back out to space first. In order:
+  //   the meltdown (to MB_BLAST): it shudders harder and harder, its lights flash red, alarms, CRITICAL! flashing,
+  //     little explosions popping all over its hull, faster and bigger; then space darkens, beams of light burst
+  //     out of it, a rising whine, and it flickers white
+  //   the blast: a white flash, the biggest bang, the ship gone in a fireball (white, yellow, orange, red, then
+  //     smoke), two shockwave rings racing out, pieces of hull and glowing embers flying off, everything shaking
+  //   then the smoke clears: THE MOTHER SHIP IS DESTROYED! (it can still be called back with the come code)
+  const MB_DARK = 110, MB_BLAST = 220, MB_END = 540;
+  const mbRand = n => { const x = Math.sin(n * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); };   // (the same "random" every time)
+  function startMotherBoom() {
+    mother = { state: 'exploding', t: 0, booms: mother.booms };   // (the last tiny ship's explosion still going off)
+    if (arcadeZoom.target) { arcadeZoom.out = true; arcadeZoom.ship = null; }
+    phase = 'mboom'; ov.hidden = true;
+  }
+  function motherBoomTick() {
+    const t = ++mother.t, m = SPACE_PLANETS.find(p => p.mother);
+    if (t < MB_BLAST && t % 30 === 1) sfx.alarm();
+    // (the little explosions on its hull: every 14 frames at first, every 2 just before the blast, bigger and bigger)
+    if (t > 20 && t < MB_BLAST) {
+      const gap = Math.max(2, Math.round(14 - 12 * t / MB_BLAST));
+      if (t % gap === 0) {
+        (mother.booms = mother.booms || []).push({ x: m.x + (mbRand(t) * 2 - 1) * 50, y: m.y + (mbRand(t + 0.37) * 2 - 1) * 11, t: 0, s: 1 + t / MB_BLAST });
+        if (t % (gap * 2) === 0) sfx.pop();
+      }
+    }
+    if (t === MB_DARK) sfx.charge();
+    if (t === MB_BLAST) {
+      sfx.boom(); sfx.braam(); sfx.aftershock();
+      mother.debris = Array.from({ length: 36 }, (_, i) => {
+        const a = mbRand(i + 0.11) * Math.PI * 2, v = 0.5 + mbRand(i + 0.53) * 2.2;
+        return { x: m.x + Math.cos(a) * 10, y: m.y + Math.sin(a) * 4, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.75,
+          w: 1 + Math.floor(mbRand(i + 0.71) * 3), h: 1 + Math.floor(mbRand(i + 0.89) * 2), ember: i % 3 === 0, grey: mbRand(i + 0.29) > 0.5 };
+      });
+    }
+    if (mother.debris) for (const d of mother.debris) { d.x += d.vx; d.y += d.vy; d.vx *= 0.993; d.vy *= 0.993; }
+    if (t >= MB_END) { mother = { state: 'gone', t: 0 }; phase = 'paused'; showPause('arcade', 0); }
+  }
+  // the ship during its meltdown: shuddering, lights flashing red, flickering white faster and faster near the end
+  function drawMotherMelting(k, ox, oy) {
+    const t = mother.t, m = SPACE_PLANETS.find(p => p.mother);
+    if (t >= MB_BLAST) return;   // (gone in the blast)
+    const fast = t > MB_DARK ? Math.max(2, Math.round(10 - 8 * (t - MB_DARK) / (MB_BLAST - MB_DARK))) : 0;
+    const s = sprite(fast && t % fast < fast / 2 ? 'mother_w' : Math.floor(t / 5) % 2 ? 'mother_r' : 'mother_0');
+    if (!s) return;
+    const j = 1 + 2 * t / MB_BLAST, x = m.x + Math.sin(t * 1.7) * j, y = m.y + Math.cos(t * 2.3) * j * 0.6;
+    const w = s.width * MOTHER_SCALE, h = s.height * MOTHER_SCALE;
+    ctx.drawImage(s, Math.round((x - w / 2 - ox) * k), Math.round((y - h / 2 - oy) * k), Math.round(w * k), Math.round(h * k));
+  }
+  // behind the ship: space darkening, and the beams of light bursting out of it
+  function drawMotherBoomBack() {
+    const t = mother.t, m = SPACE_PLANETS.find(p => p.mother);
+    const dark = t < MB_DARK ? 0 : t < MB_BLAST ? 0.65 * (t - MB_DARK) / (MB_BLAST - MB_DARK) : Math.max(0, 0.65 * (1 - (t - MB_BLAST) / 30));
+    if (dark > 0) { ctx.fillStyle = `rgba(0, 0, 0, ${dark})`; ctx.fillRect(-8, -8, PW + 16, PH + 16); }
+    if (t <= MB_DARK || t >= MB_BLAST) return;
+    const u = (t - MB_DARK) / (MB_BLAST - MB_DARK), n = 4 + Math.floor(u * 12), len = 30 + u * 150;
+    ctx.fillStyle = '#fff2b0';
+    for (let i = 0; i < n; i++) {
+      const a = mbRand(i + 3.1) * Math.PI * 2 + t * 0.004 * (i % 2 ? 1 : -1);
+      for (let d = 8; d < len; d += 2) ctx.fillRect(Math.round(m.x + Math.cos(a) * d), Math.round(m.y + Math.sin(a) * d * 0.5), 1, 1);
+    }
+  }
+  // a crisp pixel disc, filled row by row (jag: how ragged its edge is, a different raggedness for each seed)
+  function pixDisc(cx, cy, r, col, jag = 0, seed = 0) {
+    if (r < 0.5) return;
+    const ry = r * 0.85;
+    ctx.fillStyle = col;
+    for (let y = -Math.floor(ry); y <= ry; y++) {
+      const w = r * Math.sqrt(Math.max(0, 1 - (y / ry) * (y / ry))) * (1 + jag * (mbRand(y * 1.7 + seed) - 0.5));
+      const lean = jag * r * (mbRand(y * 2.3 + seed + 0.5) - 0.5) * 0.3;
+      ctx.fillRect(Math.round(cx - w + lean), Math.round(cy + y), Math.round(w * 2), 1);
+    }
+  }
+  // the blast itself: the fireball, the shockwaves and the flying pieces
+  function drawMotherBoomMid() {
+    const tb = mother.t - MB_BLAST, m = SPACE_PLANETS.find(p => p.mother);
+    if (tb < 0) return;
+    // (the fireball's layers grow fast, then slowly; the hot middle fades first and the smoke last; their edges
+    // ragged and flickering, like flames)
+    const g = 1 - Math.pow(1 - Math.min(1, tb / 45), 3);
+    let n = 0;
+    const layer = (r, col, fadeAt, fadeLen) => {
+      const a = 1 - clamp((tb - fadeAt) / fadeLen, 0, 1);
+      n++;
+      if (a > 0) { ctx.globalAlpha = a; pixDisc(m.x, m.y, r, col, 0.22, Math.floor(tb / 3) * 7 + n * 31); ctx.globalAlpha = 1; }
+    };
+    layer(78 * g + tb * 0.15, '#3a3448', 120, 140);
+    layer(66 * g, '#ff3e2a', 50, 70);
+    layer(52 * g, '#ff9a2a', 35, 60);
+    layer(38 * g * (1 - clamp((tb - 30) / 60, 0, 0.6)), '#ffe14a', 25, 50);
+    layer(24 * (1 - clamp(tb / 40, 0, 1)), '#ffffff', 0, 40);
+    // (two shockwave rings racing out, white then pink)
+    for (const [d, col] of [[0, '#ffffff'], [10, '#ff8ad8']]) {
+      const s = tb - d;
+      if (s < 0 || s > 80) continue;
+      const rx = s * 3.4, ry = rx * 0.4, n = Math.max(60, Math.round(rx * 2));
+      ctx.globalAlpha = 1 - s / 80; ctx.fillStyle = col;
+      for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; ctx.fillRect(Math.round(m.x + Math.cos(a) * rx), Math.round(m.y + Math.sin(a) * ry), 1, 1); }
+      ctx.globalAlpha = 1;
+    }
+    // (pieces of grey hull, and embers glowing yellow and orange until they burn out)
+    for (const d of mother.debris || []) {
+      if (d.ember) { if (tb > 150) continue; ctx.fillStyle = (tb + d.w) % 8 < 4 ? '#ffe14a' : '#ff9a2a'; }
+      else ctx.fillStyle = d.grey ? '#8a8a96' : '#5a5a66';
+      ctx.fillRect(Math.round(d.x), Math.round(d.y), d.w, d.h);
+    }
+  }
+  // in front of everything (and not shaking): CRITICAL!, the flash and the banner
+  function drawMotherBoomFront() {
+    const t = mother.t, tb = t - MB_BLAST;
+    if (t > 20 && t < MB_BLAST && Math.floor(t / 8) % 2 === 0) banner('CRITICAL!', 46, 'red', 2);
+    if (tb >= 0 && tb < 30) { ctx.fillStyle = `rgba(255, 255, 255, ${1 - tb / 30})`; ctx.fillRect(0, 0, PW, PH); }
+    if (tb >= 130 && (tb > 180 || Math.floor(tb / 6) % 2 === 0)) { banner('THE MOTHER SHIP', 40, 'gold'); banner('IS DESTROYED!', 54, 'gold'); }
   }
   // whether a click is on the mother ship itself, zoomed all the way in on it
   function onMotherSprite(e) {
@@ -4051,6 +4175,7 @@
     spaceT++;
     if (mother.state === 'coming') motherTick();
     if (mother.fleet) fleetTick();
+    if (mother.state === 'exploding') motherBoomTick();
     if (mother.booms) mother.booms = mother.booms.filter(b => ++b.t < TINY_BOOM_FRAMES);
     // zoomed in on a planet (or on the way in or out): the scene blown up round it, the planet sliding to the
     // middle as it grows (eased in and out); no twinkles or shooting star meanwhile
@@ -4103,10 +4228,13 @@
       for (let k = 0; k < 8; k++) { ctx.fillStyle = k < 2 ? '#ffffff' : k < 5 ? '#9fb4ff' : '#4a5a9a'; ctx.fillRect(sx + k * 2, sy - k, 1, 1); }
     }
     if (mother.state === 'coming') drawArrivalBack();
+    if (mother.state === 'exploding') drawMotherBoomBack();
     drawMother(1, 0, 0);
     drawFleet(1, 0, 0);
+    if (mother.state === 'exploding') drawMotherBoomMid();
     if (shake) ctx.restore();
     if (mother.state === 'coming') drawArrivalFront();
+    if (mother.state === 'exploding') drawMotherBoomFront();
   }
   // ----- Earth's mini-game: Banana Catch (Play on Earth in The Arcade) -----
   // The pug that pressed Play stands on the grass wearing a bowl on its head, and Big Bruno walks back and forth
