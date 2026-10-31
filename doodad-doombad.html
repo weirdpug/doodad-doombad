@@ -1373,13 +1373,14 @@
   //   |_!FE     nothing can knock the pugs out, not even the explosion, until it is typed again (toggleSafe)
   //   /\/EXT    skips straight to the next level (skipLevel), during a round
   //   ZER0      every pug's coins go back to 0 (zeroCoins), on any screen
+  //   C0/\/\E   ("come") calls the alien mother ship into The Arcade (codeCome); on the main menu, up into space first
   // A code's first key still does its usual job if it is a game key (B barks, ZER0's Z jumps), but once a
   // code has begun, its next keys only type the code: the coin code's S doesn't also climb down or pick a
   // menu choice, the skip code's X makes no tacos. A key that doesn't fit, or nothing typed for 25 seconds,
   // ends it.
   const CODES = [{ code: 'C0!NS', at: 0, run: () => openCoinBar() }, { code: 'B0O/\\/\\', at: 0, run: () => codeBoom() },
     { code: '|_!FE', at: 0, run: () => toggleSafe() }, { code: '/\\/EXT', at: 0, run: () => skipLevel() },
-    { code: 'ZER0', at: 0, run: () => zeroCoins() }];
+    { code: 'ZER0', at: 0, run: () => zeroCoins() }, { code: 'C0/\\/\\E', at: 0, run: () => codeCome() }];
   // The zero code (the user asked for one to reset their coins): every pug's coins are set to 0 and saved.
   // Store things already bought are kept.
   function zeroCoins() {
@@ -3724,9 +3725,7 @@
     arcadeZoom.ship = null;
     // every planet's spaceship blown up: straight back out to space, and in comes the mother ship
     if (mother.state === 'gone' && SPACE_PLANETS.every(p => p.mother || p.shipGone)) {
-      arcadeZoom = { target: null, p: 0, out: false, ship: null };
-      mother = { state: 'coming', t: 0 };
-      phase = 'arrive'; ov.hidden = true;   // (its grand entrance: see motherTick)
+      startMotherEntrance();
       return;
     }
     phase = 'paused'; showPause('arcade', 0);
@@ -3743,6 +3742,23 @@
   //   300      a white flash and a huge BRAAAM as it arrives; the portal snaps shut and space brightens again
   //   315-450  THE MOTHER SHIP HAS ARRIVED! ... then The Arcade's title and buttons come back
   let mother = { state: 'gone', t: 0 };
+  // its grand entrance begins: out in space, zoomed all the way out, everything else waiting
+  function startMotherEntrance() {
+    arcadeZoom = { target: null, p: 0, out: false, ship: null };
+    mother = { state: 'coming', t: 0 };
+    phase = 'arrive'; ov.hidden = true;   // (see motherTick)
+  }
+  // The come code (C0/\/\E): the mother ship makes its grand entrance straight away, without blowing up the
+  // spaceships. In The Arcade it starts at once; on the main menu the view glides up into space first
+  // (motherCalled: drawSkyScroll starts it at the top). Not during a game, the Store or Customize.
+  let motherCalled = false;
+  function codeCome() {
+    if (mother.state !== 'gone') return;
+    const titleScreen = phase === 'paused' && fromTitle && pauseView !== 'arcade' && !pauseView.startsWith('banana');
+    if (phase === 'title' || titleScreen) { motherCalled = true; scrollSky(1, kbBy()); return; }   // (the Store, Customize too)
+    if (phase === 'mini' || (phase === 'paused' && fromTitle && pauseView.startsWith('banana'))) backToArcade();   // (Banana Catch: out to space)
+    if (phase === 'mini' || (phase === 'paused' && fromTitle && pauseView === 'arcade')) startMotherEntrance();
+  }
   const M_PORTAL = 100, M_EMERGE = 160, M_ARRIVE = 300, MOTHER_FRAMES = 450, MOTHER_SCALE = 2.5;
   Object.assign(SWAPS, { red: { W: 'R' } });   // (red writing, for the WARNING)
   function motherTick() {
@@ -3906,7 +3922,10 @@
     ctx.save(); ctx.translate(0, off - PH); drawSpaceScene(); ctx.restore();
     if (s.t < 1) return;
     skyScroll = null;
-    if (s.dir > 0) { phase = 'title'; openFromTitle('arcade', s.by); } else showTitle(0);
+    if (s.dir > 0) {
+      phase = 'title'; openFromTitle('arcade', s.by);
+      if (motherCalled) { motherCalled = false; startMotherEntrance(); }   // (the come code, typed on the main menu)
+    } else showTitle(0);
   }
   function drawSpaceScene() {
     if (!spaceBgReady) { buildSpaceBg(); spaceBgReady = true; }
