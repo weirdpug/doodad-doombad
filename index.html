@@ -3687,8 +3687,8 @@
     { name: 'Pluto', x: 32, y: 222, r: 7, cols: ['#d8a6e8', '#9c5ab8', '#5a2c7a'], stripe: '#7a3c9a', dot: [43, 214] },
     // the alien mother ship: not a planet, but it works like one once it has come (mother: see drawMother)
     // (drawn 2.5 times its sprite's size, 120 pixels across, so it really is giant: r is half that, and a click
-    // counts anywhere in its box)
-    { name: 'Mother Ship', x: 112, y: 168, r: 60, box: [60, 18], mother: true, dot: [182, 150] },
+    // counts anywhere in its box; no green pixel or alien spaceship by it: the user asked for none)
+    { name: 'Mother Ship', x: 112, y: 168, r: 60, box: [60, 18], mother: true },
   ];
   // the zoom: which planet, how far in (p, 0 to 1 over half a second) and whether it is heading back out
   // (ship: the second zoom, from a planet's green pixel into the alien spaceship it really is, the same way)
