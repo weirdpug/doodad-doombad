@@ -1344,6 +1344,7 @@
     swish: () => tone(900, 0.09, 'sawtooth', 0.025, -650),   // a sword swung (the Colosseum)
     slash: () => { tone(1400, 0.05, 'square', 0.04, -900); tone(160, 0.14, 'square', 0.06, -90, 0.02); },   // ...and landing a hit
     fight: () => [523, 659, 784].forEach((f, i) => tone(f, 0.12, 'square', 0.05, 0, i * 0.08)),   // ...and FIGHT!
+    poof: () => { noise(0.35, 0.16, 2500, 300); tone(300, 0.12, 'sine', 0.05, 200); },   // a cloud poofing away (the main menu)
     pop: () => { tone(320, 0.12, 'square', 0.05, -260); tone(140, 0.18, 'sawtooth', 0.05, -90, 0.02); },   // ...and one blown up
     recall: () => [0, 0.08, 0.16, 0.24].forEach((d, i) => tone(900 - i * 150, 0.1, 'sine', 0.04, -200, d)),   // ...and they are called back in
     fireFart: () => { sfx.fart(); tone(220, 0.32, 'sawtooth', 0.05, 900, 0.05); },   // ...and a spicy one: the raspberry with a fiery whoosh
@@ -1844,6 +1845,12 @@
     return !!pt && r.height > 0 && (pt.clientY - r.top) / r.height * PH < NIGHT_Y;
   };
   const ovPressed = e => {
+    // (a cloud on the main menu poofs away; the rest of that same tap does nothing more)
+    if (phase === 'title' && !e.target.closest('button')) {
+      const i = cloudAt(e);
+      if (i >= 0) { poofCloud(i); return; }
+      if (performance.now() - cloudTapT < 600) return;
+    }
     if (phase === 'title' && !e.target.closest('button') && inNightSky(e)) { scrollSky(1, kbBy()); return; }
     if (phase !== 'paused' && !e.target.closest('.titlebtns .alt')) startClicked();
   };
@@ -3739,6 +3746,33 @@
   }
   // the flagpoles on the three roofs (their tips), for the waving flags
   const FLAGS = [[120, CASTLE_Y - 81], [72, CASTLE_Y - 75], [168, CASTLE_Y - 75]];
+  // The main menu's clouds: where cloud i is now (w: its width; lap: how many times it has drifted round). A click on
+  // one poofs it away (the user asked 2026-10-31): a puff of smoke and a soft poof, and it stays gone until it has
+  // drifted off the right edge and comes round again. (cloudGone: the lap each cloud was poofed on; cloudTapT: when,
+  // so the click that comes with the same tap doesn't start the game)
+  const CLOUD_POOF = 22;
+  let cloudGone = [-1, -1, -1], cloudPoofs = [], cloudTapT = -1e9;
+  function titleCloud(i) {
+    const w = 26 + i * 8, s = frame * (0.12 + i * 0.05) + i * 97;
+    return { x: Math.round((s % (PW + w)) - w), y: 70 + i * 18, w, lap: Math.floor(s / (PW + w)) };
+  }
+  function cloudAt(e) {
+    const pt = e.touches ? e.touches[0] : e, r = cv.getBoundingClientRect();
+    if (!pt || !r.height) return -1;
+    const x = (pt.clientX - r.left) / r.width * PW, y = (pt.clientY - r.top) / r.height * PH;
+    for (let i = 0; i < 3; i++) {
+      const c = titleCloud(i);
+      if (cloudGone[i] !== c.lap && x >= c.x - 2 && x <= c.x + c.w + 2 && y >= c.y - 7 && y <= c.y + 5) return i;
+    }
+    return -1;
+  }
+  function poofCloud(i) {
+    const c = titleCloud(i);
+    cloudGone[i] = c.lap; cloudTapT = performance.now();
+    cloudPoofs.push({ x: c.x + c.w / 2, y: c.y - 1, w: c.w, col: i === 2 ? '#e8a0a8' : '#c8a6d8', t: CLOUD_POOF });
+    try { initAudio(); } catch (e) {}
+    sfx.poof();
+  }
   function drawTitleScene() {
     if (!titleBgReady) { buildTitleBg(); titleBgReady = true; }
     ctx.drawImage(titleBg, 0, 0);
@@ -3747,12 +3781,26 @@
       const x = (i * 71 + 13) % PW, y = (i * 29 + 7) % 64;
       if ((frame + i * 17) % 90 < 70) { ctx.fillStyle = (frame + i * 31) % 50 < 6 ? '#ffffff' : '#9fb4ff'; ctx.fillRect(x, y, 1, 1); }
     }
-    // a few soft pixel clouds drifting slowly to the right
+    // a few soft pixel clouds drifting slowly to the right (not one that was poofed, until it comes round again)
     for (let i = 0; i < 3; i++) {
-      const w = 26 + i * 8, x = ((frame * (0.12 + i * 0.05) + i * 97) % (PW + w)) - w, y = 70 + i * 18;
+      const { x, y, w, lap } = titleCloud(i);
+      if (cloudGone[i] === lap) continue;
       ctx.fillStyle = i === 2 ? '#e8a0a8' : '#c8a6d8';
-      ctx.fillRect(Math.round(x), y, w, 3); ctx.fillRect(Math.round(x) + 4, y - 2, w - 10, 2); ctx.fillRect(Math.round(x) + 9, y - 4, 8, 2);
+      ctx.fillRect(x, y, w, 3); ctx.fillRect(x + 4, y - 2, w - 10, 2); ctx.fillRect(x + 9, y - 4, 8, 2);
     }
+    // (a poofed cloud's puff: little bits of cloud and white flying out and fading)
+    for (const p of cloudPoofs) {
+      const k = 1 - p.t / CLOUD_POOF, sz = Math.max(1, Math.round(4 - k * 3));
+      ctx.globalAlpha = 1 - k;
+      for (let j = 0; j < 10; j++) {
+        const a = j / 10 * Math.PI * 2, r = 3 + k * 12;
+        ctx.fillStyle = j % 2 ? '#ffffff' : p.col;
+        ctx.fillRect(Math.round(p.x + Math.cos(a) * (r + p.w * 0.35) - sz / 2), Math.round(p.y + Math.sin(a) * r * 0.5 - sz / 2), sz, sz);
+      }
+      ctx.globalAlpha = 1;
+      p.t--;
+    }
+    cloudPoofs = cloudPoofs.filter(p => p.t > 0);
     // the flags on the castle roofs, waving (two frames)
     const wave = Math.floor(frame / 14) % 2;
     for (const [x, y] of FLAGS) {
