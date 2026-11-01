@@ -1725,14 +1725,18 @@
   // drags a little square round the screen like a mouse pointer (in its player's colour), and A clicks right where it
   // is: a cloud, the sun, a planet, a green pixel, a button, anything a mouse click does. It shows once it moves and
   // hides after a few idle seconds; while it is hidden, A does what it always did there (picks the chosen button).
-  // (padCursor: the square, over everything, never in the way of a click; curX/curY: where, in screen pixels)
-  const padCursor = document.createElement('div');
-  padCursor.style.cssText = 'position:fixed;width:6px;height:6px;border:2px solid #fff;outline:1px solid #000;pointer-events:none;z-index:9999;display:none';
-  document.body.append(padCursor);
-  let curX = PW / 2, curY = PH / 2, curShowT = 0, curOwner = 0;
+  // Every player's controller has its very own square (the user asked 2026-11-01), so up to four can point and click
+  // at once. (padCursors[id]: player id's square, over everything, never in the way of a click; x/y: where, in
+  // screen pixels; they start side by side in the middle)
+  const padCursors = [0, 1, 2, 3].map(id => {
+    const el = document.createElement('div');
+    el.style.cssText = 'position:fixed;width:6px;height:6px;border:2px solid #fff;outline:1px solid #000;pointer-events:none;z-index:9999;display:none';
+    document.body.append(el);
+    return { el, x: PW / 2 - 24 + id * 16, y: PH / 2, showT: 0 };
+  });
   const cursorScreen = () => phase === 'title' || (phase === 'paused' && fromTitle && pauseView === 'arcade');
-  function padClick() {
-    const r = cv.getBoundingClientRect(), x = r.left + (curX + 0.5) / PW * r.width, y = r.top + (curY + 0.5) / PH * r.height;
+  function padClick(c) {
+    const r = cv.getBoundingClientRect(), x = r.left + (c.x + 0.5) / PW * r.width, y = r.top + (c.y + 0.5) / PH * r.height;
     const el = document.elementFromPoint(x, y);
     if (!el) return;
     const opts = { bubbles: true, cancelable: true, clientX: x, clientY: y, view: window };
@@ -1748,6 +1752,7 @@
     for (const i of Object.keys(padOwner)) if (!present.has(i)) {
       const who = padOwner[i];
       delete padOwner[i]; delete padPrev[i];
+      padCursors[who].showT = 0;   // (its square goes with it)
       if (who > 0) leaveSlot(who);
       // Player 1's pug stays: the keyboard (if it isn't already another player's) or any controller can take
       // it over. During the level-clear banner, the pause waits for the next level to start.
@@ -1763,6 +1768,7 @@
     const held = [{}, {}, {}, {}];   // directions held on each player's controller
     const ph = phase;
     let menuActed = false;   // one pause-menu pick per poll, even if two players press at once
+    let clickMoved = false;  // a square's click changed the screen: the other controllers' presses wait for the next poll
     for (const gp of pads) {
       const b = i => !!(gp.buttons[i] && gp.buttons[i].pressed);
       const ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
@@ -1785,16 +1791,23 @@
         } else continue;
       }
       held[owner] = now;
+      if (clickMoved) continue;
       const p = pById(owner);
-      // (on the main menu and in The Arcade the sticks and D-pad drag the cursor, and A, with it showing, clicks)
+      // (on the main menu and in The Arcade the sticks and D-pad drag this player's square, and A, with it showing,
+      // clicks; two players' squares can both click in the same poll unless the first click changed the screen)
       const curMode = cursorScreen();
       if (curMode) {
-        const rx = gp.axes[2] || 0, ry = gp.axes[3] || 0;
+        const c = padCursors[owner], rx = gp.axes[2] || 0, ry = gp.axes[3] || 0;
         let dx = (now.right ? 1 : 0) - (now.left ? 1 : 0), dy = (now.down ? 1 : 0) - (now.up ? 1 : 0);
         if (Math.abs(ax) > 0.2 || Math.abs(ay) > 0.2) { dx = ax; dy = ay; }
         if (Math.abs(rx) > 0.2 || Math.abs(ry) > 0.2) { dx = rx; dy = ry; }
-        if (dx || dy) { curX = clamp(curX + dx * 2.2, 0, PW - 1); curY = clamp(curY + dy * 2.2, 0, PH - 1); curShowT = 360; curOwner = owner; }
-        if (curShowT > 0 && fresh('jump') && !menuActed) { menuActed = true; padClick(); continue; }
+        if (dx || dy) { c.x = clamp(c.x + dx * 2.2, 0, PW - 1); c.y = clamp(c.y + dy * 2.2, 0, PH - 1); c.showT = 360; }
+        if (c.showT > 0 && fresh('jump')) {
+          const was = pauseView;
+          menuActed = true; padClick(c);
+          clickMoved = phase !== ph || pauseView !== was;
+          continue;
+        }
       }
       // In the pause menu any player's controller drives it: stick or D-pad up/down choose, A picks,
       // B backs out, Menu resumes. (A menu that only opened during this poll waits for the next one.)
@@ -1836,13 +1849,15 @@
       if (fresh('taco') && ph === 'play') xPower(p);       // RB (the keyboard's X): tacos (Taco Pug), a disco floor (Snazz) and a shot (Snifer Ripple)
     }
     padHeld = held;   // (Banana Catch reads every controller's directions from here)
-    // (the controller's cursor: shown where it is, until it has sat still a while or the screen has no use for it)
-    if (cursorScreen() && curShowT > 0) {
-      curShowT--;
-      const r = cv.getBoundingClientRect();
-      padCursor.style.display = 'block'; padCursor.style.background = LOOK[curOwner].hex;
-      padCursor.style.left = Math.round(r.left + curX / PW * r.width - 5) + 'px'; padCursor.style.top = Math.round(r.top + curY / PH * r.height - 5) + 'px';
-    } else if (padCursor.style.display !== 'none') padCursor.style.display = 'none';
+    // (each controller's square: shown where it is, until it has sat still a while or the screen has no use for it)
+    const curOn = cursorScreen(), r = cv.getBoundingClientRect();
+    padCursors.forEach((c, id) => {
+      if (curOn && c.showT > 0) {
+        c.showT--;
+        c.el.style.display = 'block'; c.el.style.background = LOOK[id].hex;
+        c.el.style.left = Math.round(r.left + c.x / PW * r.width - 5) + 'px'; c.el.style.top = Math.round(r.top + c.y / PH * r.height - 5) + 'px';
+      } else if (c.el.style.display !== 'none') c.el.style.display = 'none';
+    });
     // the keyboard's pug also hears the keyboard and touch buttons
     for (const p of players) {
       const h = held[p.id], kb = p.id === kbSlot;
