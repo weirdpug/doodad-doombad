@@ -4019,9 +4019,11 @@
   }
   // Big Bruno lives in the castle (the user asked 2026-10-31): a click on the castle swings its door open and out he
   // runs, over the drawbridge and down the path towards you (growing as he comes), stops to pound his chest and
-  // growl, then runs back in and the door thuds shut. (brunoOut: how far through that he is, or null)
+  // growl, then turns round (the user asked: not running back in backwards) and runs back in, and the door thuds
+  // shut. (brunoOut: how far through that he is, or null; ape_back: Bruno seen from behind, all fur, no face)
   const CASTLE_COLS = ['b0b0b4', '4a4a52', '14141a', '87604a', '1e140e', '068c22'];
-  const BR_OPEN = 8, BR_OUT = 50, BR_POUND = 120, BR_BACK = 162, BR_SHUT = 170;
+  const BR_OPEN = 8, BR_OUT = 50, BR_POUND = 120, BR_TURN = 10, BR_BACK = 172, BR_SHUT = 180;
+  SPRITES.ape_back = SPRITES.ape_idle.map((row, y) => y < 5 ? row.replace(/W/g, 'Y') : y < 25 ? row.replace(/[TWKN]/g, 'A') : row.replace(/T/g, 'A'));
   let brunoOut = null;
   function onCastle([x, y]) {
     if (!titleBgReady || x < 66 || x > 174 || y < 60 || y >= CASTLE_Y + 1) return false;
@@ -4040,11 +4042,18 @@
     }
     if (t >= BR_OPEN && t < BR_BACK) {
       // (u: 0 at the door, 1 out on the path in front)
-      const u = t < BR_OUT ? ease((t - BR_OPEN) / (BR_OUT - BR_OPEN)) : t < BR_POUND ? 1 : 1 - ease((t - BR_POUND) / (BR_BACK - BR_POUND));
-      const running = t < BR_OUT || t >= BR_POUND, step = Math.floor(t / 5) % 2;
-      const s = running ? sprite('ape_idle', !!step) : sprite(Math.floor(t / 8) % 2 ? 'ape_poundL' : 'ape_poundR');
+      const home = BR_POUND + BR_TURN, back = t >= home;
+      const u = t < BR_OUT ? ease((t - BR_OPEN) / (BR_OUT - BR_OPEN)) : t < home ? 1 : 1 - ease((t - home) / (BR_BACK - home));
+      const running = t < BR_OUT || back, step = Math.floor(t / 5) % 2;
+      let s, wf = 1;
+      if (running) s = sprite(back ? 'ape_back' : 'ape_idle', !!step);
+      else if (t >= BR_POUND) {
+        // (turning round: narrowing to his side, then widening again with his back to you)
+        const k = (t - BR_POUND) / BR_TURN;
+        s = sprite(k < 0.5 ? 'ape_idle' : 'ape_back'); wf = Math.max(0.15, Math.abs(Math.cos(k * Math.PI)));
+      } else s = sprite(Math.floor(t / 8) % 2 ? 'ape_poundL' : 'ape_poundR');
       const sc = 0.55 + 0.3 * u, y = CASTLE_Y + 44 * u - (running ? step : 0);
-      if (s) ctx.drawImage(s, Math.round(120 - s.width * sc / 2), Math.round(y - s.height * sc), Math.round(s.width * sc), Math.round(s.height * sc));
+      if (s) ctx.drawImage(s, Math.round(120 - s.width * sc * wf / 2), Math.round(y - s.height * sc), Math.max(1, Math.round(s.width * sc * wf)), Math.round(s.height * sc));
       if (running && t % 5 === 0) sfx.stomp();
       if (t === BR_OUT + 4 || t === BR_OUT + 40) sfx.grr();
     }
