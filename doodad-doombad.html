@@ -5233,7 +5233,7 @@
       if (inp.jump && P.ground) { P.vy = -5; P.ground = false; sfx.jump(); }
       if (inp.drop && P.ground && P.y < ARENA_GROUND) { P.dropT = 10; P.ground = false; }
       if (inp.swing && P.swingT === 0) {
-        if (g.gun) { P.swingT = 18; g.bolts.push({ x: P.x + P.face * 10, y: P.y - 9, vx: P.face * 4.5, id: P.id }); tone(1500, 0.1, 'square', 0.035, -1100); }   // (a ray gun's zap)
+        if (g.gun) { P.swingT = 18; g.bolts.push({ x: P.x + P.face * 10, y: P.y - 9, vx: P.face * 2.5, id: P.id }); tone(1500, 0.1, 'square', 0.035, -1100); }   // (a ray gun's zap; the bolts slowed from 4.5 at the user's request)
         else { P.swingT = ARENA_SWING; P.hitIds = []; sfx.swish(); }
       }
       // falling, and landing on the sand or on a ledge (only from above; Down drops through one)
