@@ -1274,7 +1274,7 @@
     showControllerHelp(); updateHud(true);
     // (in the Store opened from the main menu no game is running: it just shows the pugs still here)
     // (in the Colosseum its pug fights on for the computer, and the fight pauses to say so)
-    if ((arena || race || blaster) && fromTitle && phase === 'mini') { pauseMini(`Player ${id + 1}'s controller disconnected. Press A on a controller to bring them back.`); return; }
+    if ((arena || race) && fromTitle && phase === 'mini') { pauseMini(`Player ${id + 1}'s controller disconnected. Press A on a controller to bring them back.`); return; }
     if (fromTitle) { if (phase === 'paused') showPause(pauseView, menuSel); return; }
     if (phase === 'play' || phase === 'paused' || phase === 'win') {
       // if everyone left was sitting out, the team is out: that costs a heart and the level restarts
@@ -1613,11 +1613,11 @@
     // X or Enter also swings the sword)
     if (phase === 'mini') {
       const km = keyMap[e.code];
-      const swing = (arena || blaster) && (e.code === 'KeyX' || e.key === 'Enter');
+      const swing = arena && (e.code === 'KeyX' || e.key === 'Enter');
       // (in the Colosseum a keyboard that hasn't joined yet joins as the next player, as in the main game)
-      if ((arena || race || blaster) && (km || swing) && !e.repeat) claimKeyboard(true);
+      if ((arena || race) && (km || swing) && !e.repeat) claimKeyboard(true);
       if (km) { e.preventDefault(); keys[km] = true; }
-      if (swing && !e.repeat) { e.preventDefault(); if (arena) arena.kbAtk = true; else blaster.kbFire = true; }   // (X or Enter: a sword swing, or held down, firing)
+      if (swing && !e.repeat) { e.preventDefault(); arena.kbAtk = true; }
       if ((e.key === 'Escape' || e.key === 'p' || e.key === 'P') && !e.repeat) pauseMini();
       return;
     }
@@ -1684,13 +1684,12 @@
     if (phase === 'title' && (e.code === 'Space' || e.key === 'Enter')) e.preventDefault();
     const k = keyMap[e.code];
     if (k) keys[k] = false;
-    if (blaster && (e.code === 'KeyX' || e.key === 'Enter')) blaster.kbFire = false;
     if (e.key === 'Meta' || e.key === 'Control' || e.key === 'Alt') releaseAll();
   });
   addEventListener('blur', releaseAll);
 
   // the touch buttons count as the keyboard: the same pug, and they join the same way its keys do
-  document.getElementById('barkBtn').addEventListener('pointerdown', e => { e.preventDefault(); initAudio(); if (phase === 'mini' && (arena || race || blaster)) { if (arena && claimKeyboard(true)) arena.kbAtk = true; if (blaster && claimKeyboard(true)) { blaster.kbFire = true; setTimeout(() => { if (blaster) blaster.kbFire = false; }, 250); } return; } if (claimKeyboard(true) === true) doBark(pById(kbSlot)); });
+  document.getElementById('barkBtn').addEventListener('pointerdown', e => { e.preventDefault(); initAudio(); if (phase === 'mini' && (arena || race)) { if (arena && claimKeyboard(true)) arena.kbAtk = true; return; } if (claimKeyboard(true) === true) doBark(pById(kbSlot)); });
   document.querySelectorAll('.pad button[data-k]').forEach(btn => {
     const k = btn.dataset.k;
     const on = e => {
@@ -1736,7 +1735,6 @@
       // it over. During the level-clear banner, the pause waits for the next level to start.
       else if ((phase === 'play' || phase === 'paused') && !fromTitle) p1Lost();
       // (the keyboard can only take Player 1 back if it isn't already someone else)
-      else if (phase === 'mini' && blaster && !blaster.endT) pauseBlaster(`Player 1's controller disconnected. ${kbSlot === null || kbSlot === 0 ? 'Press a key, or A on a controller,' : 'Press A on a controller'} to take Player 1 back.`);
       else if (phase === 'mini' && race && !race.endT) pauseRace(`Player 1's controller disconnected. ${kbSlot === null || kbSlot === 0 ? 'Press a key, or A on a controller,' : 'Press A on a controller'} to take Player 1 back.`);
       else if (phase === 'mini' && arena && !arena.result) pauseArena(`Player 1's controller disconnected. ${kbSlot === null || kbSlot === 0 ? 'Press a key, or A on a controller,' : 'Press A on a controller'} to take Player 1 back.`);
       else if (phase === 'win') p1LostAtWin = true;
@@ -2137,13 +2135,10 @@
     bananaOver: () => [{ label: 'Play again', act: by => startBanana(by) }, { label: 'Back', act: () => backToArcade() }],
     // the Colosseum's, the same way (Back goes to The Arcade, zoomed in on the mother ship)
     arenaPause: () => [{ label: 'Resume', act: () => resumeGame() }, { label: 'Back', act: () => backFromArena() }],
-    arenaOver: () => [{ label: 'Fight again', act: by => startArena(by) }, { label: 'Back', act: () => backFromArena() }],
+    arenaOver: () => [{ label: 'Fight again', act: by => startArena(by, arena && arena.gun) }, { label: 'Back', act: () => backFromArena() }],
     // the Moon Race's, the same way (Back goes to The Arcade, zoomed in on the Moon)
     racePause: () => [{ label: 'Resume', act: () => resumeGame() }, { label: 'Back', act: () => backFromRace() }],
     raceOver: () => [{ label: 'Race again', act: by => startRace(by) }, { label: 'Back', act: () => backFromRace() }],
-    // Pluto Blaster's, the same way (Back goes to The Arcade, zoomed in on Pluto)
-    blasterPause: () => [{ label: 'Resume', act: () => resumeGame() }, { label: 'Back', act: () => backFromBlaster() }],
-    blasterOver: () => [{ label: 'Play again', act: by => startBlaster(by) }, { label: 'Back', act: () => backFromBlaster() }],
     arcade: () => [
       ...(arcadeZoom.target && !arcadeZoom.out && !onShip() ? [{ label: 'Play', act: by => playFromArcade(by) }] : []),
       // (zoomed in on the spaceship, Back zooms out to Saturn first)
@@ -2170,18 +2165,16 @@
     // (the Store and Necklaces show the bag or look of the pug that opened them)
     if ((store || neck) && by !== undefined && joined[by]) storeBy = by;
     if (!joined[storeBy]) storeBy = kbBy();
-    const bpause = /^(banana|arena|race|blaster)Pause$/.test(view), bover = /^(banana|arena|race|blaster)Over$/.test(view);
-    ovTitle.textContent = bpause ? 'Paused' : view === 'arenaOver' ? arenaWords().title : view === 'raceOver' ? raceWords().title : view === 'blasterOver' ? 'Game over!' : bover ? 'Splat!' : arcade ? (onShip() ? 'Alien Spaceship' : arcadeZoom.target && !arcadeZoom.out ? arcadeZoom.target.name : 'The Arcade') : store ? 'Store' : part ? part.name : custom ? 'Customize' : 'Paused';
+    const bpause = view === 'bananaPause' || view === 'arenaPause' || view === 'racePause', bover = view === 'bananaOver' || view === 'arenaOver' || view === 'raceOver';
+    ovTitle.textContent = bpause ? 'Paused' : view === 'arenaOver' ? arenaWords().title : view === 'raceOver' ? raceWords().title : bover ? 'Splat!' : arcade ? (onShip() ? 'Alien Spaceship' : arcadeZoom.target && !arcadeZoom.out ? arcadeZoom.target.name : 'The Arcade') : store ? 'Store' : part ? part.name : custom ? 'Customize' : 'Paused';
     // (Necklaces keeps a line for what was just put on, and with 2-4 pugs, whose look it is)
     ovText.hidden = arcade || (custom && !neck);
     ovText.textContent = note || (store
       ? (multi() ? `${LOOK[storeBy].name}'s bag. Each pug pays with its own coins!` : 'Buy things, then equip them!')
       : neck ? [multi() ? `${LOOK[storeBy].name}'s ${part.name.toLowerCase()}` : '',
         LOOK_SECTIONS[view].max ? (isFinite(LOOK_SECTIONS[view].max) ? `Bring up to ${LOOK_SECTIONS[view].max} at a time!` : 'Bring as many as you like!') : ''].filter(Boolean).join('. ')
-      : view === 'arenaPause' ? 'The Colosseum. Swing your sword: the last pug standing wins!'
+      : view === 'arenaPause' ? (arena && arena.gun ? 'Pluto Showdown. Blast the other pugs: the last pug standing wins!' : 'The Colosseum. Swing your sword: the last pug standing wins!')
       : view === 'racePause' ? 'The Moon Race. Steer round the craters and be first to the flag!'
-      : view === 'blasterPause' ? 'Pluto Blaster. Shoot the ice rocks and saucers, and dodge the snowballs!'
-      : view === 'blasterOver' && blaster ? `You scored ${blaster.score}. Best: ${blaster.best}.`
       : view === 'raceOver' ? raceWords().text
       : view === 'arenaOver' ? arenaWords().text
       : bpause ? 'Banana Catch. Catch every banana in your bowl!'
@@ -2407,8 +2400,6 @@
     if (fromTitle && pauseView === 'arenaOver') return backFromArena();
     if (fromTitle && pauseView === 'racePause') { releaseAll(); phase = 'mini'; hideOverlay(); return; }
     if (fromTitle && pauseView === 'raceOver') return backFromRace();
-    if (fromTitle && pauseView === 'blasterPause') { releaseAll(); phase = 'mini'; hideOverlay(); return; }
-    if (fromTitle && pauseView === 'blasterOver') return backFromBlaster();
     if (fromTitle) return backToTitle();   // (the Store or Customize opened from the main menu goes back there)
     releaseAll(); phase = 'play'; hideOverlay();
   }
@@ -3306,7 +3297,7 @@
       }
     } else if (phase === 'title') {
       updateApe(); updateBarrels(); barrels = barrels.filter(b => !b.dead);
-    } else if (phase === 'mini') { if (arena) stepArena(); else if (race) stepRace(); else if (blaster) stepBlaster(); else stepBanana(); }
+    } else if (phase === 'mini') { if (arena) stepArena(); else if (race) stepRace(); else stepBanana(); }
     else if (phase === 'boom' && --shipBoomT <= 0) endShipBoom();   // (the spaceship's explosion picture, 5 seconds)
     // pets fly along with their pugs while a level plays and during the level-clear banner
     if (phase === 'play' || phase === 'win') for (const p of players) movePets(p);
@@ -4296,7 +4287,7 @@
     { name: 'Mars', x: 192, y: 66, r: 10, cols: ['#ff8a6a', '#e8282f', '#a8141f'], dot: [206, 54] },
     { name: 'Earth', x: 182, y: 196, r: 18, cols: ['#9fb4ff', '#2f5bff', '#1d2f8c'], game: 'banana', dot: [157, 208] },
     { name: 'The Moon', x: 214, y: 172, r: 6, cols: ['#eef0f6', '#b4b8c8', '#7f8396'], game: 'race', dot: [204, 163] },
-    { name: 'Pluto', x: 32, y: 222, r: 7, cols: ['#d8a6e8', '#9c5ab8', '#5a2c7a'], stripe: '#7a3c9a', game: 'blaster', dot: [43, 214] },
+    { name: 'Pluto', x: 32, y: 222, r: 7, cols: ['#d8a6e8', '#9c5ab8', '#5a2c7a'], stripe: '#7a3c9a', game: 'showdown', dot: [43, 214] },
     // the alien mother ship: not a planet, but it works like one once it has come (mother: see drawMother)
     // (drawn 2.5 times its sprite's size, 120 pixels across, so it really is giant: r is half that, and a click
     // counts anywhere in its box; no green pixel or alien spaceship by it: the user asked for none)
@@ -4429,9 +4420,9 @@
   let motherCalled = false;
   function codeCome() {
     if (mother.state !== 'gone') return;
-    const titleScreen = phase === 'paused' && fromTitle && pauseView !== 'arcade' && !/^(banana|arena|race|blaster)/.test(pauseView);
+    const titleScreen = phase === 'paused' && fromTitle && pauseView !== 'arcade' && !/^(banana|arena|race)/.test(pauseView);
     if (phase === 'title' || titleScreen) { motherCalled = true; scrollSky(1, kbBy()); return; }   // (the Store, Customize too)
-    if (phase === 'mini' || (phase === 'paused' && fromTitle && /^(banana|arena|race|blaster)/.test(pauseView))) backToArcade();   // (a mini-game: out to space)
+    if (phase === 'mini' || (phase === 'paused' && fromTitle && /^(banana|arena|race)/.test(pauseView))) backToArcade();   // (a mini-game: out to space)
     if (phase === 'mini' || (phase === 'paused' && fromTitle && pauseView === 'arcade')) startMotherEntrance();
   }
   const M_PORTAL = 100, M_EMERGE = 160, M_ARRIVE = 300, MOTHER_FRAMES = 450, MOTHER_SCALE = 2.5;
@@ -4754,14 +4745,14 @@
     return Math.hypot(x - sx, y - sy) <= 8;
   }
   // A planet's Play button: a planet with its own game plays it (Earth: Banana Catch; the mother ship: the
-  // Colosseum; the Moon: the Moon Race; Pluto: Pluto Blaster); the others start a new game, the same as Start on the
-  // main menu (each is meant to get its own game later)
+  // Colosseum; the Moon: the Moon Race; Pluto: Pluto Showdown, the Colosseum's fight with ray guns); the others start
+  // a new game, the same as Start on the main menu (each is meant to get its own game later)
   function playFromArcade(by) {
     if (!(fromTitle && pauseView === 'arcade')) return;
     if (arcadeZoom.target && arcadeZoom.target.game === 'banana') { startBanana(by); return; }
     if (arcadeZoom.target && arcadeZoom.target.game === 'arena') { startArena(by); return; }   // (the mother ship: the Colosseum)
     if (arcadeZoom.target && arcadeZoom.target.game === 'race') { startRace(by); return; }   // (the Moon: the Moon Race)
-    if (arcadeZoom.target && arcadeZoom.target.game === 'blaster') { startBlaster(by); return; }   // (Pluto: Pluto Blaster)
+    if (arcadeZoom.target && arcadeZoom.target.game === 'showdown') { startArena(by, true); return; }   // (Pluto: Pluto Showdown)
     fromTitle = false; phase = 'title';
     startClicked();
   }
@@ -4998,7 +4989,7 @@
     try { best = Math.max(0, Math.floor(+localStorage.getItem(BANANA_BEST_KEY)) || 0); } catch (e) {}
     banana = { id: joined[by] ? by : 0, x: PW / 2, face: 1, anim: 0, moving: false, score: 0, best, items: [], plus: [],
       bruno: { x: PW / 2, dir: 1, throwT: 50, holdT: 0 }, lastTarget: PW / 2, lost: 0, splat: null, startT: 100, time: 0, fasterT: 0 };
-    arena = race = blaster = null;
+    arena = race = null;
     try { initAudio(); } catch (e) {}
     releaseAll(); fromTitle = true; phase = 'mini'; hideOverlay();
   }
@@ -5131,16 +5122,17 @@
   // hit takes one (and knocks the pug back, blinking and safe for a moment), and the last pug standing wins. Every
   // pug in the game is played by its own player (its controller, and the keyboard for the keyboard's pug); the rest
   // are the computer's. Left/Right walk, Up/Space/Z (a controller's A) jump, Down drops through a ledge, X or Enter
-  // (a controller's B or Y, the touch Bark button) swings the sword, Esc or P (or Menu) pauses.
+  // (a controller's B or Y, the touch Bark button) swings the sword, Esc or P (or Menu) pauses. (Pluto Showdown is
+  // this same fight with ray guns: see buildPlutoBg.)
   // (Played from The Arcade like Banana Catch, in its phase 'mini': fromTitle stays on, and Back goes to The Arcade,
   // zoomed in on the mother ship.)
   const ARENA_GROUND = 250, ARENA_LEDGES = [[30, 90, 196], [150, 210, 196], [90, 150, 150]];   // ledges: [left, right, top]
   const ARENA_X = [40, 92, 148, 200], ARENA_HP = 5, ARENA_SWING = 16;   // (where each pug starts; hearts, 5 at the user's request; a swing's frames)
   const arenaBg = document.createElement('canvas');
   let arena = null, arenaBgReady = false;
-  function startArena(by) {
-    banana = race = blaster = null;
-    arena = { startT: 110, fightT: 0, result: null, endT: 0, kbAtk: false, prev: [{}, {}, {}, {}], sparks: [],
+  function startArena(by, gun) {
+    banana = race = null;
+    arena = { gun: !!gun, bolts: [], startT: 110, fightT: 0, result: null, endT: 0, kbAtk: false, prev: [{}, {}, {}, {}], sparks: [],
       pugs: [0, 1, 2, 3].map(i => ({ id: i, cpu: !joined[i], x: ARENA_X[i], y: ARENA_GROUND, vx: 0, vy: 0, kx: 0, ground: true,
         face: i < 2 ? 1 : -1, hp: ARENA_HP, hurtT: 0, swingT: 0, hitIds: [], cool: 0, anim: 0, moving: false, dropT: 0, ko: false, out: false, spin: 0, climbT: 0, climbX: 0 })) };
     try { initAudio(); } catch (e) {}
@@ -5155,11 +5147,12 @@
   // whether a player drives pug id: its controller, or the keyboard (the keyboard drives Player 1's pug until it
   // joins as someone else, unless a controller has Player 1); a pug nobody drives fights for the computer
   const arenaDriven = id => joined[id] && (ownerOf(id) !== undefined || kbSlot === id || (id === 0 && kbSlot === null));
-  const pauseMini = note => arena ? pauseArena(note) : race ? pauseRace(note) : blaster ? pauseBlaster(note) : pauseBanana();
+  const pauseMini = note => arena ? pauseArena(note) : race ? pauseRace(note) : pauseBanana();
   // back to The Arcade, zoomed in on the mother ship
   function backFromArena() {
+    const gun = arena && arena.gun;
     showPause('arcade', 0);
-    arcadeZoom = { target: SPACE_PLANETS.find(p => p.mother), p: 1, out: false, ship: null };
+    arcadeZoom = { target: SPACE_PLANETS.find(p => gun ? p.game === 'showdown' : p.mother), p: 1, out: false, ship: null };
     showPause('arcade', 0);
   }
   // what a player's pug is told to do this frame: its controller, and the keyboard for the keyboard's pug (jumps,
@@ -5191,22 +5184,33 @@
       if (Math.abs(gx - P.x) > 16) inp[gx > P.x ? 'right' : 'left'] = true; else { inp.jump = true; P.climbX = gx; P.climbT = 60; }
       return inp;
     }
-    if (Math.abs(dx) > 13) inp[dx > 0 ? 'right' : 'left'] = true;
-    else P.face = dx >= 0 ? 1 : -1;
+    if (arena.gun) {
+      // (with a ray gun: keep a shooting distance, face the foe and fire when level with it, and hop over a bolt
+      // coming straight at it)
+      if (Math.abs(dx) > 120) inp[dx > 0 ? 'right' : 'left'] = true;
+      else if (Math.abs(dx) < 40 && Math.abs(dy) < 14) inp[dx > 0 ? 'left' : 'right'] = true;
+      else P.face = dx >= 0 ? 1 : -1;
+      if (Math.abs(dy) < 10 && P.cool <= 0 && Math.random() < 0.12) { P.face = dx >= 0 ? 1 : -1; inp.swing = true; P.cool = 40 + Math.floor(Math.random() * 35); }
+      if (P.ground && arena.bolts.some(b => b.id !== P.id && Math.abs(b.y - (P.y - 9)) < 8 && Math.sign(P.x - b.x) === Math.sign(b.vx) && Math.abs(P.x - b.x) < 45) && Math.random() < 0.3) inp.jump = true;
+    } else {
+      if (Math.abs(dx) > 13) inp[dx > 0 ? 'right' : 'left'] = true;
+      else P.face = dx >= 0 ? 1 : -1;
+    }
     if (P.ground && dy < -20 && Math.random() < 0.04) inp.jump = true;
     if (P.ground && dy > 20 && P.y < ARENA_GROUND && Math.abs(dx) < 50 && Math.random() < 0.05) inp.drop = true;
-    if (Math.abs(dx) < 19 && Math.abs(dy) < 14 && P.cool <= 0 && Math.random() < 0.1) { inp.swing = true; P.cool = 40 + Math.floor(Math.random() * 40); }
+    if (!arena.gun && Math.abs(dx) < 19 && Math.abs(dy) < 14 && P.cool <= 0 && Math.random() < 0.1) { inp.swing = true; P.cool = 40 + Math.floor(Math.random() * 40); }
     if (P.ground && Math.random() < 0.004) inp.jump = true;   // (a hop now and then, to be harder to hit)
     return inp;
   }
-  function arenaHit(P, Q) {
+  // (dir: which way the blow knocks it, the sword's swing or the bolt's flight)
+  function arenaHit(P, Q, dir = P.face) {
     const g = arena;
     P.hitIds.push(Q.id);
-    Q.hp--; Q.hurtT = 50; Q.kx = P.face * 3; Q.vy = -2.5; Q.ground = false;
+    Q.hp--; Q.hurtT = 50; Q.kx = dir * 3; Q.vy = -2.5; Q.ground = false;
     g.sparks.push({ x: Q.x, y: Q.y - 9, t: 10 });
-    sfx.slash();
+    if (g.gun) noise(0.18, 0.16, 6000, 900); else sfx.slash();
     // (out of hearts: flung up spinning, and off the bottom of the screen)
-    if (Q.hp <= 0) { Q.ko = true; Q.vy = -4.5; Q.vx = P.face * 1.5; sfx.die(); }
+    if (Q.hp <= 0) { Q.ko = true; Q.vy = -4.5; Q.vx = dir * 1.5; sfx.die(); }
   }
   function stepArena() {
     const g = arena;
@@ -5232,7 +5236,10 @@
       if (Math.abs(P.kx) < 0.05) P.kx = 0;
       if (inp.jump && P.ground) { P.vy = -5; P.ground = false; sfx.jump(); }
       if (inp.drop && P.ground && P.y < ARENA_GROUND) { P.dropT = 10; P.ground = false; }
-      if (inp.swing && P.swingT === 0) { P.swingT = ARENA_SWING; P.hitIds = []; sfx.swish(); }
+      if (inp.swing && P.swingT === 0) {
+        if (g.gun) { P.swingT = 18; g.bolts.push({ x: P.x + P.face * 10, y: P.y - 9, vx: P.face * 4.5, id: P.id }); tone(1500, 0.1, 'square', 0.035, -1100); }   // (a ray gun's zap)
+        else { P.swingT = ARENA_SWING; P.hitIds = []; sfx.swish(); }
+      }
       // falling, and landing on the sand or on a ledge (only from above; Down drops through one)
       const prevY = P.y;
       P.vy = Math.min(P.vy + 0.22, 6); P.y += P.vy;
@@ -5242,8 +5249,10 @@
         if (P.y >= ARENA_GROUND) { P.y = ARENA_GROUND; P.vy = 0; P.ground = true; }
         else if (!P.dropT) for (const [l, r, top] of ARENA_LEDGES) if (P.x >= l && P.x <= r && prevY <= top && P.y >= top) { P.y = top; P.vy = 0; P.ground = true; }
       }
-      // the sword: raised, then swept out in front, hitting each pug in reach once a swing
-      if (P.swingT > 0) {
+      // the sword: raised, then swept out in front, hitting each pug in reach once a swing (with a ray gun, the
+      // swing's frames are just the time before it can fire again)
+      if (P.swingT > 0 && g.gun) P.swingT--;
+      else if (P.swingT > 0) {
         const t = ARENA_SWING - --P.swingT;
         if (t >= 5 && t <= 12) {
           const x0 = P.face > 0 ? P.x + 3 : P.x - 19, x1 = x0 + 16;
@@ -5255,6 +5264,15 @@
       }
     }
     g.kbAtk = false;   // (a swing pressed when it couldn't count, during GET READY or by nobody's pug, isn't saved up)
+    // (ray-gun bolts: straight across, through the ledges; one that reaches another pug hits it)
+    for (const b of g.bolts) {
+      b.x += b.vx;
+      for (const Q of g.pugs) {
+        if (Q.id === b.id || Q.ko || Q.out || Q.hurtT > 0) continue;
+        if (Math.abs(b.x - Q.x) <= 6 && b.y >= Q.y - 15 && b.y <= Q.y) { b.dead = true; arenaHit(g.pugs[b.id], Q, Math.sign(b.vx)); break; }
+      }
+    }
+    g.bolts = g.bolts.filter(b => !b.dead && b.x > -8 && b.x < PW + 8);
     for (const s of g.sparks) s.t--;
     g.sparks = g.sparks.filter(s => s.t > 0);
     // the last pug standing wins (and once every player's pug is out, it's over for them)
@@ -5323,6 +5341,42 @@
       for (let x = l + 8; x < r; x += 10) rect('#55556a', x, top + 1, 1, 3);
     }
   }
+  // Pluto Showdown's arena (the user asked 2026-11-01: on Pluto, a shooting game where the pugs shoot each other):
+  // the same fight as the Colosseum's, with ray guns instead of swords, out on Pluto's ice under a purple-black sky
+  // with Charon (its moon, with its reddish cap) hanging over pale ice mountains, a heart of bright ice in the plain,
+  // and ledges of ice. (arena.gun: this fight; bolts fly straight across, and a bolt that hits takes a heart)
+  const plutoBg = document.createElement('canvas');
+  let plutoBgReady = false;
+  Object.assign(SPRITES, { ray_gun: ['.GGGG..', 'GGGGGCC', '.KK....'] });
+  function buildPlutoBg() {
+    plutoBg.width = PW; plutoBg.height = PH;
+    const c = plutoBg.getContext('2d');
+    const rect = (col, x, y, w, h) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
+    ['#07040f', '#0c0618', '#120922', '#180c2c', '#1e1036', '#241440', '#2a184a'].forEach((col, i) => rect(col, 0, i * 34, PW, 34));
+    for (let i = 0; i < 90; i++) rect(i % 7 ? '#8a7ab8' : '#ffffff', (i * 89 + 7) % PW, (i * 47 + 11) % 200, 1, 1);
+    // (Charon: a big pale grey moon, darker on its lower side, with a reddish-brown cap at the top)
+    for (let y = -26; y <= 26; y++) for (let x = -26; x <= 26; x++) {
+      const d = x * x + y * y;
+      if (d > 26 * 26) continue;
+      rect(y < -18 + Math.abs(x) * 0.15 ? '#8a5a4a' : x + y > 14 ? '#8a8e9e' : '#c4c8d4', 186 + x, 62 + y, 1, 1);
+    }
+    for (const [x, y, r] of [[176, 70, 3], [194, 56, 2], [190, 76, 2]]) for (let j = -r; j <= r; j++) for (let i = -r; i <= r; i++) if (i * i + j * j <= r * r) rect('#a4a8b6', x + i, y + j, 1, 1);
+    // (pale ice mountains along the horizon, lit on their left faces)
+    for (let x = 0; x < PW; x++) {
+      const top = Math.round(196 - 26 * Math.abs(Math.sin(x / 41 + 0.6)) - 12 * Math.abs(Math.sin(x / 17)));
+      rect('#7f86b8', x, top, 1, 238 - top);
+      if (Math.sin(x / 41 + 0.6) * Math.cos(x / 41 + 0.6) > 0) rect('#a8b0dc', x, top, 1, Math.max(1, Math.round((238 - top) * 0.3)));
+    }
+    // (the icy plain: lavender-white, with blue cracks and a bright heart-shaped glacier in it)
+    rect('#d8cce8', 0, 238, PW, PH - 238);
+    rect('#f2ecfa', 0, 238, PW, 2);
+    for (let i = 0; i < 24; i++) { const x = (i * 61) % PW, y = 244 + (i * 13) % 32; rect('#a8b0dc', x, y, 6 + (i % 4) * 2, 1); }
+    for (const [x, y, w] of [[104, 256, 12], [122, 256, 12], [102, 258, 34], [104, 260, 30], [108, 262, 22], [112, 264, 14], [116, 266, 6]]) rect('#ffffff', x, y, w, 2);
+    for (const [l, r, top] of ARENA_LEDGES) {
+      rect('#7f9cc8', l, top + 4, r - l, 2); rect('#b8d0ec', l, top, r - l, 4); rect('#e8f4ff', l, top, r - l, 1);
+      for (let x = l + 6; x < r; x += 9) rect('#e8f4ff', x, top + 2, 2, 1);
+    }
+  }
   const HEART = ['RR.RR', 'RRRRR', '.RRR.', '..R..'];
   function drawArenaHeart(x, y, full) {
     ctx.fillStyle = full ? PAL.R : '#3b3b4c';
@@ -5339,6 +5393,13 @@
     if (L.hat) blitFeet(L.hat + '_' + pose, X, Y, flip);
     if (L.necklace) blitFeet(L.necklace + '_' + pose, X, Y, flip);
     if (P.ko) return;
+    // with a ray gun: held out in front, with a flash at its tip just after it fires
+    if (arena.gun) {
+      blit('ray_gun', left ? X - 10 : X + 3, Y - 11, left);
+      if (P.swingT > 14) { ctx.fillStyle = '#ffffff'; ctx.fillRect(left ? X - 12 : X + 10, Y - 11, 2, 2); }
+      if (!P.cpu) drawText('P' + (P.id + 1), X, Y - 27 - hatUp(P.id), LOOK[P.id].tag, 'center');
+      return;
+    }
     // the sword: held out in front, raised for a swing, then swept forward with a white streak
     const t = P.swingT ? ARENA_SWING - P.swingT : 0;
     if (t >= 1 && t <= 4) blit('sword_up', left ? X - 8 : X + 5, Y - 21, left);
@@ -5349,16 +5410,17 @@
     if (!P.cpu) drawText('P' + (P.id + 1), X, Y - 27 - hatUp(P.id), LOOK[P.id].tag, 'center');
   }
   function drawArena() {
-    if (!arenaBgReady) { buildArenaBg(); arenaBgReady = true; }
     const g = arena;
-    ctx.drawImage(arenaBg, 0, 0);
-    // (the torches flicker)
-    for (const tx of [18, 120, 222]) {
+    if (g.gun) { if (!plutoBgReady) { buildPlutoBg(); plutoBgReady = true; } ctx.drawImage(plutoBg, 0, 0); }
+    else { if (!arenaBgReady) { buildArenaBg(); arenaBgReady = true; } ctx.drawImage(arenaBg, 0, 0); }
+    // (the Colosseum's torches flicker)
+    if (!g.gun) for (const tx of [18, 120, 222]) {
       const f = Math.floor(frame / 5 + tx) % 3;
       ctx.fillStyle = '#ff8a1f'; ctx.fillRect(tx - 1, 184 - f, 3, 5 + f);
       ctx.fillStyle = '#ffcc3d'; ctx.fillRect(tx, 186 - f, 1, 3 + f);
     }
     for (const P of g.pugs) drawArenaPug(P);
+    for (const b of g.bolts) { ctx.fillStyle = PAL[LOOK[b.id].mark]; ctx.fillRect(Math.round(b.x) - 3, Math.round(b.y), 7, 1); ctx.fillStyle = '#ffffff'; ctx.fillRect(Math.round(b.x) - 1, Math.round(b.y), 3, 1); }
     for (const s of g.sparks) {
       ctx.fillStyle = s.t > 6 ? '#ffffff' : '#ffcc3d';
       for (let a = 0; a < 6; a++) { const r = (10 - s.t) * 1.2 + 1, an = a / 6 * Math.PI * 2; ctx.fillRect(Math.round(s.x + Math.cos(an) * r), Math.round(s.y + Math.sin(an) * r), 1, 1); }
@@ -5398,7 +5460,7 @@
   }
   let race = null;
   function startRace(by) {
-    banana = arena = blaster = null;
+    banana = arena = null;
     const id = joined[by] ? by : 0;
     race = { by: id, startT: RACE_COUNT, goT: 0, endT: 0, placed: 0, camD: 0, dust: [],
       cars: [0, 1, 2, 3].map(i => ({ id: i, cpu: !joined[i], d: 0, x: raceMid(0) + [-30, -10, 10, 30][i], v: 0, spin: 0, boost: 0, place: 0,
@@ -5589,213 +5651,10 @@
     if (g.startT > 0) banner(g.startT > 120 ? '3' : g.startT > 60 ? '2' : '1', 110, 'gold', 2);
     else if (g.goT > 0) banner('GO!', 110, 'gold', 2);
   }
-  // ----- Pluto's game: Pluto Blaster (Play on Pluto in The Arcade; the user asked 2026-11-01) -----
-  // Each pug in the game flies its own little rocket above icy Pluto, shooting up at what comes down at it: ice
-  // rocks, which crack into two smaller ones until they are only chips, and green-alien saucers that weave across
-  // and throw snowballs. Shot things sometimes drop a star (double lasers for a while) or a heart. Each rocket has
-  // three hearts; a hit takes one (and blinks it safe for a moment); the game is over when every rocket is out, and
-  // the best score is kept in the browser. It gets busier the longer it goes. Arrows (or WASD, a controller's stick)
-  // fly, Space/Z/X/Enter (a controller's A, B or Y, the touch Bark button) shoot, Esc or P (or Menu) pauses.
-  // (Played from The Arcade like Banana Catch, in its phase 'mini': fromTitle stays on, and Back goes to The Arcade,
-  // zoomed in on Pluto. A pug that joins during a game gets a rocket of its own.)
-  const BL_BEST_KEY = 'doodad-doombad-pluto-best', BL_HEARTS = 3, BL_TOP = 24, BL_BOTTOM = 252;
-  {
-    // a little rocket in each pug's colour, its pug looking out of the cockpit
-    const ROCKET = ['....W....', '...WCW...', '...BBB...', '..BTTTB..', '..BKTKB..', '..BBBBB..', '.BBBBBBB.', 'BB.BBB.BB', 'B.......B'];
-    for (let i = 0; i < 4; i++) SPRITES['rocket_' + i] = ROCKET.map(r => r.replace(/B/g, LOOK[i].mark));
-  }
-  let blaster = null;
-  function startBlaster(by) {
-    banana = arena = race = null;
-    let best = 0;
-    try { best = Math.max(0, Math.floor(+localStorage.getItem(BL_BEST_KEY)) || 0); } catch (e) {}
-    blaster = { startT: 90, t: 0, score: 0, best, endT: 0, kbFire: false, ships: [], shots: [], rocks: [], saucers: [], snow: [], items: [], booms: [], spawnT: 60, saucerT: 400 };
-    for (let i = 0; i < 4; i++) if (arenaDriven(i) || i === (joined[by] ? by : 0)) blasterShip(i);
-    try { initAudio(); } catch (e) {}
-    releaseAll(); fromTitle = true; phase = 'mini'; hideOverlay();
-  }
-  function blasterShip(id) {
-    const g = blaster, n = g.ships.length;
-    g.ships.push({ id, x: 60 + (id % 4) * 40, y: BL_BOTTOM - 10, hearts: BL_HEARTS, inv: 90, cool: 0, dbl: 0, out: false });
-    return n;
-  }
-  function pauseBlaster(note) {
-    if (phase !== 'mini' || !blaster || blaster.endT) return;
-    releaseAll(); blaster.kbFire = false; phase = 'paused'; showPause('blasterPause', 0, note);
-  }
-  function backFromBlaster() {
-    showPause('arcade', 0);
-    arcadeZoom = { target: SPACE_PLANETS.find(p => p.game === 'blaster'), p: 1, out: false, ship: null };
-    showPause('arcade', 0);
-  }
-  function blasterInput(s) {
-    const g = blaster, pad = padHeld[s.id] || {}, kb = kbSlot !== null ? s.id === kbSlot : s.id === 0 && ownerOf(0) === undefined;
-    const held = k => !!pad[k] || (kb && keys[k]);
-    return { left: held('left'), right: held('right'), up: held('up'), down: held('down'),
-      fire: !!pad.jump || !!pad.bark || !!pad.toss || (kb && (keys.jump || g.kbFire)) };
-  }
-  function blasterBoom(x, y, big) {
-    blaster.booms.push({ x, y, t: big ? 22 : 14, big });
-    noise(big ? 0.35 : 0.15, big ? 0.22 : 0.12, big ? 3000 : 5000, 200);
-  }
-  function blasterDrop(x, y) {
-    const r = Math.random();
-    if (r < 0.08) blaster.items.push({ x, y, kind: 'star' }); else if (r < 0.12) blaster.items.push({ x, y, kind: 'heart' });
-  }
-  function hitShip(s) {
-    if (s.inv > 0 || s.out) return;
-    s.hearts--; s.inv = 90; sfx.die();
-    if (s.hearts <= 0) { s.out = true; blasterBoom(s.x, s.y, true); }
-  }
-  function stepBlaster() {
-    const g = blaster;
-    if (g.startT > 0) { g.startT--; }
-    else if (!g.endT) g.t++;
-    // (a pug that joins during the game gets a rocket)
-    for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.ships.some(s => s.id === i)) blasterShip(i);
-    for (const s of g.ships) {
-      if (s.out) continue;
-      if (s.inv > 0) s.inv--;
-      if (s.cool > 0) s.cool--;
-      if (s.dbl > 0) s.dbl--;
-      const inp = g.endT ? {} : blasterInput(s);
-      s.x = clamp(s.x + ((inp.right ? 1 : 0) - (inp.left ? 1 : 0)) * 2.2, 6, PW - 6);
-      s.y = clamp(s.y + ((inp.down ? 1 : 0) - (inp.up ? 1 : 0)) * 1.8, BL_TOP + 40, BL_BOTTOM);
-      if (inp.fire && s.cool === 0 && g.startT === 0) {
-        s.cool = 9;
-        if (s.dbl) { g.shots.push({ x: s.x - 3, y: s.y - 6, id: s.id }, { x: s.x + 3, y: s.y - 6, id: s.id }); } else g.shots.push({ x: s.x, y: s.y - 6, id: s.id });
-        tone(1300, 0.06, 'square', 0.025, -700);
-      }
-    }
-    // things coming down: ice rocks more and more often, and now and then a saucer
-    if (g.startT === 0 && !g.endT) {
-      if (--g.spawnT <= 0) {
-        g.spawnT = Math.max(22, 70 - Math.floor(g.t / 360) * 6) + Math.floor(Math.random() * 20);
-        g.rocks.push({ x: 12 + Math.random() * (PW - 24), y: BL_TOP - 10, vx: (Math.random() - 0.5) * 0.8, vy: 0.5 + Math.random() * 0.4 + Math.min(g.t / 3600, 0.8), r: 8, spin: Math.random() * 6 });
-      }
-      if (--g.saucerT <= 0) {
-        g.saucerT = Math.max(160, 420 - Math.floor(g.t / 600) * 40);
-        const dir = Math.random() < 0.5 ? 1 : -1;
-        g.saucers.push({ x: dir > 0 ? -10 : PW + 10, y: BL_TOP + 20 + Math.random() * 40, dir, hp: 2, t: 0, fireT: 60 });
-      }
-    }
-    for (const r of g.rocks) { r.x += r.vx; r.y += r.vy; r.spin += 0.05; if (r.x < 4 || r.x > PW - 4) r.vx = -r.vx; }
-    for (const u of g.saucers) {
-      u.t++; u.x += u.dir * 1.1; u.y += Math.sin(u.t / 18) * 0.6;
-      if (--u.fireT <= 0 && !g.endT) {
-        u.fireT = 80 + Math.floor(Math.random() * 40);
-        const live = g.ships.filter(s => !s.out);
-        if (live.length) { const s = live.reduce((a, b) => Math.abs(b.x - u.x) < Math.abs(a.x - u.x) ? b : a), d = Math.hypot(s.x - u.x, s.y - u.y) || 1; g.snow.push({ x: u.x, y: u.y + 3, vx: (s.x - u.x) / d * 1.6, vy: (s.y - u.y) / d * 1.6 }); }
-      }
-    }
-    for (const b of g.snow) { b.x += b.vx; b.y += b.vy; }
-    for (const p of g.shots) p.y -= 5;
-    for (const it of g.items) it.y += 0.7;
-    // lasers hitting rocks (which crack into two smaller ones) and saucers (two hits)
-    for (const p of g.shots) {
-      for (const r of g.rocks) if (!r.dead && Math.hypot(p.x - r.x, p.y - r.y) <= r.r + 1) {
-        p.dead = r.dead = true;
-        g.score += r.r >= 8 ? 20 : r.r >= 5 ? 50 : 100;
-        if (r.r > 3) for (const sgn of [-1, 1]) g.rocks.push({ x: r.x, y: r.y, vx: sgn * (0.6 + Math.random() * 0.4), vy: r.vy * 0.9, r: r.r >= 8 ? 5 : 3, spin: r.spin });
-        else blasterDrop(r.x, r.y);
-        blasterBoom(r.x, r.y, false);
-        break;
-      }
-      if (p.dead) continue;
-      for (const u of g.saucers) if (!u.dead && Math.abs(p.x - u.x) <= 6 && Math.abs(p.y - u.y) <= 4) {
-        p.dead = true;
-        if (--u.hp <= 0) { u.dead = true; g.score += 150; blasterBoom(u.x, u.y, true); blasterDrop(u.x, u.y); } else tone(700, 0.05, 'square', 0.03);
-        break;
-      }
-    }
-    // rocks, snowballs and saucers hitting rockets; rockets picking up stars and hearts
-    for (const s of g.ships) {
-      if (s.out) continue;
-      for (const r of g.rocks) if (!r.dead && Math.hypot(s.x - r.x, s.y - 2 - r.y) <= r.r + 3) { r.dead = true; blasterBoom(r.x, r.y, false); hitShip(s); }
-      for (const b of g.snow) if (!b.dead && Math.abs(s.x - b.x) <= 4 && Math.abs(s.y - 2 - b.y) <= 5) { b.dead = true; hitShip(s); }
-      for (const u of g.saucers) if (!u.dead && Math.abs(s.x - u.x) <= 7 && Math.abs(s.y - 2 - u.y) <= 5) { u.dead = true; blasterBoom(u.x, u.y, true); hitShip(s); }
-      for (const it of g.items) if (!it.dead && Math.abs(s.x - it.x) <= 6 && Math.abs(s.y - 2 - it.y) <= 6) {
-        it.dead = true; sfx.coin();
-        if (it.kind === 'star') s.dbl = 600; else s.hearts = Math.min(5, s.hearts + 1);
-      }
-    }
-    g.shots = g.shots.filter(p => !p.dead && p.y > BL_TOP - 8);
-    g.rocks = g.rocks.filter(r => !r.dead && r.y < PH + 12);
-    g.saucers = g.saucers.filter(u => !u.dead && u.x > -20 && u.x < PW + 20);
-    g.snow = g.snow.filter(b => !b.dead && b.y < PH + 6 && b.y > BL_TOP - 6 && b.x > -6 && b.x < PW + 6);
-    g.items = g.items.filter(it => !it.dead && it.y < PH + 6);
-    for (const b of g.booms) b.t--;
-    g.booms = g.booms.filter(b => b.t > 0);
-    // every rocket out: game over (after a moment to see the last one go)
-    if (!g.endT && g.ships.length && g.ships.every(s => s.out)) g.endT = 120;
-    if (g.endT && --g.endT === 0) {
-      if (g.score > g.best) { g.best = g.score; try { localStorage.setItem(BL_BEST_KEY, String(g.score)); } catch (e) {} }
-      phase = 'paused'; showPause('blasterOver', 0);
-    }
-  }
-  // the screen: deep purple space with stars streaming down, icy Pluto (with its pale heart) along the bottom, the
-  // rocks, saucers, snowballs, lasers, stars and hearts, the rockets (each with a flickering flame, blinking just
-  // after a hit), little explosions, and along the top the score, the best and every rocket's hearts
-  function drawBlaster() {
-    const g = blaster;
-    ['#0e0820', '#120a28', '#170c30', '#1c0e38', '#200f3e'].forEach((col, i) => { ctx.fillStyle = col; ctx.fillRect(0, i * 56, PW, 56); });
-    for (let i = 0; i < 60; i++) {
-      const sp = i % 3 === 0 ? 1.2 : 0.5, x = (i * 97 + 13) % PW, y = Math.floor((i * 53 + frame * sp) % PH);
-      ctx.fillStyle = i % 3 === 0 ? '#ffffff' : '#7a6aa8'; ctx.fillRect(x, y, 1, 1);
-    }
-    for (let y = 246; y < PH; y++) {
-      const half = Math.sqrt(Math.max(0, 150 * 150 - (y - 390) ** 2));
-      ctx.fillStyle = y < 249 ? '#f2e8f6' : '#c8b0d8'; ctx.fillRect(Math.round(120 - half), y, Math.round(half * 2), 1);
-    }
-    ctx.fillStyle = '#f2e8f6';
-    for (const [x, y, w] of [[96, 256, 10], [110, 256, 10], [95, 259, 26], [97, 262, 22], [100, 265, 16], [104, 268, 8], [107, 270, 2]]) ctx.fillRect(x, y, w, 2);   // (its heart)
-    ctx.fillStyle = '#9c80b8'; for (const [x, y] of [[40, 262], [168, 258], [190, 268], [60, 272], [140, 274]]) ctx.fillRect(x, y, 5, 2);
-    for (const r of g.rocks) {
-      for (let j = -r.r; j <= r.r; j++) {
-        const w = Math.round(Math.sqrt(r.r * r.r - j * j) * (0.85 + 0.15 * Math.sin(r.spin + j)));
-        ctx.fillStyle = j < -r.r / 3 ? '#e8f4ff' : j > r.r / 3 ? '#7f9cc8' : '#b8d0ec';
-        ctx.fillRect(Math.round(r.x - w), Math.round(r.y + j), w * 2, 1);
-      }
-    }
-    for (const u of g.saucers) { const s = sprite(Math.floor(frame / 8) % 2 ? 'tiny_1' : 'tiny_0'); if (s) ctx.drawImage(s, Math.round(u.x - s.width), Math.round(u.y - s.height), s.width * 2, s.height * 2); }
-    ctx.fillStyle = '#ffffff';
-    for (const b of g.snow) ctx.fillRect(Math.round(b.x) - 1, Math.round(b.y) - 1, 3, 3);
-    for (const p of g.shots) { ctx.fillStyle = PAL[LOOK[p.id].mark]; ctx.fillRect(Math.round(p.x), Math.round(p.y) - 3, 1, 4); }
-    for (const it of g.items) {
-      if (frame % 10 < 3) continue;
-      if (it.kind === 'star') { ctx.fillStyle = '#ffcc3d'; ctx.fillRect(Math.round(it.x) - 1, Math.round(it.y) - 3, 3, 7); ctx.fillRect(Math.round(it.x) - 3, Math.round(it.y) - 1, 7, 3); }
-      else drawArenaHeart(Math.round(it.x) - 2, Math.round(it.y) - 2, true);
-    }
-    for (const s of g.ships) {
-      if (s.out || (s.inv > 0 && Math.floor(frame / 3) % 2)) continue;
-      const sp = sprite('rocket_' + s.id, false, LOOK[s.id].swap);
-      if (sp) ctx.drawImage(sp, Math.round(s.x) - 4, Math.round(s.y) - 7);
-      ctx.fillStyle = frame % 4 < 2 ? '#ffcc3d' : '#ff8a1f'; ctx.fillRect(Math.round(s.x) - 1, Math.round(s.y) + 2, 3, 2 + (frame % 3));
-    }
-    for (const b of g.booms) {
-      const k = 1 - b.t / (b.big ? 22 : 14), n = b.big ? 12 : 8, rr = (b.big ? 10 : 6) * k + 1;
-      ctx.fillStyle = k < 0.3 ? '#ffffff' : k < 0.6 ? '#ffcc3d' : '#ff8a1f';
-      for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; ctx.fillRect(Math.round(b.x + Math.cos(a) * rr), Math.round(b.y + Math.sin(a) * rr), 2, 2); }
-    }
-    ctx.fillStyle = '#07081a'; ctx.fillRect(0, 0, PW, BL_TOP - 4);
-    drawText('SCORE ' + g.score, 4, 3, 'gold');
-    const bestStr = 'BEST ' + Math.max(g.best, g.score);
-    drawText(bestStr, PW - 4 - (bestStr.length * 6 - 1), 3);
-    g.ships.forEach((s, i) => {
-      const x0 = 4 + i * 59;
-      drawText('P' + (s.id + 1), x0, 12, LOOK[s.id].tag);
-      for (let h = 0; h < Math.max(BL_HEARTS, s.hearts); h++) drawArenaHeart(x0 + 14 + h * 7, 13, h < s.hearts && !s.out);
-    });
-    if (g.startT > 0) banner('BLAST THE ICE!', 120, 'gold');
-    if (g.endT) banner('GAME OVER', 120, 'pink', 2);
-  }
   function draw() {
     // gliding between the main menu and The Arcade, both scenes
     if (skyScroll) { drawSkyScroll(); updateHud(); return; }
-    // Pluto Blaster (and its pause and score screens) has its own scene, and so do the Moon Race and the Colosseum
-    if (blaster && (phase === 'mini' || (fromTitle && (pauseView === 'blasterPause' || pauseView === 'blasterOver')))) {
-      drawBlaster(); updateHud(); return;
-    }
+    // the Moon Race (and its pause and score screens) has its own scene, and so does the Colosseum
     if (race && (phase === 'mini' || (fromTitle && (pauseView === 'racePause' || pauseView === 'raceOver')))) {
       drawRace(); updateHud(); return;
     }
