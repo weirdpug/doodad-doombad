@@ -1717,6 +1717,24 @@
       ? (document.hasFocus() ? 'Carry on with the keyboard' : 'Click the game and carry on with the keyboard') + ', or press a button on a controller.'
       : 'Press a button on a controller to carry on.'}`);
   }
+  // A controller's cursor (the user asked 2026-11-01): on the main menu and in The Arcade, either stick or the D-pad
+  // drags a little square round the screen like a mouse pointer (in its player's colour), and A clicks right where it
+  // is: a cloud, the sun, a planet, a green pixel, a button, anything a mouse click does. It shows once it moves and
+  // hides after a few idle seconds; while it is hidden, A does what it always did there (picks the chosen button).
+  // (padCursor: the square, over everything, never in the way of a click; curX/curY: where, in screen pixels)
+  const padCursor = document.createElement('div');
+  padCursor.style.cssText = 'position:fixed;width:6px;height:6px;border:2px solid #fff;outline:1px solid #000;pointer-events:none;z-index:9999;display:none';
+  document.body.append(padCursor);
+  let curX = PW / 2, curY = PH / 2, curShowT = 0, curOwner = 0;
+  const cursorScreen = () => phase === 'title' || (phase === 'paused' && fromTitle && pauseView === 'arcade');
+  function padClick() {
+    const r = cv.getBoundingClientRect(), x = r.left + (curX + 0.5) / PW * r.width, y = r.top + (curY + 0.5) / PH * r.height;
+    const el = document.elementFromPoint(x, y);
+    if (!el) return;
+    const opts = { bubbles: true, cancelable: true, clientX: x, clientY: y, view: window };
+    el.dispatchEvent(new PointerEvent('pointerdown', opts));
+    el.dispatchEvent(new MouseEvent('click', opts));
+  }
   function pollPads() {
     let pads = [];
     // some embedded pages block controllers; then only the keyboard and touch controls are used
@@ -1764,6 +1782,16 @@
       }
       held[owner] = now;
       const p = pById(owner);
+      // (on the main menu and in The Arcade the sticks and D-pad drag the cursor, and A, with it showing, clicks)
+      const curMode = cursorScreen();
+      if (curMode) {
+        const rx = gp.axes[2] || 0, ry = gp.axes[3] || 0;
+        let dx = (now.right ? 1 : 0) - (now.left ? 1 : 0), dy = (now.down ? 1 : 0) - (now.up ? 1 : 0);
+        if (Math.abs(ax) > 0.2 || Math.abs(ay) > 0.2) { dx = ax; dy = ay; }
+        if (Math.abs(rx) > 0.2 || Math.abs(ry) > 0.2) { dx = rx; dy = ry; }
+        if (dx || dy) { curX = clamp(curX + dx * 2.2, 0, PW - 1); curY = clamp(curY + dy * 2.2, 0, PH - 1); curShowT = 360; curOwner = owner; }
+        if (curShowT > 0 && fresh('jump') && !menuActed) { menuActed = true; padClick(); continue; }
+      }
       // In the pause menu any player's controller drives it: stick or D-pad up/down choose, A picks,
       // B backs out, Menu resumes. (A menu that only opened during this poll waits for the next one.)
       if (ph === 'paused' && phase === 'paused') {
@@ -1771,6 +1799,7 @@
           if (fresh('start')) { menuActed = true; resumeGame(); }
           else if (fresh('jump')) { menuActed = true; chooseSel(owner); }
           else if (fresh('bark')) { menuActed = true; menuBack(); }
+          else if (curMode) {}   // (in The Arcade the stick drags the cursor instead)
           else if (fresh('up')) moveSel(-1, 'y');
           else if (fresh('down')) moveSel(1, 'y');
           else if (fresh('left')) moveSel(-1, 'x');
@@ -1788,8 +1817,8 @@
         else if (ph === 'over') startClicked();
         else if (ph === 'play' && p) p.jp.jump = true;
       }
-      // on the main menu the stick or D-pad chooses Start or Store
-      if (ph === 'title' && phase === 'title') {
+      // on the main menu the stick or D-pad chooses Start or Store (unless it is dragging the cursor)
+      if (ph === 'title' && phase === 'title' && !curMode) {
         if (fresh('up') || fresh('left')) moveTitle(-1);
         else if (fresh('down') || fresh('right')) moveTitle(1);
       }
@@ -1803,6 +1832,13 @@
       if (fresh('taco') && ph === 'play') xPower(p);       // RB (the keyboard's X): tacos (Taco Pug), a disco floor (Snazz) and a shot (Snifer Ripple)
     }
     padHeld = held;   // (Banana Catch reads every controller's directions from here)
+    // (the controller's cursor: shown where it is, until it has sat still a while or the screen has no use for it)
+    if (cursorScreen() && curShowT > 0) {
+      curShowT--;
+      const r = cv.getBoundingClientRect();
+      padCursor.style.display = 'block'; padCursor.style.background = LOOK[curOwner].hex;
+      padCursor.style.left = Math.round(r.left + curX / PW * r.width - 5) + 'px'; padCursor.style.top = Math.round(r.top + curY / PH * r.height - 5) + 'px';
+    } else if (padCursor.style.display !== 'none') padCursor.style.display = 'none';
     // the keyboard's pug also hears the keyboard and touch buttons
     for (const p of players) {
       const h = held[p.id], kb = p.id === kbSlot;
