@@ -1370,6 +1370,7 @@
     bang: () => { noise(0.5, 0.35, 5000, 200); tone(120, 0.25, 'sine', 0.2, -70); [0.22, 0.29, 0.35, 0.42, 0.5, 0.57].forEach(d => noise(0.04, 0.08, 9000, 4000, d)); },   // ...and bursting, then crackling
     bloop: () => { tone(260, 0.14, 'sine', 0.08, 520); noise(0.12, 0.08, 2500, 600); },   // a fish leaping out of the moat (the main menu)
     splash: () => { noise(0.3, 0.14, 3500, 300); tone(520, 0.1, 'sine', 0.04, -300); },   // ...and diving back in
+    stomp: () => tone(80, 0.06, 'square', 0.05, -25),   // Bruno's footsteps running out of the castle (the main menu)
     poof: () => { noise(0.35, 0.16, 2500, 300); tone(300, 0.12, 'sine', 0.05, 200); },   // a cloud poofing away (the main menu)
     pop: () => { tone(320, 0.12, 'square', 0.05, -260); tone(140, 0.18, 'sawtooth', 0.05, -90, 0.02); },   // ...and one blown up
     recall: () => [0, 0.08, 0.16, 0.24].forEach((d, i) => tone(900 - i * 150, 0.1, 'sine', 0.04, -200, d)),   // ...and they are called back in
@@ -1890,6 +1891,7 @@
       if (!inNightSky(e)) {
         const p = titlePoint(e), i = cloudAt(e);
         if (i >= 0) poofCloud(i);   // (a cloud just poofs: no firework, the user asked)
+        else if (p && !brunoOut && onCastle(p)) brunoRunsOut();   // (the castle: out runs Bruno)
         else if (p && moatNear(p)) leapFish(moatNear(p));   // (the moat: a fish leaps out)
         else if (p && p[1] < floorY(p[0])) launchFirework(p);
         else if (onMeadow(e)) {
@@ -4015,6 +4017,39 @@
     }
     drops = drops.filter(d => d.t > 0);
   }
+  // Big Bruno lives in the castle (the user asked 2026-10-31): a click on the castle swings its door open and out he
+  // runs, over the drawbridge and down the path towards you (growing as he comes), stops to pound his chest and
+  // growl, then runs back in and the door thuds shut. (brunoOut: how far through that he is, or null)
+  const CASTLE_COLS = ['b0b0b4', '4a4a52', '14141a', '87604a', '1e140e', '068c22'];
+  const BR_OPEN = 8, BR_OUT = 50, BR_POUND = 120, BR_BACK = 162, BR_SHUT = 170;
+  let brunoOut = null;
+  function onCastle([x, y]) {
+    if (!titleBgReady || x < 66 || x > 174 || y < 60 || y >= CASTLE_Y + 1) return false;
+    const d = titleBg.getContext('2d').getImageData(Math.floor(x), Math.floor(y), 1, 1).data;
+    return CASTLE_COLS.includes([d[0], d[1], d[2]].map(v => v.toString(16).padStart(2, '0')).join(''));
+  }
+  function brunoRunsOut() { brunoOut = { t: 0 }; try { initAudio(); } catch (e) {} sfx.rumble(); }
+  function drawBrunoOut() {
+    const b = brunoOut;
+    if (!b) return;
+    const t = ++b.t, ease = u => u * u * (3 - 2 * u);
+    // (the open doorway, dark, from when the door swings open until it shuts behind him)
+    if (t < BR_SHUT) {
+      ctx.fillStyle = '#11132a';
+      for (let y = CASTLE_Y - 21; y < CASTLE_Y; y++) { const r = y - CASTLE_Y + 21, inset = r < 5 ? [6, 3, 2, 1, 0][r] : 0; ctx.fillRect(109 + inset, y, 22 - inset * 2, 1); }
+    }
+    if (t >= BR_OPEN && t < BR_BACK) {
+      // (u: 0 at the door, 1 out on the path in front)
+      const u = t < BR_OUT ? ease((t - BR_OPEN) / (BR_OUT - BR_OPEN)) : t < BR_POUND ? 1 : 1 - ease((t - BR_POUND) / (BR_BACK - BR_POUND));
+      const running = t < BR_OUT || t >= BR_POUND, step = Math.floor(t / 5) % 2;
+      const s = running ? sprite('ape_idle', !!step) : sprite(Math.floor(t / 8) % 2 ? 'ape_poundL' : 'ape_poundR');
+      const sc = 0.55 + 0.3 * u, y = CASTLE_Y + 44 * u - (running ? step : 0);
+      if (s) ctx.drawImage(s, Math.round(120 - s.width * sc / 2), Math.round(y - s.height * sc), Math.round(s.width * sc), Math.round(s.height * sc));
+      if (running && t % 5 === 0) sfx.stomp();
+      if (t === BR_OUT + 4 || t === BR_OUT + 40) sfx.grr();
+    }
+    if (t === BR_SHUT) { sfx.rumble(); brunoOut = null; }
+  }
   function drawTitleScene() {
     if (!titleBgReady) { buildTitleBg(); titleBgReady = true; }
     ctx.drawImage(titleBg, 0, 0);
@@ -4065,6 +4100,7 @@
     ctx.fillStyle = '#9fd8ff';
     MOAT_GLINTS.forEach(([x, y], i) => { if (Math.floor(frame / 18 + i * 3) % 7 === 0) ctx.fillRect(x, y, 2, 1); });
     drawFish();
+    drawBrunoOut();
     drawFireworks();
   }
   // ----- The Arcade: out in space, reached by clicking the night sky on the main menu -----
