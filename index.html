@@ -1373,6 +1373,7 @@
     whistle: dur => tone(700, dur, 'sine', 0.03, 900),   // a firework rocket whistling up (the main menu)
     bang: () => { noise(0.5, 0.35, 5000, 200); tone(120, 0.25, 'sine', 0.2, -70); [0.22, 0.29, 0.35, 0.42, 0.5, 0.57].forEach(d => noise(0.04, 0.08, 9000, 4000, d)); },   // ...and bursting, then crackling
     bloop: () => { tone(260, 0.14, 'sine', 0.08, 520); noise(0.12, 0.08, 2500, 600); },   // a fish leaping out of the moat (the main menu)
+    flop: () => tone(330, 0.05, 'sine', 0.06, -180),   // a caught fish flapping, or flopping along the ground
     splash: () => { noise(0.3, 0.14, 3500, 300); tone(520, 0.1, 'sine', 0.04, -300); },   // ...and diving back in
     patter: () => tone(900, 0.025, 'triangle', 0.02),   // a pug's little steps up the path (the main menu)
     stomp: () => tone(80, 0.06, 'square', 0.05, -25),   // Bruno's footsteps running out of the castle (the main menu)
@@ -1801,7 +1802,7 @@
       // (on the main menu and in The Arcade the sticks and D-pad drag this player's square, and A, with it showing,
       // clicks; two players' squares can both click in the same poll unless the first click changed the screen)
       const curMode = cursorScreen();
-      // (a controller holding Bruno or a pug carries it with its square while A is held, and lets go when A is)
+      // (a controller holding Bruno, a pug or a fish carries it with its square while A is held, and lets go when A is)
       const carrying = heldBy('pad' + owner);
       if (carrying && (!now.jump || ph !== 'title' || phase !== 'title')) dropHeld(carrying);
       if (curMode) {
@@ -1959,7 +1960,7 @@
       if (e.type === 'pointerdown') titleSwallow = false;
       else if (titleSwallow || performance.now() - titleTapT < 600) { if (e.type === 'click') titleSwallow = false; return; }
       const p0 = titlePoint(e);
-      // (Bruno while he is out, or a pug: pressed and held, it is picked up, wherever it is)
+      // (Bruno while he is out, a pug, or a fish out of the water: pressed and held, it is picked up, wherever it is)
       if (e.type === 'pointerdown' && p0 && grabAt(p0, padClickBy !== null ? 'pad' + padClickBy : e.pointerId, e.pointerType === 'touch')) {
         if (padClickBy === null) try { ov.setPointerCapture(e.pointerId); } catch (err) {}
         titleSwallow = true; titleTapT = performance.now(); return;
@@ -4145,6 +4146,7 @@
       const vy = -f.h * 4 * (1 - 2 * u) / f.T, vx = Math.max(Math.abs(f.dx), 4) / f.T, s = sprite('fish', f.dir > 0);
       // (tipped nose-up on the way up and nose-down on the way down)
       if (s) { ctx.save(); ctx.translate(Math.round(x), Math.round(y)); ctx.rotate(Math.atan2(vy, vx) * (f.dir > 0 ? 1 : -1)); ctx.drawImage(s, -4, -2); ctx.restore(); }
+      f.pos = [x, y]; f.box = [Math.round(x) - 5, Math.round(y) - 4, 10, 8];   // (a little bigger than it is: it's small)
       if (f.t >= f.T) { f.done = true; splash(f.x0 + f.dx, f.y0); sfx.splash(); }
     }
     fishes = fishes.filter(f => !f.done);
@@ -4379,9 +4381,13 @@
   // Bruno's), and whether it is held, falling, landed or on its way in)
   const PUG_LAND = 12, PUG_HOME_SPEED = 0.9;
   let freePugs = [];
-  // (what is under a press, whatever is drawn on top first: a pug already picked up, the pug running from Bruno,
-  // Bruno, then the pugs on the path)
+  // (what is under a press: the little fish first, caught ones then leaping ones, then whatever is drawn on top
+  // first: a pug already picked up, the pug running from Bruno, Bruno, then the pugs on the path)
   function holdableAt(p) {
+    const fc = [...freeFish].reverse().find(f => f.box && hitBox(f.box, p));
+    if (fc) return { fish: fc };
+    const fl = [...fishes].reverse().find(f => f.box && hitBox(f.box, p));
+    if (fl) return { leaper: fl };
     const f = [...freePugs].reverse().find(f => f.box && hitBox(f.box, p));
     if (f) return { pug: f };
     const c = brunoOut && brunoOut.chase;
@@ -4394,13 +4400,18 @@
     const h = holdableAt(p);
     if (!h) return false;
     if (h.bruno) return grabBruno(p, id, touch);
-    let f = h.pug;
+    let f = h.pug || h.fish;
     if (h.chase) { h.chase.gone = true; f = freePug(h.chase.id, h.chase.feet, h.chase.sc); }   // (Bruno has lost it)
     if (h.walker) { pugWalkers.splice(pugWalkers.indexOf(h.walker), 1); f = freePug(h.walker.id, [h.walker.x, h.walker.y], h.walker.sc); }
+    if (h.leaper) {
+      fishes.splice(fishes.indexOf(h.leaper), 1);
+      f = { fish: true, x: h.leaper.pos[0], y: h.leaper.pos[1], dir: h.leaper.dir, box: null, grab: null };
+      freeFish.push(f);
+    }
     f.state = 'held'; f.t = 0; f.vy = 0;
     f.grab = { id, touch, dx: p[0] - f.x, dy: p[1] - f.y, x: p[0], y: p[1] };
     try { initAudio(); } catch (e) {}
-    sfx.bark(LOOK[f.id].bark * 1.4);   // (a surprised yelp)
+    if (f.fish) sfx.bloop(); else sfx.bark(LOOK[f.id].bark * 1.4);   // (a surprised yelp)
     return true;
   }
   function freePug(id, [x, y], sc) {
@@ -4408,15 +4419,16 @@
     freePugs.push(f);
     return f;
   }
-  function dropPug(f) {
+  function dropFree(f) {   // (a pug or a fish)
     f.grab = null; f.state = 'fall'; f.t = 0; f.vy = 0;
     f.land = Math.max(f.y, brunoGround(f.x));
     if (ov.style.cursor) ov.style.cursor = '';
   }
-  // (the held things: Bruno and the pugs; whatever a pointer or a controller ('pad' and its player) holds)
-  const heldBy = id => [brunoOut, ...freePugs].find(o => o && o.grab && o.grab.id === id);
+  // (the held things: Bruno, the pugs and the fish; whatever a pointer or a controller ('pad' and its player) holds)
+  const holdables = () => [brunoOut, ...freePugs, ...freeFish];
+  const heldBy = id => holdables().find(o => o && o.grab && o.grab.id === id);
   const dragHeld = (o, [x, y]) => { o.grab.x = x; o.grab.y = y; };
-  const dropHeld = o => o === brunoOut ? dropBruno() : dropPug(o);
+  const dropHeld = o => o === brunoOut ? dropBruno() : dropFree(o);
   function drawFreePugs() {
     for (const f of freePugs) {
       f.t++;
@@ -4456,6 +4468,71 @@
     }
     freePugs = freePugs.filter(f => !f.done);
   }
+  // The fish can be caught too (the user asked 2026-11-01): grab one while it is out of the water and it comes away
+  // with the mouse, finger or a controller's square, wriggling and flapping; let go and it drops, straight back in
+  // with a splash if it comes down on the moat, or else it flops along the ground, hop by hop, to the nearest water
+  // and dives in. It can be caught again on the way. (freeFish: the fish caught and not back in yet; moatPx: every
+  // pixel of water you can see, to find the nearest; FISH_HOP: frames per flop, FISH_STEP: pixels per flop)
+  const FISH_HOP = 14, FISH_STEP = 10;
+  let freeFish = [], moatPx = null;
+  function nearestWater([x, y]) {
+    if (!moatPx) {
+      moatPx = [];
+      const d = titleBg.getContext('2d').getImageData(0, 0, PW, PH).data;
+      for (let yy = 120; yy < 180; yy++) for (let xx = 40; xx < 200; xx++) {
+        const i = (yy * PW + xx) * 4;
+        if (MOAT_COLS.includes([d[i], d[i + 1], d[i + 2]].map(v => v.toString(16).padStart(2, '0')).join(''))) moatPx.push([xx + 0.5, yy + 0.5]);
+      }
+    }
+    let best = null, bd = Infinity;
+    for (const w of moatPx) { const dd = (w[0] - x) ** 2 + (w[1] - y) ** 2; if (dd < bd) { bd = dd; best = w; } }
+    return best;
+  }
+  // (the next flop: up to FISH_STEP pixels towards the nearest water, the last one into it)
+  function nextFlop(f) {
+    const w = nearestWater([f.x, f.y]) || [f.x, f.y], dx = w[0] - f.x, dy = w[1] - f.y, d = Math.hypot(dx, dy), k = d <= FISH_STEP ? 1 : FISH_STEP / d;
+    f.hx0 = f.x; f.hy0 = f.y; f.hx1 = f.x + dx * k; f.hy1 = f.y + dy * k; f.last = k === 1;
+    if (dx) f.dir = dx > 0 ? 1 : -1;
+  }
+  function fishIn(f, [x, y]) { f.done = true; splash(x, y); sfx.splash(); }
+  function drawFreeFish() {
+    for (const f of freeFish) {
+      f.t++;
+      let ang = 0;
+      if (f.state === 'held') {
+        f.x = clamp(f.grab.x - f.grab.dx, -6, PW + 6); f.y = clamp(f.grab.y - f.grab.dy, 2, PH + 4);
+        ang = Math.floor(f.t / 3) % 2 ? 0.5 : -0.5;   // (wriggling, and turning about now and then)
+        if (f.t % 12 === 0) f.dir = -f.dir;
+        if (f.t % 24 === 6) sfx.flop();
+      } else if (f.state === 'fall') {
+        f.vy = Math.min(f.vy + 0.3, 6); f.y += f.vy;
+        ang = Math.atan2(f.vy, 1) * (f.dir > 0 ? 1 : -1);   // (nose down)
+        if (onMoat([f.x, f.y])) fishIn(f, [f.x, f.y]);
+        else if (f.y >= f.land) {
+          f.y = f.land;
+          const w = moatNear([f.x, f.y]);
+          if (w) fishIn(f, w);
+          else { f.state = 'flop'; f.t = 0; nextFlop(f); sfx.flop(); }
+        }
+      } else {
+        // (flopping: a little hop at a time, tipped nose-up then nose-down as it goes)
+        const u = Math.min(1, f.t / FISH_HOP);
+        f.x = f.hx0 + (f.hx1 - f.hx0) * u; f.y = f.hy0 + (f.hy1 - f.hy0) * u - 20 * u * (1 - u);
+        const vx = Math.max(Math.abs(f.hx1 - f.hx0), 4) / FISH_HOP, vy = (f.hy1 - f.hy0) / FISH_HOP - 20 * (1 - 2 * u) / FISH_HOP;
+        ang = Math.atan2(vy, vx) * (f.dir > 0 ? 1 : -1);
+        if (f.t >= FISH_HOP) {
+          f.x = f.hx1; f.y = f.hy1;
+          if (f.last) fishIn(f, [f.x, f.y]); else { f.t = 0; nextFlop(f); sfx.flop(); }
+        }
+      }
+      f.box = null;
+      if (f.done) continue;
+      const s = sprite('fish', f.dir > 0);
+      if (s) { ctx.save(); ctx.translate(Math.round(f.x), Math.round(f.y)); ctx.rotate(ang); ctx.drawImage(s, -4, -2); ctx.restore(); }
+      f.box = [Math.round(f.x) - 5, Math.round(f.y) - 4, 10, 8];
+    }
+    freeFish = freeFish.filter(f => !f.done);
+  }
   // (the mouse or a finger drags what it holds, and letting go drops it; over something to pick up the mouse pointer
   // is a hand. While a finger holds something the page never scrolls under it, and if the browser takes the pointer
   // away anyway, the finger's touches drag it instead and lifting it lets go)
@@ -4474,7 +4551,7 @@
   };
   window.addEventListener('pointerup', letGo);
   window.addEventListener('pointercancel', letGo);
-  const fingerHeld = () => [brunoOut, ...freePugs].filter(o => o && o.grab && o.grab.touch);
+  const fingerHeld = () => holdables().filter(o => o && o.grab && o.grab.touch);
   ov.addEventListener('touchmove', e => {
     const held = fingerHeld();
     if (!held.length) return;
@@ -4544,6 +4621,7 @@
     drawPugWalkers();
     drawBrunoOut();
     drawFreePugs();
+    drawFreeFish();
     drawFireworks();
   }
   // ----- The Arcade: out in space, reached by clicking the night sky on the main menu -----
