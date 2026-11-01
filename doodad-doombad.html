@@ -5365,7 +5365,7 @@
   // a burst of speed. First past the chequered flag wins. Esc or P (or Menu) pauses.
   // (Played from The Arcade like Banana Catch, in its phase 'mini': fromTitle stays on, and Back goes to The Arcade,
   // zoomed in on the Moon. d: how far down the track, x: across the screen; the camera follows the pug that pressed
-  // Play, which sits at CAM_Y on the screen.)
+  // Play, which sits at CAM_Y on the screen; with more players the screen splits, a view each: see drawRace.)
   const RACE_LEN = 6000, ROAD_HALF = 50, CAM_Y = 205, RACE_COUNT = 200;
   const raceMid = d => 120 + 42 * Math.sin(d / 310) + 18 * Math.sin(d / 127 + 1.3);   // (the middle of the track)
   const raceHash = n => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
@@ -5387,7 +5387,7 @@
     const id = joined[by] ? by : 0;
     race = { by: id, startT: RACE_COUNT, goT: 0, endT: 0, placed: 0, camD: 0, dust: [],
       cars: [0, 1, 2, 3].map(i => ({ id: i, cpu: !joined[i], d: 0, x: raceMid(0) + [-30, -10, 10, 30][i], v: 0, spin: 0, boost: 0, place: 0,
-        lane: [-20, -7, 7, 20][i], skill: 0.84 + raceHash(i + 5) * 0.07 })) };
+        lane: [-20, -7, 7, 20][i], skill: 0.84 + raceHash(i + 5) * 0.07, camD: 0, camX: raceMid(0) })) };
     try { initAudio(); } catch (e) {}
     releaseAll(); fromTitle = true; phase = 'mini'; hideOverlay();
   }
@@ -5453,10 +5453,10 @@
       if (off && c.v > 0.6 && Math.random() < 0.4) g.dust.push({ d: c.d - 6, x: c.x + (Math.random() * 6 - 3), t: 18 });
       if (c.d >= RACE_LEN) { c.place = ++g.placed; if (!c.cpu) sfx.hammer(); }
     }
-    // (the camera follows the pug that pressed Play; another player's buggy left far behind is pulled up to the
-    // bottom of the screen so it stays in the race)
+    // (the cameras: the whole screen's follows the pug that pressed Play; each split-screen view follows its own
+    // buggy, sideways too, halfway between it and the middle of the track)
     g.camD += (cam.d - g.camD) * 0.2;
-    for (const c of g.cars) if (!c.cpu && c !== cam && !c.place && c.d < g.camD - 190) c.d = g.camD - 190;
+    for (const c of g.cars) { c.camD += (c.d - c.camD) * 0.2; c.camX += ((c.x + raceMid(c.d)) / 2 - c.camX) * 0.2; }
     if (g.startT === 0 && !cam.place && frame % 10 === 0) tone(60 + cam.v * 28, 0.09, 'square', 0.02);   // (the engine)
     for (const p of g.dust) p.t--;
     g.dust = g.dust.filter(p => p.t > 0);
@@ -5476,10 +5476,12 @@
     const text = race.cars.slice().sort((a, b) => a.place - b.place).map(c => `${ordinal(c.place)} ${LOOK[c.id].name}${c.cpu ? ' (computer)' : ''}`).join(', ');
     return { title, text };
   }
-  // the screen: moon dust with craters in it, the paler track winding through, the race's craters and arrows, the
-  // flags, the buggies, and along the top the place of the pug the camera follows; down the right side, a bar with
-  // everyone's buggy on it by how far along they are
-  const raceY = d => Math.round(CAM_Y - (d - race.camD));
+  // The screen. With one player: the whole screen, following the pug that pressed Play, with a bar down the right
+  // side showing everyone by how far along they are. With more players it is split (the user asked 2026-11-01):
+  // two players side by side, each half following its own buggy (sideways too, as the track winds); three or four
+  // in four quarters (with three, the fourth quarter shows how far along everyone is). Each view has its pug's place
+  // at its top. A view shows moon dust with craters in it, the paler track winding through, the race's craters and
+  // arrows, the flags and the buggies.
   function drawRaceCrater(x, y, r, inner, rim) {
     const ry = Math.max(2, Math.round(r * 0.7));
     for (let j = -ry; j <= ry; j++) {
@@ -5487,10 +5489,21 @@
       ctx.fillStyle = j >= ry - 1 ? rim : inner; ctx.fillRect(Math.round(x - w), y + j, w * 2, 1);
     }
   }
-  function drawRace() {
-    const g = race;
-    for (let sy = 0; sy < PH; sy++) {
-      const d = g.camD + (CAM_Y - sy), di = Math.floor(d), mid = raceMid(d);
+  // a line of words on a dark plate, in the middle of a view
+  function viewBanner(str, vx, vy, vw, y, swapKey) {
+    const s = vw >= PW ? 2 : 1, w = (str.length * 6 - 1) * s;
+    ctx.fillStyle = '#07081a'; ctx.fillRect(Math.round(vx + vw / 2 - w / 2) - 3, vy + y - 3, w + 6, 7 * s + 6);
+    drawText(str, Math.round(vx + vw / 2), vy + y, swapKey, 'center', s);
+  }
+  const racePlace = c => c.place || 1 + race.cars.filter(o => o !== c && (o.place || o.d > c.d)).length;
+  function drawRaceView(c, vx, vy, vw, vh, full) {
+    const g = race, camD = full ? g.camD : c.camD, camX = full ? PW / 2 : clamp(c.camX, vw / 2, PW - vw / 2);
+    const cy = full ? CAM_Y : Math.round(vh * 0.72), Y = d => Math.round(cy - (d - camD));
+    ctx.save();
+    ctx.beginPath(); ctx.rect(vx, vy, vw, vh); ctx.clip();
+    ctx.translate(Math.round(vx + vw / 2 - camX), vy);
+    for (let sy = 0; sy < vh; sy++) {
+      const d = camD + (cy - sy), di = Math.floor(d), mid = raceMid(d);
       ctx.fillStyle = '#6a6e7c'; ctx.fillRect(0, sy, PW, 1);
       if (raceHash(di) < 0.35) { ctx.fillStyle = '#5a5e6c'; ctx.fillRect(Math.floor(raceHash(di + 0.5) * PW), sy, 2, 1); }
       ctx.fillStyle = '#a8acb8'; ctx.fillRect(Math.round(mid - ROAD_HALF), sy, ROAD_HALF * 2, 1);
@@ -5502,37 +5515,60 @@
       }
     }
     // (craters in the dust beside the track, for scenery)
-    for (let b = Math.floor((g.camD - 90) / 40); b <= Math.floor((g.camD + CAM_Y + 20) / 40); b++) {
+    for (let b = Math.floor((camD - (vh - cy) - 20) / 40); b <= Math.floor((camD + cy + 20) / 40); b++) {
       if (raceHash(b + 0.77) > 0.55) continue;
       const d = b * 40, side = raceHash(b + 0.11) < 0.5 ? -1 : 1, x = raceMid(d) + side * (ROAD_HALF + 12 + raceHash(b + 0.21) * 30);
-      drawRaceCrater(x, raceY(d), 6, '#55586a', '#8a8e9a');
+      drawRaceCrater(x, Y(d), 6, '#55586a', '#8a8e9a');
     }
-    for (const cr of RACE_CRATERS) { const y = raceY(cr.d); if (y > -12 && y < PH + 12) drawRaceCrater(cr.x, y, cr.r, '#55586a', '#c8ccd6'); }
+    for (const cr of RACE_CRATERS) { const y = Y(cr.d); if (y > -12 && y < vh + 12) drawRaceCrater(cr.x, y, cr.r, '#55586a', '#c8ccd6'); }
     for (const p of RACE_PADS) {
-      const y = raceY(p.d);
-      if (y < -10 || y > PH + 10) continue;
+      const y = Y(p.d);
+      if (y < -10 || y > vh + 10) continue;
       ctx.fillStyle = frame % 16 < 8 ? '#ffcc3d' : '#ff8a1f';
       for (let k = 0; k < 2; k++) for (let j = 0; j < 4; j++) { ctx.fillRect(Math.round(p.x) - 4 + j, y - 4 + k * 4 + j, 1, 1); ctx.fillRect(Math.round(p.x) + 4 - j, y - 4 + k * 4 + j, 1, 1); }
     }
-    for (const p of g.dust) { ctx.globalAlpha = p.t / 18; ctx.fillStyle = '#c8ccd6'; ctx.fillRect(Math.round(p.x), raceY(p.d), 2, 2); }
+    for (const p of g.dust) { ctx.globalAlpha = p.t / 18; ctx.fillStyle = '#c8ccd6'; ctx.fillRect(Math.round(p.x), Y(p.d), 2, 2); }
     ctx.globalAlpha = 1;
     // (the buggies, the furthest along drawn first; one spinning out turns round and round)
-    for (const c of [...g.cars].sort((a, b) => b.d - a.d)) {
-      const y = raceY(c.d), s = sprite('buggy_' + c.id, false, LOOK[c.id].swap);
-      if (!s || y < -20 || y > PH + 20) continue;
-      ctx.save(); ctx.translate(Math.round(c.x), y);
-      if (c.spin) ctx.rotate(c.spin * 0.45);
+    for (const o of [...g.cars].sort((a, b) => b.d - a.d)) {
+      const y = Y(o.d), s = sprite('buggy_' + o.id, false, LOOK[o.id].swap);
+      if (!s || y < -20 || y > vh + 20) continue;
+      ctx.save(); ctx.translate(Math.round(o.x), y);
+      if (o.spin) ctx.rotate(o.spin * 0.45);
       ctx.drawImage(s, -5, -6); ctx.restore();
-      if (!c.cpu) drawText('P' + (c.id + 1), Math.round(c.x), y - 16, LOOK[c.id].tag, 'center');
+      if (!o.cpu) drawText('P' + (o.id + 1), Math.round(o.x), y - 16, LOOK[o.id].tag, 'center');
     }
-    // (the place bar down the right side, and the place of the pug followed, top left)
-    ctx.fillStyle = '#14141a'; ctx.fillRect(PW - 8, 20, 4, PH - 40);
-    for (const c of g.cars) { ctx.fillStyle = PAL[LOOK[c.id].mark]; ctx.fillRect(PW - 10, Math.round(PH - 20 - (PH - 40) * clamp(c.d / RACE_LEN, 0, 1)) - 1, 8, 3); }
-    const me = g.cars[g.by], pos = me.place || 1 + g.cars.filter(c => c !== me && (c.place || c.d > me.d)).length;
-    drawText(ordinal(pos).toUpperCase() + ' OF 4', 6, 6, 'gold');
+    ctx.restore();
+    // (this view's pug: its place, and the big banner once it is past the flag)
+    drawText(ordinal(racePlace(c)).toUpperCase() + ' OF 4', vx + 5, vy + 5, LOOK[c.id].tag);
+    if (c.place) viewBanner(ordinal(c.place).toUpperCase() + ' PLACE!', vx, vy, vw, Math.round(vh * 0.36), c.place === 1 ? 'gold' : 'pink');
+  }
+  // everyone's progress: a bar each, in their colour, with P1-P4 or CPU
+  function drawRaceOverview(vx, vy, vw, vh) {
+    ctx.fillStyle = '#0b0c1c'; ctx.fillRect(vx, vy, vw, vh);
+    drawText('MOON RACE', vx + vw / 2, vy + 10, 'gold', 'center');
+    race.cars.forEach((c, i) => {
+      const y = vy + 34 + i * 24;
+      drawText(c.cpu ? 'CPU' : 'P' + (c.id + 1), vx + 6, y, LOOK[c.id].tag);
+      ctx.fillStyle = '#22265a'; ctx.fillRect(vx + 30, y + 1, vw - 40, 5);
+      ctx.fillStyle = PAL[LOOK[c.id].mark]; ctx.fillRect(vx + 30, y + 1, Math.round((vw - 40) * clamp(c.d / RACE_LEN, 0, 1)), 5);
+    });
+  }
+  function drawRace() {
+    const g = race, humans = g.cars.filter(c => !c.cpu);
+    if (humans.length <= 1) {
+      drawRaceView(g.cars[g.by], 0, 0, PW, PH, true);
+      ctx.fillStyle = '#14141a'; ctx.fillRect(PW - 8, 20, 4, PH - 40);
+      for (const c of g.cars) { ctx.fillStyle = PAL[LOOK[c.id].mark]; ctx.fillRect(PW - 10, Math.round(PH - 20 - (PH - 40) * clamp(c.d / RACE_LEN, 0, 1)) - 1, 8, 3); }
+    } else {
+      const half = PW / 2, views = humans.length === 2 ? [[0, 0, half, PH], [half, 0, half, PH]] : [[0, 0, half, PH / 2], [half, 0, half, PH / 2], [0, PH / 2, half, PH / 2], [half, PH / 2, half, PH / 2]];
+      humans.forEach((c, i) => drawRaceView(c, ...views[i], false));
+      if (humans.length === 3) drawRaceOverview(...views[3]);
+      ctx.fillStyle = '#14141a'; ctx.fillRect(half - 1, 0, 2, PH);
+      if (humans.length > 2) ctx.fillRect(0, PH / 2 - 1, PW, 2);
+    }
     if (g.startT > 0) banner(g.startT > 140 ? '3' : g.startT > 80 ? '2' : g.startT > 20 ? '1' : 'GO!', 110, 'gold', 2);
     else if (g.goT > 0) banner('GO!', 110, 'gold', 2);
-    if (me.place) banner(ordinal(me.place).toUpperCase() + ' PLACE!', 100, me.place === 1 ? 'gold' : 'pink', 2);
   }
   function draw() {
     // gliding between the main menu and The Arcade, both scenes
