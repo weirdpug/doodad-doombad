@@ -175,7 +175,7 @@
   #overlay.menu-mode { cursor: default; }
   /* the main menu (the start screen): the outdoor castle scene shows through. The title sits in the sky at the
      top and the rest at the bottom on a dark fade, so the castle shows between them. */
-  #overlay.title-mode { justify-content: space-between; background: transparent; }
+  #overlay.title-mode { justify-content: space-between; background: transparent; -webkit-user-select: none; user-select: none; }
   /* The Arcade (space): see-through too, its name at the top and Back at the bottom */
   #overlay.arcade-mode { justify-content: space-between; background: transparent; }
   /* (the story, the controls and Start sit together in .ovbody; it adds nothing to the layout anywhere) */
@@ -1742,10 +1742,13 @@
     if (!el) return;
     const opts = { bubbles: true, cancelable: true, clientX: x, clientY: y, view: window };
     padClickBy = by;   // (so a press that picks Bruno up knows which controller is holding him)
+    // (and whatever the mouse or a finger is in the middle of pressing is still swallowed afterwards: its own
+    // release must not set off a firework or open The Arcade because a controller clicked meanwhile)
+    const swallowing = titleSwallow;
     try {
       el.dispatchEvent(new PointerEvent('pointerdown', opts));
       el.dispatchEvent(new MouseEvent('click', opts));
-    } finally { padClickBy = null; }
+    } finally { padClickBy = null; titleSwallow = swallowing; }
   }
   function pollPads() {
     let pads = [];
@@ -1961,7 +1964,9 @@
       else if (titleSwallow || performance.now() - titleTapT < 600) { if (e.type === 'click') titleSwallow = false; return; }
       const p0 = titlePoint(e);
       // (Bruno while he is out, a pug, or a fish out of the water: pressed and held, it is picked up, wherever it is)
-      if (e.type === 'pointerdown' && p0 && grabAt(p0, padClickBy !== null ? 'pad' + padClickBy : e.pointerId, e.pointerType === 'touch')) {
+      // (a plain left press only: a right-click's release can be lost to the menu it opens)
+      const primary = e.pointerType !== 'mouse' || (e.button === 0 && !e.ctrlKey);
+      if (e.type === 'pointerdown' && p0 && primary && grabAt(p0, padClickBy !== null ? 'pad' + padClickBy : e.pointerId, e.pointerType === 'touch')) {
         if (padClickBy === null) try { ov.setPointerCapture(e.pointerId); } catch (err) {}
         titleSwallow = true; titleTapT = performance.now(); return;
       }
@@ -4538,16 +4543,19 @@
   // away anyway, the finger's touches drag it instead and lifting it lets go)
   window.addEventListener('pointermove', e => {
     const o = heldBy(e.pointerId), p = titlePoint(e);
-    if (o && p) dragHeld(o, p);
-    if (e.pointerType === 'mouse') {
-      const want = phase === 'title' && p ? (o ? 'grabbing' : holdableAt(p) ? 'grab' : '') : '';
+    if (o && e.pointerType === 'mouse' && !e.buttons) dropHeld(o);   // (its button came up where we never heard it)
+    else if (o && p) dragHeld(o, p);
+    // (only the main menu's own cursor: The Arcade sets its hand over planets itself)
+    if (e.pointerType === 'mouse' && phase === 'title') {
+      const want = p ? (heldBy(e.pointerId) ? 'grabbing' : holdableAt(p) ? 'grab' : '') : '';
       if (ov.style.cursor !== want) ov.style.cursor = want;
-    }
+    } else if (e.pointerType === 'mouse' && /grab/.test(ov.style.cursor)) ov.style.cursor = '';
   });
   const letGo = e => {
     const o = heldBy(e.pointerId);
     if (!o) return;
-    if (e.type === 'pointercancel' && o.grab.touch) o.grab.lost = true; else dropHeld(o);
+    if (e.type === 'pointercancel' && o.grab.touch) o.grab.lost = true;
+    else { dropHeld(o); titleSwallow = true; }   // (the click that follows letting go does nothing more)
   };
   window.addEventListener('pointerup', letGo);
   window.addEventListener('pointercancel', letGo);
