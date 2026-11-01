@@ -1735,13 +1735,16 @@
     return { el, x: PW / 2 - 24 + id * 16, y: PH / 2, showT: 0 };
   });
   const cursorScreen = () => phase === 'title' || (phase === 'paused' && fromTitle && pauseView === 'arcade');
-  function padClick(c) {
+  function padClick(c, by) {
     const r = cv.getBoundingClientRect(), x = r.left + (c.x + 0.5) / PW * r.width, y = r.top + (c.y + 0.5) / PH * r.height;
     const el = document.elementFromPoint(x, y);
     if (!el) return;
     const opts = { bubbles: true, cancelable: true, clientX: x, clientY: y, view: window };
-    el.dispatchEvent(new PointerEvent('pointerdown', opts));
-    el.dispatchEvent(new MouseEvent('click', opts));
+    padClickBy = by;   // (so a press that picks Bruno up knows which controller is holding him)
+    try {
+      el.dispatchEvent(new PointerEvent('pointerdown', opts));
+      el.dispatchEvent(new MouseEvent('click', opts));
+    } finally { padClickBy = null; }
   }
   function pollPads() {
     let pads = [];
@@ -1752,7 +1755,8 @@
     for (const i of Object.keys(padOwner)) if (!present.has(i)) {
       const who = padOwner[i];
       delete padOwner[i]; delete padPrev[i];
-      padCursors[who].showT = 0;   // (its square goes with it)
+      padCursors[who].showT = 0;   // (its square goes with it, and lets go of Bruno)
+      if (brunoOut && brunoOut.grab && brunoOut.grab.id === 'pad' + who) dropBruno();
       if (who > 0) leaveSlot(who);
       // Player 1's pug stays: the keyboard (if it isn't already another player's) or any controller can take
       // it over. During the level-clear banner, the pause waits for the next level to start.
@@ -1796,15 +1800,19 @@
       // (on the main menu and in The Arcade the sticks and D-pad drag this player's square, and A, with it showing,
       // clicks; two players' squares can both click in the same poll unless the first click changed the screen)
       const curMode = cursorScreen();
+      // (a controller holding Bruno carries him with its square while A is held, and lets go when A is)
+      const carrying = brunoOut && brunoOut.grab && brunoOut.grab.id === 'pad' + owner;
+      if (carrying && (!now.jump || ph !== 'title' || phase !== 'title')) dropBruno();
       if (curMode) {
         const c = padCursors[owner], rx = gp.axes[2] || 0, ry = gp.axes[3] || 0;
         let dx = (now.right ? 1 : 0) - (now.left ? 1 : 0), dy = (now.down ? 1 : 0) - (now.up ? 1 : 0);
         if (Math.abs(ax) > 0.2 || Math.abs(ay) > 0.2) { dx = ax; dy = ay; }
         if (Math.abs(rx) > 0.2 || Math.abs(ry) > 0.2) { dx = rx; dy = ry; }
         if (dx || dy) { c.x = clamp(c.x + dx * 2.2, 0, PW - 1); c.y = clamp(c.y + dy * 2.2, 0, PH - 1); c.showT = 360; }
+        if (carrying && now.jump && phase === 'title') { c.showT = 360; dragBruno([c.x, c.y]); }
         if (c.showT > 0 && fresh('jump')) {
           const was = pauseView;
-          menuActed = true; padClick(c);
+          menuActed = true; padClick(c, owner);
           clickMoved = phase !== ph || pauseView !== was;
           continue;
         }
@@ -1950,6 +1958,11 @@
       if (e.type === 'pointerdown') titleSwallow = false;
       else if (titleSwallow || performance.now() - titleTapT < 600) { if (e.type === 'click') titleSwallow = false; return; }
       const p0 = titlePoint(e);
+      // (Bruno, while he is out: pressed and held, he is picked up, wherever he is)
+      if (e.type === 'pointerdown' && p0 && grabBruno(p0, padClickBy !== null ? 'pad' + padClickBy : e.pointerId, e.pointerType === 'touch')) {
+        if (padClickBy === null) try { ov.setPointerCapture(e.pointerId); } catch (err) {}
+        titleSwallow = true; titleTapT = performance.now(); return;
+      }
       if (p0 && toggleSky(p0)) { titleSwallow = true; titleTapT = performance.now(); return; }   // (the sun, or the moon)
       if (!inNightSky(e) || titleNight) {   // (at night the night sky is just sky: no Arcade)
         const p = titlePoint(e), i = cloudAt(e);
@@ -4237,6 +4250,14 @@
     if (!b) return;
     // (with a pug to chase out, Bruno's own timing runs that much behind the pug's)
     const t0 = ++b.t, t = b.chase ? t0 - CH_LAG : t0, ease = u => u * u * (3 - 2 * u);
+    // (once he has been picked up he is on his own: see drawBrunoFree; the pug he chased keeps running)
+    if (b.free) {
+      drawBrunoFree(b);
+      if (b.chase) drawFleeingPug(b.chase, t0);
+      if (b.done && (!b.chase || b.chase.gone)) brunoOut = null;
+      return;
+    }
+    b.box = null;
     // (the open doorway, dark, from when the door swings open until it shuts behind him)
     if (t < BR_SHUT) drawDoorway();
     if (t >= BR_OPEN && t < BR_BACK) {
@@ -4252,13 +4273,120 @@
         s = sprite(k < 0.5 ? 'ape_idle' : 'ape_back'); wf = Math.max(0.15, Math.abs(Math.cos(k * Math.PI)));
       } else s = sprite(Math.floor(t / 8) % 2 ? 'ape_poundL' : 'ape_poundR');
       const sc = 0.55 + 0.3 * u, y = CASTLE_Y + 44 * u - (running ? step : 0);
-      if (s) ctx.drawImage(s, Math.round(120 - s.width * sc * wf / 2), Math.round(y - s.height * sc), Math.max(1, Math.round(s.width * sc * wf)), Math.round(s.height * sc));
+      if (s) {
+        const w = Math.max(1, Math.round(s.width * sc * wf)), h = Math.round(s.height * sc);
+        ctx.drawImage(s, Math.round(120 - s.width * sc * wf / 2), Math.round(y - s.height * sc), w, h);
+        b.box = [Math.round(120 - s.width * sc * wf / 2), Math.round(y - s.height * sc), w, h]; b.feet = [120, y]; b.sc = sc;
+      }
       if (running && t % 5 === 0) sfx.stomp();
       if (t === BR_OUT + 4 || t === BR_OUT + 40) sfx.grr();
     }
     if (b.chase) drawFleeingPug(b.chase, t0);   // (in front of him: it is ahead)
     if (t === BR_SHUT) { sfx.rumble(); brunoOut = null; }
   }
+  // Bruno can be picked up (the user asked 2026-11-01): press and hold on him while he is out and he comes away with
+  // the mouse, finger or a controller's square (held on A), dangling and flailing (arms up, then beating his chest,
+  // growling) wherever he is dragged, the sky included. Let go and he drops to the ground with a thud and a puff of
+  // dust (or a splash, in the moat), shakes it off, and runs back to the drawbridge and in at the door, which thuds
+  // shut behind him. He can be caught again while he falls or runs home. (b.box: where he was last drawn, to hit;
+  // b.grab: who holds him (a pointer's id, or 'pad' and the player) and where on him; b.free: his feet, his size,
+  // and whether he is held, falling, landed or on his way home; b.done: back inside)
+  const BR_LAND = 16, BR_HOME_SPEED = 1.5;
+  // (where he comes down: in front of the castle on its hill, or else on the hill's top edge, unless he is let go
+  // lower than that, on the grass, where he just lands)
+  const brunoGround = x => Math.abs(x - 120) <= 56 ? CASTLE_Y + 3 : floorY(x);
+  let padClickBy = null;   // (the player whose controller square is clicking, while it clicks)
+  function brunoAt([x, y]) {
+    const b = brunoOut;
+    if (!b || !b.box || b.done) return false;
+    const [x0, y0, w, h] = b.box;
+    return x >= x0 - 2 && x <= x0 + w + 2 && y >= y0 - 2 && y <= y0 + h + 2;
+  }
+  function grabBruno([x, y], id, touch) {
+    const b = brunoOut;
+    if (!brunoAt([x, y])) return false;
+    const f = b.free || (b.free = { x: b.feet[0], y: b.feet[1], sc: b.sc });
+    f.state = 'held'; f.t = 0; f.vy = 0;
+    b.grab = { id, touch, dx: x - f.x, dy: y - f.y, x, y };
+    try { initAudio(); } catch (e) {}
+    sfx.grr();
+    return true;
+  }
+  function dragBruno([x, y]) { const g = brunoOut && brunoOut.grab; if (g) { g.x = x; g.y = y; } }
+  function dropBruno() {
+    const b = brunoOut;
+    if (!b || !b.grab) return;
+    const f = b.free;
+    b.grab = null; f.state = 'fall'; f.t = 0; f.vy = 0;
+    f.land = Math.max(f.y, brunoGround(f.x));
+    if (ov.style.cursor) ov.style.cursor = '';
+  }
+  function landBruno(f) {
+    f.state = 'land'; f.t = 0;
+    const w = moatNear([f.x, f.y]);
+    if (w) { splash(w[0], w[1]); sfx.splash(); }
+    else for (let i = 0; i < 8; i++) drops.push({ x: f.x + (i - 3.5) * 2, y: f.y - 1, vx: (i - 3.5) * 0.3, vy: -0.6 - Math.random() * 0.6, t: 12, col: nc(i % 2 ? '#c8a070' : '#9a7a50') });
+    sfx.thud();
+  }
+  function drawBrunoFree(b) {
+    const f = b.free, g = b.grab;
+    if (b.done) { b.box = null; return; }
+    drawDoorway();   // (the door stays open while he is out)
+    f.t++;
+    let s, bob = 0;
+    if (f.state === 'held') {
+      // (his feet follow the hand that holds him, at the spot he was picked up by)
+      f.x = clamp(g.x - g.dx, -10, PW + 10); f.y = clamp(g.y - g.dy, 8, PH + 10);
+      s = sprite(['ape_throw', 'ape_poundL', 'ape_throw', 'ape_poundR'][Math.floor(f.t / 5) % 4]);
+      bob = Math.floor(f.t / 5) % 2;
+      if (f.t % 50 === 25) sfx.grr();
+    } else if (f.state === 'fall') {
+      f.vy = Math.min(f.vy + 0.35, 7); f.y += f.vy;
+      s = sprite('ape_throw');
+      if (f.y >= f.land) { f.y = f.land; landBruno(f); }
+    } else if (f.state === 'land') {
+      // (shaking it off: beating his chest, with a growl)
+      s = sprite(Math.floor(f.t / 4) % 2 ? 'ape_poundL' : 'ape_poundR');
+      if (f.t === 3) sfx.grr();
+      if (f.t >= BR_LAND) { f.state = 'home'; f.t = 0; f.x0 = f.x; f.y0 = f.y; f.sc0 = f.sc; }
+    } else {
+      // (home: to the foot of the drawbridge, then up it and in at the door, getting smaller as he goes; with his
+      // back to you, unless he has to come down the hill towards you first)
+      const ax = 120, ay = CASTLE_Y + 12, l1 = Math.hypot(ax - f.x0, ay - f.y0), L = l1 + 12, d = Math.min(L, f.t * BR_HOME_SPEED);
+      if (d < l1) { f.x = f.x0 + (ax - f.x0) * d / l1; f.y = f.y0 + (ay - f.y0) * d / l1; } else { f.x = ax; f.y = ay - (d - l1); }
+      f.sc = f.sc0 + (0.55 - f.sc0) * d / L;
+      const step = Math.floor(f.t / 5) % 2;
+      s = sprite(d >= l1 || ay <= f.y0 ? 'ape_back' : 'ape_idle', !!step);
+      bob = step;
+      if (f.t % 5 === 0) sfx.stomp();
+      if (d >= L) { b.done = true; b.box = null; sfx.rumble(); return; }
+    }
+    if (!s) return;
+    const w = Math.round(s.width * f.sc), h = Math.round(s.height * f.sc), x0 = Math.round(f.x - w / 2), y0 = Math.round(f.y - h - bob);
+    ctx.drawImage(s, x0, y0, w, h);
+    b.box = [x0, y0, w, h];
+  }
+  // (the mouse or a finger drags him while it holds him, and letting go drops him; over him the mouse pointer is a
+  // hand. A finger also drags him by its touches, so the page never scrolls under it, and lifting it lets go even
+  // if the browser has taken the pointer away)
+  window.addEventListener('pointermove', e => {
+    const g = brunoOut && brunoOut.grab, p = titlePoint(e);
+    if (g && g.id === e.pointerId && p) dragBruno(p);
+    if (e.pointerType === 'mouse') {
+      const want = phase === 'title' && p ? (g ? 'grabbing' : brunoAt(p) ? 'grab' : '') : '';
+      if (ov.style.cursor !== want) ov.style.cursor = want;
+    }
+  });
+  const letGoOfBruno = e => { const g = brunoOut && brunoOut.grab; if (g && g.id === e.pointerId && !(e.type === 'pointercancel' && g.touch)) dropBruno(); };
+  window.addEventListener('pointerup', letGoOfBruno);
+  window.addEventListener('pointercancel', letGoOfBruno);
+  ov.addEventListener('touchmove', e => {
+    const g = brunoOut && brunoOut.grab;
+    if (g && g.touch) { e.preventDefault(); const p = titlePoint(e); if (p) dragBruno(p); }
+  }, { passive: false });
+  const fingerOffBruno = e => { const g = brunoOut && brunoOut.grab; if (g && g.touch && !e.touches.length) dropBruno(); };
+  ov.addEventListener('touchend', fingerOffBruno);
+  ov.addEventListener('touchcancel', fingerOffBruno);
   function drawTitleScene() {
     if (!titleBgReady) { buildTitleBg(); titleBgReady = true; }
     if (titleNight && !titleNightReady) { buildTitleNight(); titleNightReady = true; }
