@@ -1270,7 +1270,7 @@
     showControllerHelp(); updateHud(true);
     // (in the Store opened from the main menu no game is running: it just shows the pugs still here)
     // (in the Colosseum its pug fights on for the computer, and the fight pauses to say so)
-    if ((arena || race) && fromTitle && phase === 'mini') { pauseMini(`Player ${id + 1}'s controller disconnected. Press A on a controller to bring them back.`); return; }
+    if ((arena || race || snake) && fromTitle && phase === 'mini') { pauseMini(`Player ${id + 1}'s controller disconnected. Press A on a controller to bring them back.`); return; }
     if (fromTitle) { if (phase === 'paused') showPause(pauseView, menuSel); return; }
     if (phase === 'play' || phase === 'paused' || phase === 'win') {
       // if everyone left was sitting out, the team is out: that costs a heart and the level restarts
@@ -1611,7 +1611,7 @@
       const km = keyMap[e.code];
       const swing = arena && (e.code === 'KeyX' || e.key === 'Enter');
       // (in the Colosseum a keyboard that hasn't joined yet joins as the next player, as in the main game)
-      if ((arena || race) && (km || swing) && !e.repeat) claimKeyboard(true);
+      if ((arena || race || snake) && (km || swing) && !e.repeat) claimKeyboard(true);
       if (km) { e.preventDefault(); keys[km] = true; }
       if (swing && !e.repeat) { e.preventDefault(); arena.kbAtk = true; }
       if ((e.key === 'Escape' || e.key === 'p' || e.key === 'P') && !e.repeat) pauseMini();
@@ -1685,7 +1685,7 @@
   addEventListener('blur', releaseAll);
 
   // the touch buttons count as the keyboard: the same pug, and they join the same way its keys do
-  document.getElementById('barkBtn').addEventListener('pointerdown', e => { e.preventDefault(); initAudio(); if (phase === 'mini' && (arena || race)) { if (arena && claimKeyboard(true)) arena.kbAtk = true; return; } if (claimKeyboard(true) === true) doBark(pById(kbSlot)); });
+  document.getElementById('barkBtn').addEventListener('pointerdown', e => { e.preventDefault(); initAudio(); if (phase === 'mini' && (arena || race || snake)) { if (arena && claimKeyboard(true)) arena.kbAtk = true; return; } if (claimKeyboard(true) === true) doBark(pById(kbSlot)); });
   document.querySelectorAll('.pad button[data-k]').forEach(btn => {
     const k = btn.dataset.k;
     const on = e => {
@@ -1731,6 +1731,7 @@
       // it over. During the level-clear banner, the pause waits for the next level to start.
       else if ((phase === 'play' || phase === 'paused') && !fromTitle) p1Lost();
       // (the keyboard can only take Player 1 back if it isn't already someone else)
+      else if (phase === 'mini' && snake && !snake.endT) pauseSnake(`Player 1's controller disconnected. ${kbSlot === null || kbSlot === 0 ? 'Press a key, or A on a controller,' : 'Press A on a controller'} to take Player 1 back.`);
       else if (phase === 'mini' && race && !race.endT) pauseRace(`Player 1's controller disconnected. ${kbSlot === null || kbSlot === 0 ? 'Press a key, or A on a controller,' : 'Press A on a controller'} to take Player 1 back.`);
       else if (phase === 'mini' && arena && !arena.result) pauseArena(`Player 1's controller disconnected. ${kbSlot === null || kbSlot === 0 ? 'Press a key, or A on a controller,' : 'Press A on a controller'} to take Player 1 back.`);
       else if (phase === 'win') p1LostAtWin = true;
@@ -2135,6 +2136,9 @@
     // the Moon Race's, the same way (Back goes to The Arcade, zoomed in on the Moon)
     racePause: () => [{ label: 'Resume', act: () => resumeGame() }, { label: 'Back', act: () => backFromRace() }],
     raceOver: () => [{ label: 'Race again', act: by => startRace(by) }, { label: 'Back', act: () => backFromRace() }],
+    // Pug Train's, the same way (Back goes to The Arcade, zoomed in on Mars)
+    snakePause: () => [{ label: 'Resume', act: () => resumeGame() }, { label: 'Back', act: () => backFromSnake() }],
+    snakeOver: () => [{ label: 'Play again', act: by => startSnake(by) }, { label: 'Back', act: () => backFromSnake() }],
     arcade: () => [
       ...(arcadeZoom.target && !arcadeZoom.out && !onShip() ? [{ label: 'Play', act: by => playFromArcade(by) }] : []),
       // (zoomed in on the spaceship, Back zooms out to Saturn first)
@@ -2161,8 +2165,8 @@
     // (the Store and Necklaces show the bag or look of the pug that opened them)
     if ((store || neck) && by !== undefined && joined[by]) storeBy = by;
     if (!joined[storeBy]) storeBy = kbBy();
-    const bpause = view === 'bananaPause' || view === 'arenaPause' || view === 'racePause', bover = view === 'bananaOver' || view === 'arenaOver' || view === 'raceOver';
-    ovTitle.textContent = bpause ? 'Paused' : view === 'arenaOver' ? arenaWords().title : view === 'raceOver' ? raceWords().title : bover ? 'Splat!' : arcade ? (onShip() ? 'Alien Spaceship' : arcadeZoom.target && !arcadeZoom.out ? arcadeZoom.target.name : 'The Arcade') : store ? 'Store' : part ? part.name : custom ? 'Customize' : 'Paused';
+    const bpause = /^(banana|arena|race|snake)Pause$/.test(view), bover = /^(banana|arena|race|snake)Over$/.test(view);
+    ovTitle.textContent = bpause ? 'Paused' : view === 'arenaOver' ? arenaWords().title : view === 'raceOver' ? raceWords().title : view === 'snakeOver' ? snakeWords().title : bover ? 'Splat!' : arcade ? (onShip() ? 'Alien Spaceship' : arcadeZoom.target && !arcadeZoom.out ? arcadeZoom.target.name : 'The Arcade') : store ? 'Store' : part ? part.name : custom ? 'Customize' : 'Paused';
     // (Necklaces keeps a line for what was just put on, and with 2-4 pugs, whose look it is)
     ovText.hidden = arcade || (custom && !neck);
     ovText.textContent = note || (store
@@ -2172,6 +2176,8 @@
       : view === 'arenaPause' ? (arena && arena.gun ? 'Pluto Showdown. Blast the other pugs: the last pug standing wins!' : 'The Colosseum. Swing your sword: the last pug standing wins!')
       : view === 'racePause' ? 'The Moon Race. Steer round the craters and be first to the flag!'
       : view === 'raceOver' ? raceWords().text
+      : view === 'snakePause' ? 'Pug Train. Gobble the bones, and don\'t bump into anything!'
+      : view === 'snakeOver' ? snakeWords().text
       : view === 'arenaOver' ? arenaWords().text
       : bpause ? 'Banana Catch. Catch every banana in your bowl!'
       : bover && banana ? `A banana hit the floor! You caught ${banana.score} banana${banana.score === 1 ? '' : 's'}. Best: ${banana.best}.`
@@ -2396,6 +2402,8 @@
     if (fromTitle && pauseView === 'arenaOver') return backFromArena();
     if (fromTitle && pauseView === 'racePause') { releaseAll(); phase = 'mini'; hideOverlay(); return; }
     if (fromTitle && pauseView === 'raceOver') return backFromRace();
+    if (fromTitle && pauseView === 'snakePause') { releaseAll(); phase = 'mini'; hideOverlay(); return; }
+    if (fromTitle && pauseView === 'snakeOver') return backFromSnake();
     if (fromTitle) return backToTitle();   // (the Store or Customize opened from the main menu goes back there)
     releaseAll(); phase = 'play'; hideOverlay();
   }
@@ -3293,7 +3301,7 @@
       }
     } else if (phase === 'title') {
       updateApe(); updateBarrels(); barrels = barrels.filter(b => !b.dead);
-    } else if (phase === 'mini') { if (arena) stepArena(); else if (race) stepRace(); else stepBanana(); }
+    } else if (phase === 'mini') { if (arena) stepArena(); else if (race) stepRace(); else if (snake) stepSnake(); else stepBanana(); }
     else if (phase === 'boom' && --shipBoomT <= 0) endShipBoom();   // (the spaceship's explosion picture, 5 seconds)
     // pets fly along with their pugs while a level plays and during the level-clear banner
     if (phase === 'play' || phase === 'win') for (const p of players) movePets(p);
@@ -4280,7 +4288,7 @@
         { off: [-44, -16], spr: 'ufo5' }, { off: [6, -38], spr: 'ufo6' },
         { off: [-6, 38], spr: 'ufo7' }, { off: [50, 2], spr: 'ufo8' },
         { off: [-50, -2], spr: 'ufo9' }, { off: [34, -32], spr: 'ufo10' }] },
-    { name: 'Mars', x: 192, y: 66, r: 10, cols: ['#ff8a6a', '#e8282f', '#a8141f'], dot: [206, 54] },
+    { name: 'Mars', x: 192, y: 66, r: 10, cols: ['#ff8a6a', '#e8282f', '#a8141f'], game: 'snake', dot: [206, 54] },
     { name: 'Earth', x: 182, y: 196, r: 18, cols: ['#9fb4ff', '#2f5bff', '#1d2f8c'], game: 'banana', dot: [157, 208] },
     { name: 'The Moon', x: 214, y: 172, r: 6, cols: ['#eef0f6', '#b4b8c8', '#7f8396'], game: 'race', dot: [204, 163] },
     { name: 'Pluto', x: 32, y: 222, r: 7, cols: ['#d8a6e8', '#9c5ab8', '#5a2c7a'], stripe: '#7a3c9a', game: 'showdown', dot: [43, 214] },
@@ -4416,9 +4424,9 @@
   let motherCalled = false;
   function codeCome() {
     if (mother.state !== 'gone') return;
-    const titleScreen = phase === 'paused' && fromTitle && pauseView !== 'arcade' && !/^(banana|arena|race)/.test(pauseView);
+    const titleScreen = phase === 'paused' && fromTitle && pauseView !== 'arcade' && !/^(banana|arena|race|snake)/.test(pauseView);
     if (phase === 'title' || titleScreen) { motherCalled = true; scrollSky(1, kbBy()); return; }   // (the Store, Customize too)
-    if (phase === 'mini' || (phase === 'paused' && fromTitle && /^(banana|arena|race)/.test(pauseView))) backToArcade();   // (a mini-game: out to space)
+    if (phase === 'mini' || (phase === 'paused' && fromTitle && /^(banana|arena|race|snake)/.test(pauseView))) backToArcade();   // (a mini-game: out to space)
     if (phase === 'mini' || (phase === 'paused' && fromTitle && pauseView === 'arcade')) startMotherEntrance();
   }
   const M_PORTAL = 100, M_EMERGE = 160, M_ARRIVE = 300, MOTHER_FRAMES = 450, MOTHER_SCALE = 2.5;
@@ -4741,14 +4749,15 @@
     return Math.hypot(x - sx, y - sy) <= 8;
   }
   // A planet's Play button: a planet with its own game plays it (Earth: Banana Catch; the mother ship: the
-  // Colosseum; the Moon: the Moon Race; Pluto: Pluto Showdown, the Colosseum's fight with ray guns); the others start
-  // a new game, the same as Start on the main menu (each is meant to get its own game later)
+  // Colosseum; the Moon: the Moon Race; Pluto: Pluto Showdown, the Colosseum's fight with ray guns; Mars: Pug Train);
+  // the others start a new game, the same as Start on the main menu (each is meant to get its own game later)
   function playFromArcade(by) {
     if (!(fromTitle && pauseView === 'arcade')) return;
     if (arcadeZoom.target && arcadeZoom.target.game === 'banana') { startBanana(by); return; }
     if (arcadeZoom.target && arcadeZoom.target.game === 'arena') { startArena(by); return; }   // (the mother ship: the Colosseum)
     if (arcadeZoom.target && arcadeZoom.target.game === 'race') { startRace(by); return; }   // (the Moon: the Moon Race)
     if (arcadeZoom.target && arcadeZoom.target.game === 'showdown') { startArena(by, true); return; }   // (Pluto: Pluto Showdown)
+    if (arcadeZoom.target && arcadeZoom.target.game === 'snake') { startSnake(by); return; }   // (Mars: Pug Train)
     fromTitle = false; phase = 'title';
     startClicked();
   }
@@ -4985,7 +4994,7 @@
     try { best = Math.max(0, Math.floor(+localStorage.getItem(BANANA_BEST_KEY)) || 0); } catch (e) {}
     banana = { id: joined[by] ? by : 0, x: PW / 2, face: 1, anim: 0, moving: false, score: 0, best, items: [], plus: [],
       bruno: { x: PW / 2, dir: 1, throwT: 50, holdT: 0 }, lastTarget: PW / 2, lost: 0, splat: null, startT: 100, time: 0, fasterT: 0 };
-    arena = race = null;
+    arena = race = snake = null;
     try { initAudio(); } catch (e) {}
     releaseAll(); fromTitle = true; phase = 'mini'; hideOverlay();
   }
@@ -5127,7 +5136,7 @@
   const arenaBg = document.createElement('canvas');
   let arena = null, arenaBgReady = false;
   function startArena(by, gun) {
-    banana = race = null;
+    banana = race = snake = null;
     arena = { gun: !!gun, bolts: [], startT: 110, fightT: 0, result: null, endT: 0, kbAtk: false, prev: [{}, {}, {}, {}], sparks: [],
       pugs: [0, 1, 2, 3].map(i => ({ id: i, cpu: !joined[i], x: ARENA_X[i], y: ARENA_GROUND, vx: 0, vy: 0, kx: 0, ground: true,
         face: i < 2 ? 1 : -1, hp: ARENA_HP, hurtT: 0, swingT: 0, hitIds: [], cool: 0, anim: 0, moving: false, dropT: 0, ko: false, out: false, spin: 0, climbT: 0, climbX: 0 })) };
@@ -5143,7 +5152,7 @@
   // whether a player drives pug id: its controller, or the keyboard (the keyboard drives Player 1's pug until it
   // joins as someone else, unless a controller has Player 1); a pug nobody drives fights for the computer
   const arenaDriven = id => joined[id] && (ownerOf(id) !== undefined || kbSlot === id || (id === 0 && kbSlot === null));
-  const pauseMini = note => arena ? pauseArena(note) : race ? pauseRace(note) : pauseBanana();
+  const pauseMini = note => arena ? pauseArena(note) : race ? pauseRace(note) : snake ? pauseSnake(note) : pauseBanana();
   // back to The Arcade, zoomed in on the mother ship
   function backFromArena() {
     const gun = arena && arena.gun;
@@ -5464,7 +5473,7 @@
   }
   let race = null;
   function startRace(by) {
-    banana = arena = null;
+    banana = arena = snake = null;
     const id = joined[by] ? by : 0;
     race = { by: id, startT: RACE_COUNT, goT: 0, endT: 0, placed: 0, camD: 0, dust: [],
       cars: [0, 1, 2, 3].map(i => ({ id: i, cpu: !joined[i], d: 0, x: raceMid(0) + [-30, -10, 10, 30][i], v: 0, spin: 0, boost: 0, place: 0,
@@ -5655,10 +5664,156 @@
     if (g.startT > 0) banner(g.startT > 120 ? '3' : g.startT > 60 ? '2' : '1', 110, 'gold', 2);
     else if (g.goT > 0) banner('GO!', 110, 'gold', 2);
   }
+  // ----- Mars's game: Pug Train (Play on Mars in The Arcade; the user asked 2026-11-01 for a game like Snake) -----
+  // Each pug in the game trots across the red Martian desert, a square at a time, never stopping, and the player
+  // steers it. Every bone it gobbles adds a puppy to the line trotting behind it. Running into the edge, a rock, its
+  // own line or another pug's line puts it out (two heads meeting both go out). It speeds up as the line grows. The
+  // game is over once every pug is out; the longest line (a pug's bones) is kept in the browser as the best.
+  // Arrows or WASD (a controller's stick or D-pad) steer; Esc or P (or Menu) pauses. (Played from The Arcade like
+  // Banana Catch, in its phase 'mini': fromTitle stays on, and Back goes to The Arcade, zoomed in on Mars. A pug
+  // that joins during a game gets a line of its own.)
+  const SN_CELL = 8, SN_COLS = 30, SN_ROWS = 32, SN_TOP = 24, SN_BEST_KEY = 'doodad-doombad-mars-best';
+  const SN_DIRS = { up: [0, -1], right: [1, 0], down: [0, 1], left: [-1, 0] }, SN_OPP = { up: 'down', down: 'up', left: 'right', right: 'left' };
+  const SN_ROCKS = [[6, 9], [7, 9], [22, 7], [23, 7], [14, 15], [15, 15], [14, 16], [5, 24], [24, 23], [25, 23]];   // (rocks to steer round)
+  const SN_START = [{ x: 4, y: 4, dir: 'right' }, { x: 25, y: 27, dir: 'left' }, { x: 25, y: 4, dir: 'down' }, { x: 4, y: 27, dir: 'up' }];
+  {
+    // a pug's head from above (facing up, turned for the other ways), a puppy from above, and a bone
+    const turn = rows => rows[0].split('').map((_, x) => rows.map(r => r[x]).reverse().join(''));
+    let head = ['.K....K.', '.TTTTTT.', 'TWKTTKWT', 'TTTTTTTT', 'TTKKKKTT', '.TTKKTT.', '..TTTT..', '........'];
+    for (const d of ['up', 'right', 'down', 'left']) { SPRITES['sn_head_' + d] = head; head = turn(head); }
+    let pup = ['..K..K..', '.TTTTTT.', '.TTTTTT.', 'TTTJJTTT', 'TTTJJTTT', '.TTTTTT.', '.T.TT.T.', '........'];
+    for (const d of ['up', 'right', 'down', 'left']) { SPRITES['sn_pup_' + d] = pup; pup = turn(pup); }
+    SPRITES.sn_bone = ['........', 'WW....WW', 'WWWWWWWW', '.WWWWWW.', 'WWWWWWWW', 'WW....WW', '........', '........'];
+  }
+  const marsBg = document.createElement('canvas');
+  let snake = null, marsBgReady = false;
+  function startSnake(by) {
+    banana = arena = race = null;
+    let best = 0;
+    try { best = Math.max(0, Math.floor(+localStorage.getItem(SN_BEST_KEY)) || 0); } catch (e) {}
+    snake = { startT: 90, endT: 0, best, pugs: [], bones: [] };
+    for (let i = 0; i < 4; i++) if (arenaDriven(i) || i === (joined[by] ? by : 0)) snakePug(i);
+    for (let i = 0; i < snake.pugs.length + 1; i++) snakeBone();
+    try { initAudio(); } catch (e) {}
+    releaseAll(); fromTitle = true; phase = 'mini'; hideOverlay();
+  }
+  function snakePug(id) {
+    const s = SN_START[id], [dx, dy] = SN_DIRS[s.dir];
+    snake.pugs.push({ id, dir: s.dir, next: s.dir, alive: true, timer: 0, grow: 0, score: 0, fade: 0,
+      cells: [0, 1, 2].map(k => ({ x: s.x - dx * k, y: s.y - dy * k, dir: s.dir })) });
+  }
+  // (a square nobody is on, and no rock or bone)
+  const snakeTaken = (x, y) => SN_ROCKS.some(([rx, ry]) => rx === x && ry === y) || snake.bones.some(b => b.x === x && b.y === y) || snake.pugs.some(p => p.alive && p.cells.some(c => c.x === x && c.y === y));
+  function snakeBone() {
+    for (let k = 0; k < 200; k++) {
+      const x = Math.floor(Math.random() * SN_COLS), y = Math.floor(Math.random() * SN_ROWS);
+      if (!snakeTaken(x, y)) { snake.bones.push({ x, y }); return; }
+    }
+  }
+  function pauseSnake(note) {
+    if (phase !== 'mini' || !snake || snake.endT) return;
+    releaseAll(); phase = 'paused'; showPause('snakePause', 0, note);
+  }
+  function backFromSnake() {
+    showPause('arcade', 0);
+    arcadeZoom = { target: SPACE_PLANETS.find(p => p.game === 'snake'), p: 1, out: false, ship: null };
+    showPause('arcade', 0);
+  }
+  // which way a player is steering: its controller, and the keyboard for the keyboard's pug (never straight back)
+  function snakeSteer(p) {
+    const pad = padHeld[p.id] || {}, kb = kbSlot !== null ? p.id === kbSlot : p.id === 0 && ownerOf(0) === undefined;
+    for (const d of ['up', 'down', 'left', 'right']) if ((pad[d] || (kb && keys[d])) && d !== SN_OPP[p.dir]) { p.next = d; return; }
+  }
+  function snakeOut(p) {
+    p.alive = false; p.fade = 40;
+    noise(0.3, 0.18, 2500, 200); sfx.die();
+  }
+  function stepSnake() {
+    const g = snake;
+    if (g.startT > 0) g.startT--;
+    for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.pugs.some(p => p.id === i)) snakePug(i);
+    for (const p of g.pugs) {
+      if (!p.alive) { if (p.fade > 0) p.fade--; continue; }
+      if (g.startT > 0 || g.endT) continue;
+      snakeSteer(p);
+      // (a square at a time: every 9 frames at first, down to every 4 as the line grows)
+      if (++p.timer < Math.max(4, 9 - Math.floor(p.score / 4))) continue;
+      p.timer = 0; p.dir = p.next;
+      const [dx, dy] = SN_DIRS[p.dir], h = p.cells[0], x = h.x + dx, y = h.y + dy;
+      const tailMoves = p.grow === 0;
+      const hit = x < 0 || y < 0 || x >= SN_COLS || y >= SN_ROWS || SN_ROCKS.some(([rx, ry]) => rx === x && ry === y)
+        || g.pugs.some(o => o.alive && o.cells.some((c, k) => c.x === x && c.y === y && !(o === p && tailMoves && k === o.cells.length - 1)));
+      if (hit) {
+        // (two heads meeting square on: both are out)
+        for (const o of g.pugs) if (o !== p && o.alive && o.cells[0].x === x && o.cells[0].y === y) snakeOut(o);
+        snakeOut(p); continue;
+      }
+      p.cells.unshift({ x, y, dir: p.dir });
+      const bi = g.bones.findIndex(b => b.x === x && b.y === y);
+      if (bi >= 0) { g.bones.splice(bi, 1); p.grow++; p.score++; sfx.coin(); snakeBone(); }
+      if (p.grow > 0) p.grow--; else p.cells.pop();
+    }
+    if (!g.endT && g.pugs.length && g.pugs.every(p => !p.alive)) g.endT = 90;
+    if (g.endT && --g.endT === 0) {
+      const top = Math.max(...g.pugs.map(p => p.score));
+      if (top > g.best) { g.best = top; try { localStorage.setItem(SN_BEST_KEY, String(top)); } catch (e) {} }
+      phase = 'paused'; showPause('snakeOver', 0);
+    }
+  }
+  function snakeWords() {
+    if (!snake) return { title: 'Pug Train', text: '' };
+    const ps = snake.pugs;
+    if (ps.length === 1) return { title: `${ps[0].score} bone${ps[0].score === 1 ? '' : 's'}!`, text: `${LOOK[ps[0].id].name}'s line grew to ${ps[0].cells.length} pugs. Best: ${snake.best} bone${snake.best === 1 ? '' : 's'}.` };
+    const top = Math.max(...ps.map(p => p.score)), win = ps.filter(p => p.score === top);
+    return { title: win.length > 1 ? 'A tie!' : `${LOOK[win[0].id].name} wins!`, text: ps.map(p => `${LOOK[p.id].name} ${p.score}`).join(', ') + `. Best: ${snake.best} bone${snake.best === 1 ? '' : 's'}.` };
+  }
+  // the red Martian desert: rusty sand with lighter dunes and dark pebbles, and its rocks
+  function buildMarsBg() {
+    marsBg.width = PW; marsBg.height = PH;
+    const c = marsBg.getContext('2d');
+    const rect = (col, x, y, w, h) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
+    rect('#a83c16', 0, 0, PW, PH);
+    for (let y = SN_TOP; y < PH; y++) {
+      const w = Math.sin(y / 9) * 30 + Math.sin(y / 23) * 50;
+      rect('#b84a1e', Math.round(60 + w), y, 70, 1); rect('#c25a2a', Math.round(150 - w * 0.6), y, 30, 1);
+    }
+    for (let i = 0; i < 140; i++) rect(i % 3 ? '#7a2a10' : '#d87a48', (i * 97 + 5) % PW, SN_TOP + (i * 59) % (PH - SN_TOP), 1, 1);
+    for (const [x, y] of SN_ROCKS) {
+      const X = x * SN_CELL, Y = SN_TOP + y * SN_CELL;
+      rect('#4a1e0c', X, Y + 1, 8, 7); rect('#6e2c14', X + 1, Y, 6, 6); rect('#8a3e1e', X + 1, Y, 4, 2);
+    }
+    rect('#14141a', 0, 0, PW, SN_TOP);
+  }
+  function drawSnake() {
+    if (!marsBgReady) { buildMarsBg(); marsBgReady = true; }
+    const g = snake;
+    ctx.drawImage(marsBg, 0, 0);
+    for (const b of g.bones) blit('sn_bone', b.x * SN_CELL, SN_TOP + b.y * SN_CELL);
+    for (const p of g.pugs) {
+      if (!p.alive && p.fade <= 0) continue;
+      if (!p.alive && Math.floor(p.fade / 4) % 2) continue;   // (blinking away once out)
+      const sw = LOOK[p.id].swap;
+      for (let k = p.cells.length - 1; k >= 0; k--) {
+        const c = p.cells[k];
+        blit((k === 0 ? 'sn_head_' : 'sn_pup_') + (k === 0 ? p.dir : c.dir), c.x * SN_CELL, SN_TOP + c.y * SN_CELL, false, sw);
+      }
+      // (a ring in its player's colour round the head, so each player can find their pug)
+      const h = p.cells[0];
+      ctx.fillStyle = PAL[LOOK[p.id].mark];
+      ctx.fillRect(h.x * SN_CELL - 1, SN_TOP + h.y * SN_CELL - 1, SN_CELL + 2, 1); ctx.fillRect(h.x * SN_CELL - 1, SN_TOP + h.y * SN_CELL + SN_CELL, SN_CELL + 2, 1);
+    }
+    g.pugs.forEach((p, i) => drawText(`P${p.id + 1} ${p.score}`, 4 + i * 59, 4, LOOK[p.id].tag));
+    drawText('BEST ' + Math.max(g.best, ...g.pugs.map(p => p.score)), 4, 14);
+    if (g.startT > 0) banner('GET THE BONES!', 120, 'gold');
+    if (g.endT) banner(g.pugs.length > 1 ? 'GAME OVER' : 'OUCH!', 120, 'pink', 2);
+  }
   function draw() {
     // gliding between the main menu and The Arcade, both scenes
     if (skyScroll) { drawSkyScroll(); updateHud(); return; }
-    // the Moon Race (and its pause and score screens) has its own scene, and so does the Colosseum
+    // Pug Train (and its pause and score screens) has its own scene, and so do the Moon Race and the Colosseum
+    if (snake && (phase === 'mini' || (fromTitle && (pauseView === 'snakePause' || pauseView === 'snakeOver')))) {
+      drawSnake(); updateHud(); return;
+    }
     if (race && (phase === 'mini' || (fromTitle && (pauseView === 'racePause' || pauseView === 'raceOver')))) {
       drawRace(); updateHud(); return;
     }
