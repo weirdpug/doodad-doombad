@@ -1270,7 +1270,7 @@
     showControllerHelp(); updateHud(true);
     // (in the Store opened from the main menu no game is running: it just shows the pugs still here)
     // (in the Colosseum its pug fights on for the computer, and the fight pauses to say so)
-    if (arena && fromTitle && phase === 'mini') { pauseArena(`Player 's controller disconnected. Press A on a controller to bring them back.`); return; }
+    if ((arena || race) && fromTitle && phase === 'mini') { pauseMini(`Player ${id + 1}'s controller disconnected. Press A on a controller to bring them back.`); return; }
     if (fromTitle) { if (phase === 'paused') showPause(pauseView, menuSel); return; }
     if (phase === 'play' || phase === 'paused' || phase === 'win') {
       // if everyone left was sitting out, the team is out: that costs a heart and the level restarts
@@ -1611,7 +1611,7 @@
       const km = keyMap[e.code];
       const swing = arena && (e.code === 'KeyX' || e.key === 'Enter');
       // (in the Colosseum a keyboard that hasn't joined yet joins as the next player, as in the main game)
-      if (arena && (km || swing) && !e.repeat) claimKeyboard(true);
+      if ((arena || race) && (km || swing) && !e.repeat) claimKeyboard(true);
       if (km) { e.preventDefault(); keys[km] = true; }
       if (swing && !e.repeat) { e.preventDefault(); arena.kbAtk = true; }
       if ((e.key === 'Escape' || e.key === 'p' || e.key === 'P') && !e.repeat) pauseMini();
@@ -1685,7 +1685,7 @@
   addEventListener('blur', releaseAll);
 
   // the touch buttons count as the keyboard: the same pug, and they join the same way its keys do
-  document.getElementById('barkBtn').addEventListener('pointerdown', e => { e.preventDefault(); initAudio(); if (phase === 'mini' && arena) { if (claimKeyboard(true)) arena.kbAtk = true; return; } if (claimKeyboard(true) === true) doBark(pById(kbSlot)); });
+  document.getElementById('barkBtn').addEventListener('pointerdown', e => { e.preventDefault(); initAudio(); if (phase === 'mini' && (arena || race)) { if (arena && claimKeyboard(true)) arena.kbAtk = true; return; } if (claimKeyboard(true) === true) doBark(pById(kbSlot)); });
   document.querySelectorAll('.pad button[data-k]').forEach(btn => {
     const k = btn.dataset.k;
     const on = e => {
@@ -1730,6 +1730,7 @@
       // Player 1's pug stays: the keyboard (if it isn't already another player's) or any controller can take
       // it over. During the level-clear banner, the pause waits for the next level to start.
       else if ((phase === 'play' || phase === 'paused') && !fromTitle) p1Lost();
+      else if (phase === 'mini' && race && !race.endT) pauseRace("Player 1's controller disconnected. Press a key, or A on a controller, to take Player 1 back.");
       else if (phase === 'mini' && arena && !arena.result) pauseArena("Player 1's controller disconnected. Press a key, or A on a controller, to take Player 1 back.");
       else if (phase === 'win') p1LostAtWin = true;
     }
@@ -2130,6 +2131,9 @@
     // the Colosseum's, the same way (Back goes to The Arcade, zoomed in on the mother ship)
     arenaPause: () => [{ label: 'Resume', act: () => resumeGame() }, { label: 'Back', act: () => backFromArena() }],
     arenaOver: () => [{ label: 'Fight again', act: by => startArena(by) }, { label: 'Back', act: () => backFromArena() }],
+    // the Moon Race's, the same way (Back goes to The Arcade, zoomed in on the Moon)
+    racePause: () => [{ label: 'Resume', act: () => resumeGame() }, { label: 'Back', act: () => backFromRace() }],
+    raceOver: () => [{ label: 'Race again', act: by => startRace(by) }, { label: 'Back', act: () => backFromRace() }],
     arcade: () => [
       ...(arcadeZoom.target && !arcadeZoom.out && !onShip() ? [{ label: 'Play', act: by => playFromArcade(by) }] : []),
       // (zoomed in on the spaceship, Back zooms out to Saturn first)
@@ -2156,8 +2160,8 @@
     // (the Store and Necklaces show the bag or look of the pug that opened them)
     if ((store || neck) && by !== undefined && joined[by]) storeBy = by;
     if (!joined[storeBy]) storeBy = kbBy();
-    const bpause = view === 'bananaPause' || view === 'arenaPause', bover = view === 'bananaOver' || view === 'arenaOver';
-    ovTitle.textContent = bpause ? 'Paused' : view === 'arenaOver' ? arenaWords().title : bover ? 'Splat!' : arcade ? (onShip() ? 'Alien Spaceship' : arcadeZoom.target && !arcadeZoom.out ? arcadeZoom.target.name : 'The Arcade') : store ? 'Store' : part ? part.name : custom ? 'Customize' : 'Paused';
+    const bpause = view === 'bananaPause' || view === 'arenaPause' || view === 'racePause', bover = view === 'bananaOver' || view === 'arenaOver' || view === 'raceOver';
+    ovTitle.textContent = bpause ? 'Paused' : view === 'arenaOver' ? arenaWords().title : view === 'raceOver' ? raceWords().title : bover ? 'Splat!' : arcade ? (onShip() ? 'Alien Spaceship' : arcadeZoom.target && !arcadeZoom.out ? arcadeZoom.target.name : 'The Arcade') : store ? 'Store' : part ? part.name : custom ? 'Customize' : 'Paused';
     // (Necklaces keeps a line for what was just put on, and with 2-4 pugs, whose look it is)
     ovText.hidden = arcade || (custom && !neck);
     ovText.textContent = note || (store
@@ -2165,6 +2169,8 @@
       : neck ? [multi() ? `${LOOK[storeBy].name}'s ${part.name.toLowerCase()}` : '',
         LOOK_SECTIONS[view].max ? (isFinite(LOOK_SECTIONS[view].max) ? `Bring up to ${LOOK_SECTIONS[view].max} at a time!` : 'Bring as many as you like!') : ''].filter(Boolean).join('. ')
       : view === 'arenaPause' ? 'The Colosseum. Swing your sword: the last pug standing wins!'
+      : view === 'racePause' ? 'The Moon Race. Steer round the craters and be first to the flag!'
+      : view === 'raceOver' ? raceWords().text
       : view === 'arenaOver' ? arenaWords().text
       : bpause ? 'Banana Catch. Catch every banana in your bowl!'
       : bover && banana ? `A banana hit the floor! You caught ${banana.score} banana${banana.score === 1 ? '' : 's'}. Best: ${banana.best}.`
@@ -2387,6 +2393,8 @@
     // (the key or button that picked Resume counts as already held, so it doesn't also jump or swing)
     if (fromTitle && pauseView === 'arenaPause') { releaseAll(); arenaHeld(); phase = 'mini'; hideOverlay(); return; }
     if (fromTitle && pauseView === 'arenaOver') return backFromArena();
+    if (fromTitle && pauseView === 'racePause') { releaseAll(); phase = 'mini'; hideOverlay(); return; }
+    if (fromTitle && pauseView === 'raceOver') return backFromRace();
     if (fromTitle) return backToTitle();   // (the Store or Customize opened from the main menu goes back there)
     releaseAll(); phase = 'play'; hideOverlay();
   }
@@ -3284,7 +3292,7 @@
       }
     } else if (phase === 'title') {
       updateApe(); updateBarrels(); barrels = barrels.filter(b => !b.dead);
-    } else if (phase === 'mini') { if (arena) stepArena(); else stepBanana(); }
+    } else if (phase === 'mini') { if (arena) stepArena(); else if (race) stepRace(); else stepBanana(); }
     else if (phase === 'boom' && --shipBoomT <= 0) endShipBoom();   // (the spaceship's explosion picture, 5 seconds)
     // pets fly along with their pugs while a level plays and during the level-clear banner
     if (phase === 'play' || phase === 'win') for (const p of players) movePets(p);
@@ -4273,7 +4281,7 @@
         { off: [-50, -2], spr: 'ufo9' }, { off: [34, -32], spr: 'ufo10' }] },
     { name: 'Mars', x: 192, y: 66, r: 10, cols: ['#ff8a6a', '#e8282f', '#a8141f'], dot: [206, 54] },
     { name: 'Earth', x: 182, y: 196, r: 18, cols: ['#9fb4ff', '#2f5bff', '#1d2f8c'], game: 'banana', dot: [157, 208] },
-    { name: 'The Moon', x: 214, y: 172, r: 6, cols: ['#eef0f6', '#b4b8c8', '#7f8396'], dot: [204, 163] },
+    { name: 'The Moon', x: 214, y: 172, r: 6, cols: ['#eef0f6', '#b4b8c8', '#7f8396'], game: 'race', dot: [204, 163] },
     { name: 'Pluto', x: 32, y: 222, r: 7, cols: ['#d8a6e8', '#9c5ab8', '#5a2c7a'], stripe: '#7a3c9a', dot: [43, 214] },
     // the alien mother ship: not a planet, but it works like one once it has come (mother: see drawMother)
     // (drawn 2.5 times its sprite's size, 120 pixels across, so it really is giant: r is half that, and a click
@@ -4407,7 +4415,7 @@
   let motherCalled = false;
   function codeCome() {
     if (mother.state !== 'gone') return;
-    const titleScreen = phase === 'paused' && fromTitle && pauseView !== 'arcade' && !pauseView.startsWith('banana');
+    const titleScreen = phase === 'paused' && fromTitle && pauseView !== 'arcade' && !/^(banana|arena|race)/.test(pauseView);
     if (phase === 'title' || titleScreen) { motherCalled = true; scrollSky(1, kbBy()); return; }   // (the Store, Customize too)
     if (phase === 'mini' || (phase === 'paused' && fromTitle && pauseView.startsWith('banana'))) backToArcade();   // (Banana Catch: out to space)
     if (phase === 'mini' || (phase === 'paused' && fromTitle && pauseView === 'arcade')) startMotherEntrance();
@@ -4732,12 +4740,13 @@
     return Math.hypot(x - sx, y - sy) <= 8;
   }
   // A planet's Play button: a planet with its own game plays it (Earth: Banana Catch; the mother ship: the
-  // Colosseum); the others start a new game, the same as Start on the main menu (each is meant to get its own game
-  // later)
+  // Colosseum; the Moon: the Moon Race); the others start a new game, the same as Start on the main menu (each is
+  // meant to get its own game later)
   function playFromArcade(by) {
     if (!(fromTitle && pauseView === 'arcade')) return;
     if (arcadeZoom.target && arcadeZoom.target.game === 'banana') { startBanana(by); return; }
     if (arcadeZoom.target && arcadeZoom.target.game === 'arena') { startArena(by); return; }   // (the mother ship: the Colosseum)
+    if (arcadeZoom.target && arcadeZoom.target.game === 'race') { startRace(by); return; }   // (the Moon: the Moon Race)
     fromTitle = false; phase = 'title';
     startClicked();
   }
@@ -4974,7 +4983,7 @@
     try { best = Math.max(0, Math.floor(+localStorage.getItem(BANANA_BEST_KEY)) || 0); } catch (e) {}
     banana = { id: joined[by] ? by : 0, x: PW / 2, face: 1, anim: 0, moving: false, score: 0, best, items: [], plus: [],
       bruno: { x: PW / 2, dir: 1, throwT: 50, holdT: 0 }, lastTarget: PW / 2, lost: 0, splat: null, startT: 100, time: 0, fasterT: 0 };
-    arena = null;
+    arena = race = null;
     try { initAudio(); } catch (e) {}
     releaseAll(); fromTitle = true; phase = 'mini'; hideOverlay();
   }
@@ -5115,7 +5124,7 @@
   const arenaBg = document.createElement('canvas');
   let arena = null, arenaBgReady = false;
   function startArena(by) {
-    banana = null;
+    banana = race = null;
     arena = { startT: 110, fightT: 0, result: null, endT: 0, kbAtk: false, prev: [{}, {}, {}, {}], sparks: [],
       pugs: [0, 1, 2, 3].map(i => ({ id: i, cpu: !joined[i], x: ARENA_X[i], y: ARENA_GROUND, vx: 0, vy: 0, kx: 0, ground: true,
         face: i < 2 ? 1 : -1, hp: ARENA_HP, hurtT: 0, swingT: 0, hitIds: [], cool: 0, anim: 0, moving: false, dropT: 0, ko: false, out: false, spin: 0, climbT: 0, climbX: 0 })) };
@@ -5131,7 +5140,7 @@
   // whether a player drives pug id: its controller, or the keyboard (the keyboard drives Player 1's pug until it
   // joins as someone else, unless a controller has Player 1); a pug nobody drives fights for the computer
   const arenaDriven = id => joined[id] && (ownerOf(id) !== undefined || kbSlot === id || (id === 0 && kbSlot === null));
-  const pauseMini = () => arena ? pauseArena() : pauseBanana();
+  const pauseMini = note => arena ? pauseArena(note) : race ? pauseRace(note) : pauseBanana();
   // back to The Arcade, zoomed in on the mother ship
   function backFromArena() {
     showPause('arcade', 0);
@@ -5349,10 +5358,189 @@
     else if (g.fightT > 0) banner('FIGHT!', 104, 'red', 2);
     if (g.result) { const w = arenaWords().banner; banner(w, 104, 'gold', w.length <= 18 ? 2 : 1); }
   }
+  // ----- The Moon's game: the Moon Race (Play on the Moon in The Arcade; the user asked 2026-11-01) -----
+  // Four pugs in moon buggies race down a winding track across the Moon, seen from above. Every pug in the game is
+  // driven by its own player; the rest are the computer's. Left/Right steer, Up/Space (a controller's A or Up) is
+  // the gas, Down brakes. Craters on the track spin a buggy out, the dust beside it slows it, and yellow arrows give
+  // a burst of speed. First past the chequered flag wins. Esc or P (or Menu) pauses.
+  // (Played from The Arcade like Banana Catch, in its phase 'mini': fromTitle stays on, and Back goes to The Arcade,
+  // zoomed in on the Moon. d: how far down the track, x: across the screen; the camera follows the pug that pressed
+  // Play, which sits at CAM_Y on the screen.)
+  const RACE_LEN = 6000, ROAD_HALF = 50, CAM_Y = 205, RACE_COUNT = 200;
+  const raceMid = d => 120 + 42 * Math.sin(d / 310) + 18 * Math.sin(d / 127 + 1.3);   // (the middle of the track)
+  const raceHash = n => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
+  // the craters and boost arrows along the track (the same every race)
+  const RACE_CRATERS = [], RACE_PADS = [];
+  for (let d = 320, k = 0; d < RACE_LEN - 200; d += 70, k++) {
+    const r = raceHash(k);
+    if (r < 0.5) RACE_CRATERS.push({ d, x: raceMid(d) + (raceHash(k + 0.3) * 2 - 1) * (ROAD_HALF - 12), r: 5 + Math.floor(raceHash(k + 0.6) * 4) });
+    else if (r < 0.62) RACE_PADS.push({ d, x: raceMid(d) + (raceHash(k + 0.9) * 2 - 1) * 28 });
+  }
+  // a moon buggy from above, in each pug's colour, with its pug's head in the middle (and its pug's coat colours)
+  {
+    const BUGGY = ['KK.BBBB.KK', 'KK.BBBB.KK', '..BBBBBB..', '..BWBBWB..', '..BTTTTB..', '..KTTTTK..', '..BTTTTB..', '..BBBBBB..', 'KK.BBBB.KK', 'KK.BBBB.KK', '...RRRR...'];
+    for (let i = 0; i < 4; i++) SPRITES['buggy_' + i] = BUGGY.map(r => r.replace(/B/g, LOOK[i].mark));
+  }
+  let race = null;
+  function startRace(by) {
+    banana = arena = null;
+    const id = joined[by] ? by : 0;
+    race = { by: id, startT: RACE_COUNT, goT: 0, endT: 0, placed: 0, camD: 0, dust: [],
+      cars: [0, 1, 2, 3].map(i => ({ id: i, cpu: !joined[i], d: 0, x: raceMid(0) + [-30, -10, 10, 30][i], v: 0, spin: 0, boost: 0, place: 0,
+        lane: [-20, -7, 7, 20][i], skill: 0.84 + raceHash(i + 5) * 0.07 })) };
+    try { initAudio(); } catch (e) {}
+    releaseAll(); fromTitle = true; phase = 'mini'; hideOverlay();
+  }
+  function pauseRace(note) {
+    if (phase !== 'mini' || !race || race.endT) return;
+    releaseAll(); phase = 'paused'; showPause('racePause', 0, note);
+  }
+  function backFromRace() {
+    showPause('arcade', 0);
+    arcadeZoom = { target: SPACE_PLANETS.find(p => p.game === 'race'), p: 1, out: false, ship: null };
+    showPause('arcade', 0);
+  }
+  // what a player is holding: its controller, and the keyboard for the keyboard's pug
+  function raceInput(c) {
+    const pad = padHeld[c.id] || {}, kb = kbSlot !== null ? c.id === kbSlot : c.id === 0 && ownerOf(0) === undefined;
+    const held = k => !!pad[k] || (kb && keys[k]);
+    return { left: held('left'), right: held('right'), gas: !!pad.jump || held('up') || (kb && keys.jump), brake: held('down') };
+  }
+  // the computer's drivers: keep to their own lane of the track, swerve round a crater coming up (most of the time),
+  // and floor it, a little slower than flat out (skill); far behind they speed up and far ahead they ease off
+  function raceThink(c) {
+    const g = race, lead = g.cars[g.by];
+    let tx = raceMid(c.d + 40) + c.lane;
+    for (const cr of RACE_CRATERS) {
+      const ahead = cr.d - c.d;
+      if (ahead > 0 && ahead < 70 && Math.abs(cr.x - c.x) < cr.r + 8 && raceHash(cr.d + c.id) > 0.12) { tx = cr.x + (c.x < cr.x ? -1 : 1) * (cr.r + 12); break; }
+    }
+    const gap = c.d - lead.d;
+    return { left: tx < c.x - 2, right: tx > c.x + 2, gas: true, brake: false, pace: c.skill + (gap < -250 ? 0.15 : gap > 350 ? -0.12 : 0) };
+  }
+  const ordinal = n => n + (n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th');
+  function stepRace() {
+    const g = race;
+    if (g.startT > 0) {
+      if (g.startT % 60 === 20 && g.startT < RACE_COUNT) tone(440, 0.15, 'square', 0.05);   // (3, 2, 1...)
+      if (--g.startT === 0) { g.goT = 45; tone(880, 0.35, 'square', 0.06); }
+    }
+    if (g.goT > 0) g.goT--;
+    const cam = g.cars[g.by];
+    for (const c of g.cars) {
+      c.cpu = !arenaDriven(c.id);
+      if (c.place) { c.v *= 0.97; c.d += c.v; continue; }   // (past the flag: rolling to a stop)
+      if (g.startT > 0) continue;
+      const inp = c.cpu ? raceThink(c) : raceInput(c);
+      const off = Math.abs(c.x - raceMid(c.d)) > ROAD_HALF;
+      let target = inp.brake ? 0.8 : inp.gas ? 3 * (inp.pace || 1) : 2.2;
+      if (off) target = Math.min(target, 1.3);
+      if (c.boost > 0) { c.boost--; target = 4.2; }
+      if (c.spin > 0) { c.spin--; target = 0.5; }
+      c.v += (target - c.v) * (target < c.v ? 0.12 : 0.05);
+      const steer = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
+      if (c.spin === 0) c.x = clamp(c.x + steer * (1.5 + c.v * 0.15), 6, PW - 6);
+      c.d += c.v;
+      // (bumping into a crater spins the buggy out; running over an arrow is a burst of speed)
+      for (const cr of RACE_CRATERS) if (Math.abs(cr.d - c.d) < cr.r + 4 && Math.abs(cr.x - c.x) < cr.r + 3 && c.spin === 0) {
+        c.spin = 45; c.v *= 0.4;
+        if (Math.abs(c.d - cam.d) < 200) noise(0.2, 0.15, 1800, 200);
+      }
+      for (const p of RACE_PADS) if (Math.abs(p.d - c.d) < 6 && Math.abs(p.x - c.x) < 9 && c.boost < 30) {
+        c.boost = 50;
+        if (c === cam) tone(500, 0.3, 'sawtooth', 0.04, 900);
+      }
+      if (off && c.v > 0.6 && Math.random() < 0.4) g.dust.push({ d: c.d - 6, x: c.x + (Math.random() * 6 - 3), t: 18 });
+      if (c.d >= RACE_LEN) { c.place = ++g.placed; if (!c.cpu) sfx.hammer(); }
+    }
+    // (the camera follows the pug that pressed Play; another player's buggy left far behind is pulled up to the
+    // bottom of the screen so it stays in the race)
+    g.camD += (cam.d - g.camD) * 0.2;
+    for (const c of g.cars) if (!c.cpu && c !== cam && !c.place && c.d < g.camD - 190) c.d = g.camD - 190;
+    if (g.startT === 0 && !cam.place && frame % 10 === 0) tone(60 + cam.v * 28, 0.09, 'square', 0.02);   // (the engine)
+    for (const p of g.dust) p.t--;
+    g.dust = g.dust.filter(p => p.t > 0);
+    // once every player's buggy is past the flag, the results
+    if (!g.endT && g.cars.filter(c => !c.cpu).every(c => c.place)) g.endT = 110;
+    if (g.endT && --g.endT === 0) {
+      // (anyone still racing is placed by how far along they got)
+      for (const c of [...g.cars].filter(c => !c.place).sort((a, b) => b.d - a.d)) c.place = ++g.placed;
+      phase = 'paused'; showPause('raceOver', 0);
+    }
+  }
+  function raceWords() {
+    if (!race) return { title: 'Moon Race', text: '' };
+    const win = race.cars.find(c => c.place === 1), me = race.cars[race.by], name = LOOK[me.id].name;
+    const humans = race.cars.filter(c => !c.cpu);
+    const title = humans.length > 1 ? `${LOOK[win.id].name} wins!` : `${name} came ${ordinal(me.place || 4)}!`;
+    const text = race.cars.slice().sort((a, b) => a.place - b.place).map(c => `${ordinal(c.place)} ${LOOK[c.id].name}${c.cpu ? ' (computer)' : ''}`).join(', ');
+    return { title, text };
+  }
+  // the screen: moon dust with craters in it, the paler track winding through, the race's craters and arrows, the
+  // flags, the buggies, and along the top the place of the pug the camera follows; down the right side, a bar with
+  // everyone's buggy on it by how far along they are
+  const raceY = d => Math.round(CAM_Y - (d - race.camD));
+  function drawRaceCrater(x, y, r, inner, rim) {
+    const ry = Math.max(2, Math.round(r * 0.7));
+    for (let j = -ry; j <= ry; j++) {
+      const w = Math.round(r * Math.sqrt(1 - (j / ry) ** 2));
+      ctx.fillStyle = j >= ry - 1 ? rim : inner; ctx.fillRect(Math.round(x - w), y + j, w * 2, 1);
+    }
+  }
+  function drawRace() {
+    const g = race;
+    for (let sy = 0; sy < PH; sy++) {
+      const d = g.camD + (CAM_Y - sy), di = Math.floor(d), mid = raceMid(d);
+      ctx.fillStyle = '#6a6e7c'; ctx.fillRect(0, sy, PW, 1);
+      if (raceHash(di) < 0.35) { ctx.fillStyle = '#5a5e6c'; ctx.fillRect(Math.floor(raceHash(di + 0.5) * PW), sy, 2, 1); }
+      ctx.fillStyle = '#a8acb8'; ctx.fillRect(Math.round(mid - ROAD_HALF), sy, ROAD_HALF * 2, 1);
+      ctx.fillStyle = '#d8dce6'; ctx.fillRect(Math.round(mid - ROAD_HALF), sy, 2, 1); ctx.fillRect(Math.round(mid + ROAD_HALF) - 2, sy, 2, 1);
+      if (((di % 24) + 24) % 24 < 12) { ctx.fillStyle = '#8a8e9a'; ctx.fillRect(Math.round(mid), sy, 1, 1); }
+      // (the start and finish lines, chequered)
+      for (const f of [0, RACE_LEN]) if (d >= f - 4 && d < f + 4) for (let x = Math.round(mid - ROAD_HALF); x < mid + ROAD_HALF; x += 4) {
+        ctx.fillStyle = ((x >> 2) + (Math.floor((d - f + 4) / 4))) % 2 ? '#ffffff' : '#14141a'; ctx.fillRect(x, sy, 4, 1);
+      }
+    }
+    // (craters in the dust beside the track, for scenery)
+    for (let b = Math.floor((g.camD - 90) / 40); b <= Math.floor((g.camD + CAM_Y + 20) / 40); b++) {
+      if (raceHash(b + 0.77) > 0.55) continue;
+      const d = b * 40, side = raceHash(b + 0.11) < 0.5 ? -1 : 1, x = raceMid(d) + side * (ROAD_HALF + 12 + raceHash(b + 0.21) * 30);
+      drawRaceCrater(x, raceY(d), 6, '#55586a', '#8a8e9a');
+    }
+    for (const cr of RACE_CRATERS) { const y = raceY(cr.d); if (y > -12 && y < PH + 12) drawRaceCrater(cr.x, y, cr.r, '#55586a', '#c8ccd6'); }
+    for (const p of RACE_PADS) {
+      const y = raceY(p.d);
+      if (y < -10 || y > PH + 10) continue;
+      ctx.fillStyle = frame % 16 < 8 ? '#ffcc3d' : '#ff8a1f';
+      for (let k = 0; k < 2; k++) for (let j = 0; j < 4; j++) { ctx.fillRect(Math.round(p.x) - 4 + j, y - 4 + k * 4 + j, 1, 1); ctx.fillRect(Math.round(p.x) + 4 - j, y - 4 + k * 4 + j, 1, 1); }
+    }
+    for (const p of g.dust) { ctx.globalAlpha = p.t / 18; ctx.fillStyle = '#c8ccd6'; ctx.fillRect(Math.round(p.x), raceY(p.d), 2, 2); }
+    ctx.globalAlpha = 1;
+    // (the buggies, the furthest along drawn first; one spinning out turns round and round)
+    for (const c of [...g.cars].sort((a, b) => b.d - a.d)) {
+      const y = raceY(c.d), s = sprite('buggy_' + c.id, false, LOOK[c.id].swap);
+      if (!s || y < -20 || y > PH + 20) continue;
+      ctx.save(); ctx.translate(Math.round(c.x), y);
+      if (c.spin) ctx.rotate(c.spin * 0.45);
+      ctx.drawImage(s, -5, -6); ctx.restore();
+      if (!c.cpu) drawText('P' + (c.id + 1), Math.round(c.x), y - 16, LOOK[c.id].tag, 'center');
+    }
+    // (the place bar down the right side, and the place of the pug followed, top left)
+    ctx.fillStyle = '#14141a'; ctx.fillRect(PW - 8, 20, 4, PH - 40);
+    for (const c of g.cars) { ctx.fillStyle = PAL[LOOK[c.id].mark]; ctx.fillRect(PW - 10, Math.round(PH - 20 - (PH - 40) * clamp(c.d / RACE_LEN, 0, 1)) - 1, 8, 3); }
+    const me = g.cars[g.by], pos = me.place || 1 + g.cars.filter(c => c !== me && (c.place || c.d > me.d)).length;
+    drawText(ordinal(pos).toUpperCase() + ' OF 4', 6, 6, 'gold');
+    if (g.startT > 0) banner(g.startT > 140 ? '3' : g.startT > 80 ? '2' : g.startT > 20 ? '1' : 'GO!', 110, 'gold', 2);
+    else if (g.goT > 0) banner('GO!', 110, 'gold', 2);
+    if (me.place) banner(ordinal(me.place).toUpperCase() + ' PLACE!', 100, me.place === 1 ? 'gold' : 'pink', 2);
+  }
   function draw() {
     // gliding between the main menu and The Arcade, both scenes
     if (skyScroll) { drawSkyScroll(); updateHud(); return; }
-    // the Colosseum (and its pause and score screens) has its own scene
+    // the Moon Race (and its pause and score screens) has its own scene, and so does the Colosseum
+    if (race && (phase === 'mini' || (fromTitle && (pauseView === 'racePause' || pauseView === 'raceOver')))) {
+      drawRace(); updateHud(); return;
+    }
     if (arena && (phase === 'mini' || (fromTitle && (pauseView === 'arenaPause' || pauseView === 'arenaOver')))) {
       drawArena(); updateHud(); return;
     }
