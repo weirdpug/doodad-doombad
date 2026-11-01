@@ -1372,6 +1372,8 @@
     splash: () => { noise(0.3, 0.14, 3500, 300); tone(520, 0.1, 'sine', 0.04, -300); },   // ...and diving back in
     patter: () => tone(900, 0.025, 'triangle', 0.02),   // a pug's little steps up the path (the main menu)
     stomp: () => tone(80, 0.06, 'square', 0.05, -25),   // Bruno's footsteps running out of the castle (the main menu)
+    night: () => [660, 520, 440, 330].forEach((f, i) => tone(f, 0.3, 'sine', 0.045, 0, i * 0.12)),   // the main menu turning to night
+    day: () => [330, 440, 520, 660, 880].forEach((f, i) => tone(f, 0.18, 'triangle', 0.04, 0, i * 0.08)),   // ...and back to day
     poof: () => { noise(0.35, 0.16, 2500, 300); tone(300, 0.12, 'sine', 0.05, 200); },   // a cloud poofing away (the main menu)
     pop: () => { tone(320, 0.12, 'square', 0.05, -260); tone(140, 0.18, 'sawtooth', 0.05, -90, 0.02); },   // ...and one blown up
     recall: () => [0, 0.08, 0.16, 0.24].forEach((d, i) => tone(900 - i * 150, 0.1, 'sine', 0.04, -200, d)),   // ...and they are called back in
@@ -1889,7 +1891,9 @@
     if (phase === 'title' && !e.target.closest('button')) {
       if (e.type === 'pointerdown') titleSwallow = false;
       else if (titleSwallow || performance.now() - titleTapT < 600) { if (e.type === 'click') titleSwallow = false; return; }
-      if (!inNightSky(e)) {
+      const p0 = titlePoint(e);
+      if (p0 && toggleSky(p0)) { titleSwallow = true; titleTapT = performance.now(); return; }   // (the sun, or the moon)
+      if (!inNightSky(e) || titleNight) {   // (at night the night sky is just sky: no Arcade)
         const p = titlePoint(e), i = cloudAt(e);
         if (i >= 0) poofCloud(i);   // (a cloud just poofs: no firework, the user asked)
         else if (p && !brunoOut && onCastle(p)) brunoRunsOut();   // (the castle: out runs Bruno)
@@ -1905,7 +1909,7 @@
         return;
       }
     }
-    if (phase === 'title' && !e.target.closest('button') && inNightSky(e)) { scrollSky(1, kbBy()); return; }
+    if (phase === 'title' && !titleNight && !e.target.closest('button') && inNightSky(e)) { scrollSky(1, kbBy()); return; }
     if (phase !== 'paused' && !e.target.closest('.titlebtns .alt')) startClicked();
   };
   ov.addEventListener('pointerdown', ovPressed);
@@ -3724,13 +3728,65 @@
     if (Math.abs(x - 120) < 8 + (y - CASTLE_Y) * 0.34) continue;
     TITLE_TUFTS.push(i % 5 === 0 ? { x, y, flower: ['#ff7ab8', '#ffcc3d', '#ffffff'][i % 3] } : { x, y });
   }
+  // The main menu by day (a sunset) or by night (the user asked 2026-11-01): a click on the sun turns it to night,
+  // with the moon where the sun was; a click on the moon turns it back to day; and at night the sky doesn't lead to
+  // The Arcade. The night picture (titleNightBg) is the day one with a night sky, the moon and more stars, and
+  // everything else darkened and blued (tint); the day picture stays the one clicks are tested against.
+  const TITLE_SKY = ['#0b0c1c', '#11132a', '#181a3a', '#22265a', '#2f2f72', '#47387f', '#653f8a', '#8d4588', '#b8507a', '#d9606a', '#f07c5a', '#ffa35a'];
+  const TITLE_SKY_NIGHT = ['#05060f', '#070914', '#090c1c', '#0b1024', '#0d142c', '#101834', '#121c3c', '#152044', '#18244c', '#1b2854', '#1e2c5c', '#223066'];
+  const SUN = [176, 118, 22], MOON_R = 14;
+  const titleNightBg = document.createElement('canvas');
+  let titleNight = false, titleNightReady = false, nightStars = [];
+  const hex2 = v => v.toString(16).padStart(2, '0');
+  const nightRGB = (r, g, b) => [Math.round(r * 0.42), Math.round(g * 0.48), Math.min(255, Math.round(b * 0.78 + 12))];
+  const tintCache = new Map();
+  function tint(col) {
+    if (!tintCache.has(col)) { const n = parseInt(col.slice(1), 16), [r, g, b] = nightRGB(n >> 16, (n >> 8) & 255, n & 255); tintCache.set(col, '#' + hex2(r) + hex2(g) + hex2(b)); }
+    return tintCache.get(col);
+  }
+  const nc = col => titleNight ? tint(col) : col;   // (a colour as it looks right now)
+  // the moon: pale, with a few craters and its right side a touch darker
+  function moonColor(dx, dy) {
+    for (const [cx, cy, r] of [[-4, -3, 2.5], [4, 3, 3], [-1, 6, 1.8], [5, -6, 1.5]]) if (Math.hypot(dx - cx, dy - cy) <= r) return [196, 200, 214];
+    return dx + dy * 0.3 > MOON_R * 0.55 ? [200, 204, 216] : [232, 234, 242];
+  }
+  function buildTitleNight() {
+    titleNightBg.width = PW; titleNightBg.height = PH;
+    const c = titleNightBg.getContext('2d');
+    c.drawImage(titleBg, 0, 0);
+    const img = c.getImageData(0, 0, PW, PH), d = img.data;
+    const sky = new Map(TITLE_SKY.map((col, i) => [col.slice(1), TITLE_SKY_NIGHT[i]])), rgb = h => [1, 3, 5].map(k => parseInt(h.slice(k, k + 2), 16));
+    const band = y => TITLE_SKY_NIGHT[Math.min(11, Math.floor(y * 12 / 170))];
+    nightStars = [];
+    for (let y = 0; y < PH; y++) for (let x = 0; x < PW; x++) {
+      const i = (y * PW + x) * 4, h = hex2(d[i]) + hex2(d[i + 1]) + hex2(d[i + 2]);
+      let out;
+      if (sky.has(h) || h === 'ffe08a' || h === 'ffc35a') {
+        // (the sky, and the sun: night sky, the moon, a soft glow round it, and stars here and there)
+        const dm = Math.hypot(x - SUN[0], y - SUN[1]), base = rgb(band(y));
+        if (dm <= MOON_R) out = moonColor(x - SUN[0], y - SUN[1]);
+        else if (dm <= MOON_R + 5) { const k = (1 - (dm - MOON_R) / 5) * 0.45; out = base.map((v, j) => Math.round(v + ([74, 90, 160][j] - v) * k)); }
+        else { out = base; if ((x * 73 + y * 151) % 197 === 0 && y > 60) nightStars.push([x, y]); }
+      } else out = nightRGB(d[i], d[i + 1], d[i + 2]);
+      d[i] = out[0]; d[i + 1] = out[1]; d[i + 2] = out[2];
+    }
+    c.putImageData(img, 0, 0);
+  }
+  // a click on the sun (by day) or the moon (by night) turns day to night or back
+  function toggleSky([x, y]) {
+    if (Math.hypot(x - SUN[0], y - SUN[1]) > (titleNight ? MOON_R + 2 : SUN[2]) || y >= floorY(x) || onCastle([x, y])) return false;
+    titleNight = !titleNight;
+    try { initAudio(); } catch (e) {}
+    if (titleNight) sfx.night(); else sfx.day();
+    return true;
+  }
   function buildTitleBg() {
     titleBg.width = PW; titleBg.height = PH;
     const c = titleBg.getContext('2d');
     const rect = (col, x, y, w, h) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
     const H0 = 170;   // the horizon
     // the sky, in bands from night at the top to a warm glow at the horizon
-    const sky = ['#0b0c1c', '#11132a', '#181a3a', '#22265a', '#2f2f72', '#47387f', '#653f8a', '#8d4588', '#b8507a', '#d9606a', '#f07c5a', '#ffa35a'];
+    const sky = TITLE_SKY;
     sky.forEach((col, i) => rect(col, 0, Math.floor(i * H0 / sky.length), PW, Math.ceil(H0 / sky.length) + 1));
     // a big low sun behind the castle, banded like an old arcade sunset
     for (let y = -22; y <= 22; y++) for (let x = -22; x <= 22; x++) {
@@ -3875,8 +3931,8 @@
   // ...and the green itself dies too, not just the standing grass (the user asked): a press on the green leaves a
   // ragged brown patch round it, yellowing first, only over the green (never the path or the castle). Once dry it
   // is painted onto deadGround for good, so any number of patches cost nothing to draw.
-  const deadGround = document.createElement('canvas');
-  deadGround.width = PW; deadGround.height = PH;
+  const deadGround = document.createElement('canvas'), deadGroundNight = document.createElement('canvas');   // (and as it looks at night)
+  deadGround.width = deadGroundNight.width = PW; deadGround.height = deadGroundNight.height = PH;
   let groundPatches = [], groundDead = false;
   const isGreen = (d, i) => (d[i] === 0x2f && d[i + 1] === 0x8f && d[i + 2] === 0x66) || (d[i] === 0x5f && d[i + 1] === 0xc8 && d[i + 2] === 0x8f);
   function killGround(e) {
@@ -4133,7 +4189,10 @@
   }
   function drawTitleScene() {
     if (!titleBgReady) { buildTitleBg(); titleBgReady = true; }
-    ctx.drawImage(titleBg, 0, 0);
+    if (titleNight && !titleNightReady) { buildTitleNight(); titleNightReady = true; }
+    ctx.drawImage(titleNight ? titleNightBg : titleBg, 0, 0);
+    // (at night, stars all over the sky, twinkling)
+    if (titleNight) nightStars.forEach(([x, y], i) => { if ((frame + i * 23) % 120 < 95) { ctx.fillStyle = (frame + i * 37) % 70 < 6 ? '#ffffff' : '#9fb4ff'; ctx.fillRect(x, y, 1, 1); } });
     // twinkling stars in the dark top of the sky
     for (let i = 0; i < 26; i++) {
       const x = (i * 71 + 13) % PW, y = (i * 29 + 7) % 64;
@@ -4143,7 +4202,7 @@
     for (let i = 0; i < 3; i++) {
       const { x, y, w, lap } = titleCloud(i);
       if (cloudGone[i] === lap) continue;
-      ctx.fillStyle = i === 2 ? '#e8a0a8' : '#c8a6d8';
+      ctx.fillStyle = nc(i === 2 ? '#e8a0a8' : '#c8a6d8');
       ctx.fillRect(x, y, w, 3); ctx.fillRect(x + 4, y - 2, w - 10, 2); ctx.fillRect(x + 9, y - 4, 8, 2);
     }
     // (a poofed cloud's puff: little bits of cloud and white flying out and fading)
@@ -4152,7 +4211,7 @@
       ctx.globalAlpha = 1 - k;
       for (let j = 0; j < 10; j++) {
         const a = j / 10 * Math.PI * 2, r = 3 + k * 12;
-        ctx.fillStyle = j % 2 ? '#ffffff' : p.col;
+        ctx.fillStyle = j % 2 ? '#ffffff' : nc(p.col);
         ctx.fillRect(Math.round(p.x + Math.cos(a) * (r + p.w * 0.35) - sz / 2), Math.round(p.y + Math.sin(a) * r * 0.5 - sz / 2), sz, sz);
       }
       ctx.globalAlpha = 1;
@@ -4162,23 +4221,26 @@
     // (dead grass: yellowing first, then flopped over brown)
     for (const d of deadTufts) {
       const g = TITLE_TUFTS[d.i], k = Math.min(1, d.t++ / 14);
-      ctx.fillStyle = '#2f8f66'; ctx.fillRect(g.x, g.y, 2, 2);
-      if (k < 1) { ctx.fillStyle = k < 0.5 ? '#b8c040' : '#c89a40'; ctx.fillRect(g.x, g.y, 1, 2); if (!g.flower) ctx.fillRect(g.x + 1, g.y + 1, 1, 1); }
-      else { ctx.fillStyle = '#8f5a2a'; ctx.fillRect(g.x, g.y + 1, 2, 1); ctx.fillStyle = '#a8743a'; ctx.fillRect(g.x + 1, g.y, 1, 1); }
+      ctx.fillStyle = nc('#2f8f66'); ctx.fillRect(g.x, g.y, 2, 2);
+      if (k < 1) { ctx.fillStyle = nc(k < 0.5 ? '#b8c040' : '#c89a40'); ctx.fillRect(g.x, g.y, 1, 2); if (!g.flower) ctx.fillRect(g.x + 1, g.y + 1, 1, 1); }
+      else { ctx.fillStyle = nc('#8f5a2a'); ctx.fillRect(g.x, g.y + 1, 2, 1); ctx.fillStyle = nc('#a8743a'); ctx.fillRect(g.x + 1, g.y, 1, 1); }
     }
     // (dead patches of the green: yellowing, then dry brown, painted onto deadGround once done)
     for (const g of groundPatches) if (++g.t >= 14) {
-      const c = deadGround.getContext('2d');
+      const c = deadGround.getContext('2d'), cn = deadGroundNight.getContext('2d');
       groundDead = true;
-      for (const [x, y, light] of g.px) { c.fillStyle = light ? '#9a6e34' : '#6e4a22'; c.fillRect(x, y, 1, 1); }
+      for (const [x, y, light] of g.px) {
+        c.fillStyle = light ? '#9a6e34' : '#6e4a22'; c.fillRect(x, y, 1, 1);
+        cn.fillStyle = tint(light ? '#9a6e34' : '#6e4a22'); cn.fillRect(x, y, 1, 1);
+      }
     }
     groundPatches = groundPatches.filter(g => g.t < 14);
-    if (groundDead) ctx.drawImage(deadGround, 0, 0);
-    for (const g of groundPatches) { ctx.fillStyle = g.t < 7 ? '#a8b040' : '#b8903a'; for (const [x, y] of g.px) ctx.fillRect(x, y, 1, 1); }
-    for (const b of tuftBits) { b.x += b.vx; b.vy += 0.12; b.y += b.vy; b.t--; ctx.fillStyle = '#a8743a'; ctx.fillRect(Math.round(b.x), Math.round(b.y), 1, 1); }
+    if (groundDead) ctx.drawImage(titleNight ? deadGroundNight : deadGround, 0, 0);
+    for (const g of groundPatches) { ctx.fillStyle = nc(g.t < 7 ? '#a8b040' : '#b8903a'); for (const [x, y] of g.px) ctx.fillRect(x, y, 1, 1); }
+    for (const b of tuftBits) { b.x += b.vx; b.vy += 0.12; b.y += b.vy; b.t--; ctx.fillStyle = nc('#a8743a'); ctx.fillRect(Math.round(b.x), Math.round(b.y), 1, 1); }
     tuftBits = tuftBits.filter(b => b.t > 0);
     // (the moat glinting, a spot at a time)
-    ctx.fillStyle = '#9fd8ff';
+    ctx.fillStyle = titleNight ? '#c8d0ff' : '#9fd8ff';   // (moonlit at night)
     MOAT_GLINTS.forEach(([x, y], i) => { if (Math.floor(frame / 18 + i * 3) % 7 === 0) ctx.fillRect(x, y, 2, 1); });
     drawFish();
     drawPugWalkers();
