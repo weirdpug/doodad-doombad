@@ -1370,6 +1370,7 @@
     bang: () => { noise(0.5, 0.35, 5000, 200); tone(120, 0.25, 'sine', 0.2, -70); [0.22, 0.29, 0.35, 0.42, 0.5, 0.57].forEach(d => noise(0.04, 0.08, 9000, 4000, d)); },   // ...and bursting, then crackling
     bloop: () => { tone(260, 0.14, 'sine', 0.08, 520); noise(0.12, 0.08, 2500, 600); },   // a fish leaping out of the moat (the main menu)
     splash: () => { noise(0.3, 0.14, 3500, 300); tone(520, 0.1, 'sine', 0.04, -300); },   // ...and diving back in
+    patter: () => tone(900, 0.025, 'triangle', 0.02),   // a pug's little steps up the path (the main menu)
     stomp: () => tone(80, 0.06, 'square', 0.05, -25),   // Bruno's footsteps running out of the castle (the main menu)
     poof: () => { noise(0.35, 0.16, 2500, 300); tone(300, 0.12, 'sine', 0.05, 200); },   // a cloud poofing away (the main menu)
     pop: () => { tone(320, 0.12, 'square', 0.05, -260); tone(140, 0.18, 'sawtooth', 0.05, -90, 0.02); },   // ...and one blown up
@@ -1893,6 +1894,7 @@
         if (i >= 0) poofCloud(i);   // (a cloud just poofs: no firework, the user asked)
         else if (p && !brunoOut && onCastle(p)) brunoRunsOut();   // (the castle: out runs Bruno)
         else if (p && moatNear(p)) leapFish(moatNear(p));   // (the moat: a fish leaps out)
+        else if (p && onPath(p)) walkPug(p);   // (the path: a pug walks up it into the castle)
         else if (p && p[1] < floorY(p[0])) launchFirework(p);
         else if (onMeadow(e)) {
           const g = tuftAt(e), ground = killGround(e);
@@ -4031,15 +4033,56 @@
     return CASTLE_COLS.includes([d[0], d[1], d[2]].map(v => v.toString(16).padStart(2, '0')).join(''));
   }
   function brunoRunsOut() { brunoOut = { t: 0 }; try { initAudio(); } catch (e) {} sfx.rumble(); }
+  // the castle's doorway, open and dark (Bruno coming out, a pug going in)
+  function drawDoorway() {
+    ctx.fillStyle = '#11132a';
+    for (let y = CASTLE_Y - 21; y < CASTLE_Y; y++) { const r = y - CASTLE_Y + 21, inset = r < 5 ? [6, 3, 2, 1, 0][r] : 0; ctx.fillRect(109 + inset, y, 22 - inset * 2, 1); }
+  }
+  // A click on the path sends a pug trotting up it from there, away from you and smaller as it goes, over the
+  // drawbridge and in at the castle door, which opens for it and shuts behind it (the user asked 2026-10-31). Each
+  // click sends the next pug in turn (Cinnamon, Pepper, Smokey, President Pug), with its bark. (pug_away: a pug seen
+  // from behind, walking: its legs swap sides as the picture flips; pugWalkers: those on their way in)
+  SPRITES.pug_away = ['............', '............', '............', '...KTTTTK...', '...KKTTKK...', '...TTTTTT...', '...TTTTTT...',
+    '.TTTTTTTTTT.', '.TTTTTTTTTT.', '.TTTTJJTTTT.', '.ETTJTEJTTE.', '..TTJEJJTT..', '..TTTJTTTT..', '..TTT..TTT..', '..TTT..EEE..', '..EEE.......'];
+  const PATH_COLS = ['a8743a', 'd9a066', '6e4a2a', '5a3c22'];
+  let pugWalkers = [], pugNext = 0;
+  function onPath([x, y]) {
+    if (!titleBgReady || y < CASTLE_Y) return false;
+    const d = titleBg.getContext('2d').getImageData(clamp(Math.floor(x), 0, PW - 1), clamp(Math.floor(y), 0, PH - 1), 1, 1).data;
+    return PATH_COLS.includes([d[0], d[1], d[2]].map(v => v.toString(16).padStart(2, '0')).join(''));
+  }
+  function walkPug([x, y]) {
+    if (pugWalkers.length > 5) return;
+    const id = pugNext++ % 4;
+    pugWalkers.push({ x, y, x0: x, y0: y, id, t: 0, inT: 0 });
+    try { initAudio(); } catch (e) {}
+    sfx.bark(LOOK[id].bark);
+  }
+  function drawPugWalkers() {
+    for (const w of pugWalkers) {
+      w.t++;
+      if (!w.inT) {
+        // (up the path, drifting to its middle by the time it reaches the door)
+        w.y = Math.max(CASTLE_Y, w.y - 0.6);
+        w.x = w.x0 + (120 - w.x0) * (w.y0 - w.y) / Math.max(1, w.y0 - CASTLE_Y);
+        if (w.t % 10 === 0) sfx.patter();
+        if (w.y <= CASTLE_Y) w.inT = 1;
+      } else if (++w.inT > 14) { w.done = true; sfx.rumble(); }   // (the door shuts behind it)
+    }
+    pugWalkers = pugWalkers.filter(w => !w.done);
+    if (pugWalkers.some(w => w.y < CASTLE_Y + 18)) drawDoorway();   // (the door opens as one comes near)
+    for (const w of pugWalkers) {
+      if (w.inT) continue;
+      const s = sprite('pug_away', Math.floor(w.t / 8) % 2 === 1, LOOK[w.id].swap), sc = 0.5 + 0.5 * clamp((w.y - CASTLE_Y) / (PH - CASTLE_Y), 0, 1);
+      if (s) ctx.drawImage(s, Math.round(w.x - s.width * sc / 2), Math.round(w.y - s.height * sc), Math.round(s.width * sc), Math.round(s.height * sc));
+    }
+  }
   function drawBrunoOut() {
     const b = brunoOut;
     if (!b) return;
     const t = ++b.t, ease = u => u * u * (3 - 2 * u);
     // (the open doorway, dark, from when the door swings open until it shuts behind him)
-    if (t < BR_SHUT) {
-      ctx.fillStyle = '#11132a';
-      for (let y = CASTLE_Y - 21; y < CASTLE_Y; y++) { const r = y - CASTLE_Y + 21, inset = r < 5 ? [6, 3, 2, 1, 0][r] : 0; ctx.fillRect(109 + inset, y, 22 - inset * 2, 1); }
-    }
+    if (t < BR_SHUT) drawDoorway();
     if (t >= BR_OPEN && t < BR_BACK) {
       // (u: 0 at the door, 1 out on the path in front)
       const home = BR_POUND + BR_TURN, back = t >= home;
@@ -4109,6 +4152,7 @@
     ctx.fillStyle = '#9fd8ff';
     MOAT_GLINTS.forEach(([x, y], i) => { if (Math.floor(frame / 18 + i * 3) % 7 === 0) ctx.fillRect(x, y, 2, 1); });
     drawFish();
+    drawPugWalkers();
     drawBrunoOut();
     drawFireworks();
   }
