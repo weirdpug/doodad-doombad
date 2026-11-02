@@ -535,6 +535,7 @@
     font_DOT: [".....",".....",".....",".....",".....",".....","..W.."],
     font_E: ["WWWWW","W....","W....","WWWW.","W....","W....","WWWWW"],
     font_EXCL: ["..W..","..W..","..W..","..W..","..W..",".....","..W.."],
+    font_QMARK: [".WWW.","W...W","....W","...W.","..W..",".....","..W.."],
     font_F: ["WWWWW","W....","W....","WWWW.","W....","W....","W...."],
     font_G: [".WWW.","W...W","W....","W.WWW","W...W","W...W",".WWWW"],
     font_H: ["W...W","W...W","W...W","WWWWW","W...W","W...W","W...W"],
@@ -1058,7 +1059,7 @@
   } catch (e) {}
 
   // Bitmap font: 5x7 glyphs on a 6-pixel grid
-  const GLYPH = { '!': 'EXCL', '-': 'DASH', ':': 'COLON', '.': 'DOT', "'": 'APOS' };
+  const GLYPH = { '!': 'EXCL', '-': 'DASH', ':': 'COLON', '.': 'DOT', "'": 'APOS', '?': 'QMARK' };
   function drawText(str, x, y, swapKey, align, scale) {
     const s = scale || 1;
     str = String(str).toUpperCase();
@@ -4771,7 +4772,7 @@
   }
   // (zooming in or out redoes The Arcade's screen: its title, and Play shown or gone)
   function zoomTo(p) { arcadeZoom = { target: p, p: 0, out: false, ship: null, shop: p.shop ? { p: 0 } : null };
-    if (p.shop) Object.assign(shop, { sad: false, tearT: 0, hitT: 0, ammo: null, mess: [], bits: [] });   // (Gloop happy and clean again)
+    if (p.shop) Object.assign(shop, { sad: false, tearT: 0, hitT: 0, whyT: 0, ammo: null, mess: [], bits: [] });   // (Gloop happy and clean again)
     showPause('arcade', 0); sfx.tick(); }
   function zoomOut() { if (!arcadeZoom.target || arcadeZoom.out) return; arcadeZoom.out = true; arcadeZoom.ship = arcadeZoom.deep = null; showPause('arcade', 0); sfx.tick(); }
   // (zoomed in on the spaceship, or on the way)
@@ -5491,7 +5492,8 @@
   // blinking. A click on him throws a burrito at him (the user asked 2026-11-02): it flies up from the bottom of the
   // screen, spinning, and splats on his face; beans, rice, salsa and lettuce fly off, some stick to his face, he
   // flinches, and he turns sad: droopy antennae, heavy-lidded eyes looking down, a frown, slumping slowly, with a tear
-  // now and then. Another burrito while he is sad just makes more mess. He stays sad until you leave the shop; the
+  // now and then, and asks "WHY?" in a speech bubble (the user asked). Another burrito while he is sad just makes more
+  // mess (and asks again). He stays sad until you leave the shop; the
   // next time you come in he is happy and clean again. Nothing is for sale yet. Back (or Esc, B, or a click on the way in) zooms all the way
   // back out to space. (arcadeZoom.shop: { p, out }, how far into the shop, 0 to 1 over SHOP_FRAMES, once the zoom
   // on the planet is all the way in; a planet's shop: the spot to zoom into)
@@ -5506,7 +5508,8 @@
   };
   // (sad: his mood; tearT: a tear rolling down, frames left; hitT: frames left of his flinch; ammo: the burrito in
   // the air, { t }; mess: the bits stuck to his face, [x, y, colour] from his top left; bits: bits flying off)
-  let gloopPics = null, shopBg = null, shop = { sad: false, tearT: 0, hitT: 0, ammo: null, mess: [], bits: [] };
+  // (whyT: frames left of his WHY?)
+  let gloopPics = null, shopBg = null, shop = { sad: false, tearT: 0, hitT: 0, whyT: 0, ammo: null, mess: [], bits: [] };
   const SHOP_TEAR = 50, BURRITO_T = 18;
   const BURRITO_BITS = ['#8a4a2a', '#f4f0e0', '#e8282f', '#5fd068', '#c8742f'];   // (beans, rice, salsa, lettuce, cheese)
   // (a burrito to throw: a rolled tortilla with its filling showing at one end)
@@ -5615,7 +5618,7 @@
       if (b) { ctx.save(); ctx.translate(Math.round(bx), Math.round(by)); ctx.rotate(u * Math.PI * 4); ctx.drawImage(b, -6 * sc, -3 * sc, 12 * sc, 6 * sc); ctx.restore(); }
       if (u >= 1) {
         // (splat: he flinches and turns sad, some of it sticks to his face, the rest flies off)
-        shop.ammo = null; shop.sad = true; shop.hitT = 20; shop.tearT = SHOP_TEAR;
+        shop.ammo = null; shop.sad = true; shop.hitT = 20; shop.tearT = SHOP_TEAR; shop.whyT = 150;
         for (let i = 0; i < 6 && shop.mess.length < 40; i++) shop.mess.push([8 + Math.floor(Math.random() * 28), 6 + Math.floor(Math.random() * 20), BURRITO_BITS[i % BURRITO_BITS.length]]);
         for (let i = 0; i < 16; i++) shop.bits.push({ x: fx, y: fy, vx: (Math.random() - 0.5) * 4, vy: -1 - Math.random() * 2.5, t: 30, col: BURRITO_BITS[i % BURRITO_BITS.length] });
         noise(0.25, 0.16, 1400, 200); tone(140, 0.15, 'square', 0.05, -60); tone(392, 0.35, 'sine', 0.04, -120, 0.35); tone(294, 0.5, 'sine', 0.035, -90, 0.65);   // (splat, then a sad sigh)
@@ -5623,6 +5626,14 @@
     }
     for (const b of shop.bits) { b.vy += 0.25; b.x += b.vx; b.y += b.vy; b.t--; ctx.fillStyle = b.col; ctx.fillRect(Math.round(b.x), Math.round(b.y), 2, 2); }
     shop.bits = shop.bits.filter(b => b.t > 0);
+    // (WHY?, in a little speech bubble over his head, for a moment after a burrito hits him)
+    if (shop.whyT > 0) {
+      shop.whyT--;
+      ctx.fillStyle = '#3e2414'; ctx.fillRect(102, 117, 36, 15);
+      ctx.fillStyle = '#fff6e0'; ctx.fillRect(103, 118, 34, 13);
+      for (let i = 0; i < 4; i++) { ctx.fillStyle = '#3e2414'; ctx.fillRect(117 + i, 132 + i, 8 - i * 2, 1); ctx.fillStyle = '#fff6e0'; ctx.fillRect(118 + i, 132 + i, Math.max(0, 6 - i * 2), 1); }
+      drawText('WHY?', 120, 121, 'black', 'center');
+    }
   }
   // ----- Earth's mini-game: Banana Catch (Play on Earth in The Arcade) -----
   // The pug that pressed Play stands on the grass wearing a bowl on its head, and Big Bruno walks back and forth
