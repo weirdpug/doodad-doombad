@@ -4770,7 +4770,9 @@
       Math.hypot(x - p.x, y - p.y) <= p.r + 3 || (p.ring && Math.abs(x - p.x) <= p.ring[0] + 2 && Math.abs(y - p.y) <= p.ring[1] + 2));
   }
   // (zooming in or out redoes The Arcade's screen: its title, and Play shown or gone)
-  function zoomTo(p) { arcadeZoom = { target: p, p: 0, out: false, ship: null, shop: p.shop ? { p: 0 } : null }; showPause('arcade', 0); sfx.tick(); }
+  function zoomTo(p) { arcadeZoom = { target: p, p: 0, out: false, ship: null, shop: p.shop ? { p: 0 } : null };
+    if (p.shop) Object.assign(shop, { sad: false, tearT: 0, hitT: 0, ammo: null, mess: [], bits: [] });   // (Gloop happy and clean again)
+    showPause('arcade', 0); sfx.tick(); }
   function zoomOut() { if (!arcadeZoom.target || arcadeZoom.out) return; arcadeZoom.out = true; arcadeZoom.ship = arcadeZoom.deep = null; showPause('arcade', 0); sfx.tick(); }
   // (zoomed in on the spaceship, or on the way)
   const onShip = () => !!(arcadeZoom.ship && !arcadeZoom.ship.out);
@@ -5485,22 +5487,30 @@
   // fades into a cosy wooden shop: plank walls, a round brass porthole with the storm swirling past outside, a lamp
   // swinging from the ceiling, empty shelves with cobwebs, and a counter with an old brass till and a COMING SOON
   // card. Behind the counter is Gloop, the shopkeeper: a round lavender alien with three eyes, two antennae, a red
-  // bow tie and a green vest: happy, with his antennae up and a big grin, bobbing and blinking; a click on him makes
-  // him wave. He says nothing (the user asked 2026-11-02, after trying him sad and talking, and SAD/HAPPY codes that
-  // were then taken out again). Nothing is for sale yet. Back (or Esc, B, or a click on the way in) zooms all the way
+  // bow tie and a green vest. He says nothing. He starts out happy, with his antennae up and a big grin, bobbing and
+  // blinking. A click on him throws a burrito at him (the user asked 2026-11-02): it flies up from the bottom of the
+  // screen, spinning, and splats on his face; beans, rice, salsa and lettuce fly off, some stick to his face, he
+  // flinches, and he turns sad: droopy antennae, heavy-lidded eyes looking down, a frown, slumping slowly, with a tear
+  // now and then. Another burrito while he is sad just makes more mess. He stays sad until you leave the shop; the
+  // next time you come in he is happy and clean again. Nothing is for sale yet. Back (or Esc, B, or a click on the way in) zooms all the way
   // back out to space. (arcadeZoom.shop: { p, out }, how far into the shop, 0 to 1 over SHOP_FRAMES, once the zoom
   // on the planet is all the way in; a planet's shop: the spot to zoom into)
   const SHOP_FRAMES = 45, SHOP_ZOOM = 14, SHOP_NAME = "Gloop's Shop";
   const GLOOP_COLS = { p: '#b48ae0', r: '#d8c0f4', q: '#7a54a8', o: '#3a1f5a', v: '#3a8a4a' };
-  const GLOOP = {"idle": [".....YY.........YY....", "......o.........o.....", ".......o.......o......", ".........ooooo........", ".......oorrrppoo......", ".....oorrrrpppppoo....", "....orrrrrWWWpppppo...", "....orWWWpWKWpWWWpo...", "....orWKWpWWWpWKWpo...", "...orrWWWpppppWWWpqo..", "....oppppppppppppqo...", "....opppKpppppKqqqo...", "....oppppKKKKKqqqqo...", ".....oopppWppqqqoo....", ".......opppqqqqo......", "......ovRWWWWRvvo.....", ".....ovvRRDDRRvvvo....", "..ooovvvRWWWWRvvvvoo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..oooooooooooooooooo.."], "blink": [".....YY.........YY....", "......o.........o.....", ".......o.......o......", ".........ooooo........", ".......oorrrppoo......", ".....oorrrrpppppoo....", "....orrrrrppppppppo...", "....orppppooopppppo...", "....orooopppppooopo...", "...orrppppppppppppqo..", "....oppppppppppppqo...", "....opppKpppppKqqqo...", "....oppppKKKKKqqqqo...", ".....oopppWppqqqoo....", ".......opppqqqqo......", "......ovRWWWWRvvo.....", ".....ovvRRDDRRvvvo....", "..ooovvvRWWWWRvvvvoo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..oooooooooooooooooo.."], "wave": [".....YY.........YY....", "......o.........o.....", ".......o.......o......", ".........ooooo........", ".......oorrrppoo......", ".....oorrrrpppppoooooo", "....orrrrrWWWppppppppo", "....orWWWpWKWpWWWppppo", "....orWKWpWWWpWKWpppo.", "...orrWWWpppppWWWpqpo.", "....oppppppppppppqqpo.", "....opppKpppppKqqqqpo.", "....oppppKKKKKqqqqopo.", ".....oopppWppqqqoo.oo.", ".......opppqqqqo...oo.", "......ovRWWWWRvvo..oo.", ".....ovvRRDDRRvvvo.oo.", "..ooovvvRWWWWRvvvvooo.", "..opvvvvYWWWWWYvvvo...", "..opvvvvvWWWWWvvvvo...", "..opvvvvvWWWWWvvvvo...", "..opvvvvYWWWWWYvvvo...", "..opvvvvvWWWWWvvvvo...", "..ooooooooooooooooo..."]};
+  const GLOOP = {"idle": [".....YY.........YY....", "......o.........o.....", ".......o.......o......", ".........ooooo........", ".......oorrrppoo......", ".....oorrrrpppppoo....", "....orrrrrWWWpppppo...", "....orWWWpWKWpWWWpo...", "....orWKWpWWWpWKWpo...", "...orrWWWpppppWWWpqo..", "....oppppppppppppqo...", "....opppKpppppKqqqo...", "....oppppKKKKKqqqqo...", ".....oopppWppqqqoo....", ".......opppqqqqo......", "......ovRWWWWRvvo.....", ".....ovvRRDDRRvvvo....", "..ooovvvRWWWWRvvvvoo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..oooooooooooooooooo.."], "blink": [".....YY.........YY....", "......o.........o.....", ".......o.......o......", ".........ooooo........", ".......oorrrppoo......", ".....oorrrrpppppoo....", "....orrrrrppppppppo...", "....orppppooopppppo...", "....orooopppppooopo...", "...orrppppppppppppqo..", "....oppppppppppppqo...", "....opppKpppppKqqqo...", "....oppppKKKKKqqqqo...", ".....oopppWppqqqoo....", ".......opppqqqqo......", "......ovRWWWWRvvo.....", ".....ovvRRDDRRvvvo....", "..ooovvvRWWWWRvvvvoo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..oooooooooooooooooo.."], "sad": ["......................", ".....oo.........oo....", "....o..o.......o..o...", "...Y.....ooooo.....Y..", "...Y...oorrrppoo...Y..", ".....oorrrrpppppoo....", "....orrrrrooopppppo...", "....orooopWWWpooopo...", "....orWWWpWKWpWWWpo...", "...orrWKWpppppWKWpqo..", "....oppppppppppppqo...", "....oppppppppppqqqo...", "....oppppKKKKKqqqqo...", ".....oopKppppqKqoo....", ".......opppqqqqo......", "......ovvWWWWWvvo.....", ".....ovvRWWWWRvvvo....", "..ooovvvRRDDRRvvvvoo..", "..opvvvvYRWWRWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..oooooooooooooooooo.."], "sadBlink": ["......................", ".....oo.........oo....", "....o..o.......o..o...", "...Y.....ooooo.....Y..", "...Y...oorrrppoo...Y..", ".....oorrrrpppppoo....", "....orrrrrppppppppo...", "....orppppppppppppo...", "....orppppooopppppo...", "...orrooopppppooopqo..", "....oppppppppppppqo...", "....oppppppppppqqqo...", "....oppppKKKKKqqqqo...", ".....oopKppppqKqoo....", ".......opppqqqqo......", "......ovvWWWWWvvo.....", ".....ovvRWWWWRvvvo....", "..ooovvvRRDDRRvvvvoo..", "..opvvvvYRWWRWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..oooooooooooooooooo.."]};
   const bakeWith = (rows, cols) => {
     const c = document.createElement('canvas'); c.width = rows[0].length; c.height = rows.length;
     const g = c.getContext('2d');
     rows.forEach((row, y) => [...row].forEach((ch, x) => { const col = cols[ch] || PAL[ch]; if (ch !== '.' && col) { g.fillStyle = col; g.fillRect(x, y, 1, 1); } }));
     return c;
   };
-  // (waveT: frames left of a wave)
-  let gloopPics = null, shopBg = null, shop = { waveT: 0 };
+  // (sad: his mood; tearT: a tear rolling down, frames left; hitT: frames left of his flinch; ammo: the burrito in
+  // the air, { t }; mess: the bits stuck to his face, [x, y, colour] from his top left; bits: bits flying off)
+  let gloopPics = null, shopBg = null, shop = { sad: false, tearT: 0, hitT: 0, ammo: null, mess: [], bits: [] };
+  const SHOP_TEAR = 50, BURRITO_T = 18;
+  const BURRITO_BITS = ['#8a4a2a', '#f4f0e0', '#e8282f', '#5fd068', '#c8742f'];   // (beans, rice, salsa, lettuce, cheese)
+  // (a burrito to throw: a rolled tortilla with its filling showing at one end)
+  SPRITES.thrown_burrito = ['..LLLLLLLL..', '.LOLLLLOLLL.', 'LLLLLLLLLLRg', 'LLOLLLLLLLNW', '.LLLLOLLLLL.', '..LLLLLLLL..'];
   const inShop = () => !!(arcadeZoom.shop && arcadeZoom.shop.p === 1 && arcadeZoom.target && !arcadeZoom.out);
   // (Gloop's box on the screen, drawn twice his size behind the counter)
   const GLOOP_X = 98, GLOOP_Y = 144;
@@ -5510,7 +5520,8 @@
   }
   function shopClick(e) {
     if (!onGloop(e)) return;
-    shop.waveT = 40; tone(520, 0.08, 'sine', 0.05, 380); tone(780, 0.1, 'sine', 0.04, 200, 0.09);   // (a happy alien warble)
+    if (shop.ammo) return;   // (one burrito in the air at a time)
+    shop.ammo = { t: 0 }; sfx.toss();
   }
   // the still parts of the shop, built once: the walls, beam, shelves, porthole's brass ring, counter, till and card
   function buildShopBg() {
@@ -5574,19 +5585,44 @@
     // (specks of dust drifting in the lamplight)
     ctx.fillStyle = '#ffe9b0';
     for (let i = 0; i < 7; i++) ctx.fillRect(Math.round(100 + (i * 37 + Math.sin(t / 30 + i) * 6) % 40), Math.round(80 + (t * 0.15 + i * 23) % 60), 1, 1);
-    // Gloop behind the counter (which is drawn over his middle): bobbing, blinking now and then, waving when clicked
-    if (shop.waveT > 0) shop.waveT--;
-    const pic = shop.waveT ? gloopPics.wave : t % 200 < 8 ? gloopPics.blink : gloopPics.idle, bob = Math.round(Math.sin(t / 25));
+    // Gloop behind the counter (which is drawn over his middle), with whatever burrito is stuck to his face. Happy:
+    // bobbing, blinking now and then. Sad: slumped, sinking and rising slowly, blinking slowly, a tear rolling down
+    // from his left eye now and then. Shaking for a moment when a burrito hits him.
+    if (shop.hitT > 0) shop.hitT--;
+    if (shop.tearT > 0) shop.tearT--;
+    else if (shop.sad && t % 420 === 300) shop.tearT = SHOP_TEAR;
+    const pic = shop.sad ? (t % 260 < 14 ? gloopPics.sadBlink : gloopPics.sad) : t % 200 < 8 ? gloopPics.blink : gloopPics.idle;
+    const bob = shop.sad ? Math.round(Math.sin(t / 50) + 0.5) : Math.round(Math.sin(t / 25)), gx = GLOOP_X + (shop.hitT ? (t % 4 < 2 ? 1 : -1) : 0), gy = GLOOP_Y + bob;
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, PW, 190); ctx.clip();
-    ctx.drawImage(pic, GLOOP_X, GLOOP_Y + bob, 44, 48);
+    ctx.drawImage(pic, gx, gy, 44, 48);
+    for (const [mx, my, col] of shop.mess) { ctx.fillStyle = col; ctx.fillRect(gx + mx, gy + my, 2, 2); }
+    if (shop.tearT) {
+      const k = 1 - shop.tearT / SHOP_TEAR, tx = gx + 12 - Math.round(k * 4), ty = gy + 20 + Math.round(k * 16);
+      ctx.fillStyle = '#9fd8ff'; ctx.fillRect(tx, ty, 2, 3); ctx.fillStyle = '#ffffff'; ctx.fillRect(tx, ty, 1, 1);
+    }
     ctx.restore();
-    // (his hands resting on the counter top: the right one is up while he waves)
-    const both = !shop.waveT;
-    ctx.fillStyle = GLOOP_COLS.o; ctx.fillRect(GLOOP_X + 2, 186, 8, 5); if (both) ctx.fillRect(GLOOP_X + 34, 186, 8, 5);
-    ctx.fillStyle = GLOOP_COLS.p; ctx.fillRect(GLOOP_X + 3, 187, 6, 3); if (both) ctx.fillRect(GLOOP_X + 35, 187, 6, 3);
+    // (his hands resting on the counter top)
+    ctx.fillStyle = GLOOP_COLS.o; ctx.fillRect(GLOOP_X + 2, 186, 8, 5); ctx.fillRect(GLOOP_X + 34, 186, 8, 5);
+    ctx.fillStyle = GLOOP_COLS.p; ctx.fillRect(GLOOP_X + 3, 187, 6, 3); ctx.fillRect(GLOOP_X + 35, 187, 6, 3);
     // (the card says COMING SOON, and the till shows nothing rung up)
     drawText('COMING', 191, 169, 'black', 'center'); drawText('SOON!', 191, 179, 'red', 'center');
     drawText('000', 47, 152, 'green', 'center');
+    // the thrown burrito: up from the bottom of the screen in an arc, spinning and getting smaller as it goes, to
+    // his face, where it splats
+    if (shop.ammo) {
+      const a2 = shop.ammo, u = Math.min(1, ++a2.t / BURRITO_T), fx = GLOOP_X + 22, fy = GLOOP_Y + 18;
+      const bx = 150 + (fx - 150) * u, by = 300 + (fy - 300) * u - Math.sin(u * Math.PI) * 40, sc = 2.4 - u * 0.8, b = sprite('thrown_burrito');
+      if (b) { ctx.save(); ctx.translate(Math.round(bx), Math.round(by)); ctx.rotate(u * Math.PI * 4); ctx.drawImage(b, -6 * sc, -3 * sc, 12 * sc, 6 * sc); ctx.restore(); }
+      if (u >= 1) {
+        // (splat: he flinches and turns sad, some of it sticks to his face, the rest flies off)
+        shop.ammo = null; shop.sad = true; shop.hitT = 20; shop.tearT = SHOP_TEAR;
+        for (let i = 0; i < 6 && shop.mess.length < 40; i++) shop.mess.push([8 + Math.floor(Math.random() * 28), 6 + Math.floor(Math.random() * 20), BURRITO_BITS[i % BURRITO_BITS.length]]);
+        for (let i = 0; i < 16; i++) shop.bits.push({ x: fx, y: fy, vx: (Math.random() - 0.5) * 4, vy: -1 - Math.random() * 2.5, t: 30, col: BURRITO_BITS[i % BURRITO_BITS.length] });
+        noise(0.25, 0.16, 1400, 200); tone(140, 0.15, 'square', 0.05, -60); tone(392, 0.35, 'sine', 0.04, -120, 0.35); tone(294, 0.5, 'sine', 0.035, -90, 0.65);   // (splat, then a sad sigh)
+      }
+    }
+    for (const b of shop.bits) { b.vy += 0.25; b.x += b.vx; b.y += b.vy; b.t--; ctx.fillStyle = b.col; ctx.fillRect(Math.round(b.x), Math.round(b.y), 2, 2); }
+    shop.bits = shop.bits.filter(b => b.t > 0);
   }
   // ----- Earth's mini-game: Banana Catch (Play on Earth in The Arcade) -----
   // The pug that pressed Play stands on the grass wearing a bowl on its head, and Big Bruno walks back and forth
