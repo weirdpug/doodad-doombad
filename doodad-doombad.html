@@ -2291,7 +2291,7 @@
     hopPause: () => [{ label: 'Resume', act: () => resumeGame() }, { label: 'Back', act: () => backFromHop() }],
     hopOver: () => [{ label: 'Play again', act: by => startHop(by) }, { label: 'Back', act: () => backFromHop() }],
     arcade: () => [
-      ...(arcadeZoom.target && !arcadeZoom.out && !onShip() ? [{ label: 'Play', act: by => playFromArcade(by) }] : []),
+      ...(arcadeZoom.target && !arcadeZoom.out && !onShip() && !arcadeZoom.target.shop ? [{ label: 'Play', act: by => playFromArcade(by) }] : []),
       // (zoomed in on the spaceship, Back zooms out to Saturn first)
       { label: 'Back', act: () => deepLive() ? deepOut() : onShip() ? shipOut() : arcadeZoom.target && !arcadeZoom.out ? zoomOut() : backToTitle() },
     ],
@@ -2317,7 +2317,7 @@
     if ((store || neck) && by !== undefined && joined[by]) storeBy = by;
     if (!joined[storeBy]) storeBy = kbBy();
     const bpause = /^(banana|arena|race|dig|hop)Pause$/.test(view), bover = /^(banana|arena|race|dig|hop)Over$/.test(view);
-    ovTitle.textContent = bpause ? 'Paused' : view === 'arenaOver' ? arenaWords().title : view === 'raceOver' ? raceWords().title : view === 'digOver' ? digWords().title : view === 'hopOver' ? hopWords().title : bover ? 'Splat!' : arcade ? (onShip() ? 'Alien Spaceship' : arcadeZoom.target && !arcadeZoom.out ? arcadeZoom.target.name : 'The Arcade') : store ? 'Store' : part ? part.name : custom ? 'Customize' : 'Paused';
+    ovTitle.textContent = bpause ? 'Paused' : view === 'arenaOver' ? arenaWords().title : view === 'raceOver' ? raceWords().title : view === 'digOver' ? digWords().title : view === 'hopOver' ? hopWords().title : bover ? 'Splat!' : arcade ? (onShip() ? 'Alien Spaceship' : inShop() ? SHOP_NAME : arcadeZoom.target && !arcadeZoom.out ? arcadeZoom.target.name : 'The Arcade') : store ? 'Store' : part ? part.name : custom ? 'Customize' : 'Paused';
     // (Necklaces keeps a line for what was just put on, and with 2-4 pugs, whose look it is)
     ovText.hidden = arcade || (custom && !neck);
     ovText.textContent = note || (store
@@ -4745,7 +4745,9 @@
     { name: 'Pluto', x: 32, y: 222, r: 7, cols: ['#d8a6e8', '#9c5ab8', '#5a2c7a'], stripe: '#7a3c9a', game: 'showdown', dot: [43, 214] },
     // (Jupiter: drawn by jupiter() in buildSpaceBg, as like the real one as its size allows; no game of its own yet,
     // so Play starts the main game)
-    { name: 'Jupiter', x: 172, y: 124, r: 17, cols: ['#fff2dc', '#d49a6a', '#7a4a2e'], jupiter: true, dot: [194, 108] },
+    // (shop: the spot its zoom goes on into, the Great Red Spot, where Gloop's Shop is; so no green pixel or alien
+    // spaceship by it any more: a click on Jupiter goes straight in)
+    { name: 'Jupiter', x: 172, y: 124, r: 17, cols: ['#fff2dc', '#d49a6a', '#7a4a2e'], jupiter: true, shop: [177.5, 131.5] },
     // the alien mother ship: not a planet, but it works like one once it has come (mother: see drawMother)
     // (drawn 2.5 times its sprite's size, 120 pixels across, so it really is giant: r is half that, and a click
     // counts anywhere in its box; no green pixel or alien spaceship by it: the user asked for none)
@@ -4764,7 +4766,7 @@
       Math.hypot(x - p.x, y - p.y) <= p.r + 3 || (p.ring && Math.abs(x - p.x) <= p.ring[0] + 2 && Math.abs(y - p.y) <= p.ring[1] + 2));
   }
   // (zooming in or out redoes The Arcade's screen: its title, and Play shown or gone)
-  function zoomTo(p) { arcadeZoom = { target: p, p: 0, out: false, ship: null }; showPause('arcade', 0); sfx.tick(); }
+  function zoomTo(p) { arcadeZoom = { target: p, p: 0, out: false, ship: null, shop: p.shop ? { p: 0 } : null }; if (p.shop) shop.line = 0; showPause('arcade', 0); sfx.tick(); }
   function zoomOut() { if (!arcadeZoom.target || arcadeZoom.out) return; arcadeZoom.out = true; arcadeZoom.ship = arcadeZoom.deep = null; showPause('arcade', 0); sfx.tick(); }
   // (zoomed in on the spaceship, or on the way)
   const onShip = () => !!(arcadeZoom.ship && !arcadeZoom.ship.out);
@@ -4848,7 +4850,7 @@
     if (arcadeZoom.target) arcadeZoom.target.shipGone = true;
     arcadeZoom.ship = arcadeZoom.deep = null;
     // every planet's spaceship blown up: straight back out to space, and in comes the mother ship
-    if (mother.state === 'gone' && SPACE_PLANETS.every(p => p.mother || p.shipGone)) {
+    if (mother.state === 'gone' && SPACE_PLANETS.every(p => p.mother || p.shipGone || !p.dot)) {
       startMotherEntrance();
       return;
     }
@@ -5230,6 +5232,7 @@
       if (onDeepDot(e)) deepIn(); else if (arcadeZoom.ship.p === 1 && !(arcadeZoom.deep && arcadeZoom.deep.length) && onShipSprite(e)) explodeShip(); else shipOut();
       return;
     }
+    if (arcadeZoom.shop && arcadeZoom.target && !arcadeZoom.out) { if (inShop()) shopClick(e); else zoomOut(); return; }   // (Jupiter's shop)
     if (!arcadeZoom.ship && fleetHit(e)) return;   // (one of the mother ship's tiny ships: blown up)
     if (!arcadeZoom.ship && onDot(e)) { shipIn(); return; }
     if (onMotherSprite(e)) { fleetClick(); return; }   // (zoomed in on the mother ship: its tiny ships)
@@ -5240,7 +5243,7 @@
   // (the mouse pointer turns into a hand over a planet, or a tiny ship)
   ov.addEventListener('pointermove', e => {
     if (!(fromTitle && pauseView === 'arcade')) { if (ov.style.cursor) ov.style.cursor = ''; return; }
-    const c = arcadeZoom.target || (!e.target.closest('button') && (planetAt(e) || fleetNear(e) >= 0)) ? 'pointer' : '';
+    const c = inShop() ? (onGloop(e) && !e.target.closest('button') ? 'pointer' : '') : arcadeZoom.target || (!e.target.closest('button') && (planetAt(e) || fleetNear(e) >= 0)) ? 'pointer' : '';
     if (ov.style.cursor !== c) ov.style.cursor = c;
   });
   function buildSpaceBg() {
@@ -5358,7 +5361,14 @@
     // middle as it grows (eased in and out); no twinkles or shooting star meanwhile
     const z = arcadeZoom;
     if (z.target) {
-      z.p = clamp(z.p + (z.out ? -1 : 1) / ZOOM_FRAMES, 0, 1);
+      // (with a shop: in on the planet, then on into the shop; back out of the shop first, then off the planet)
+      const sp = z.shop;
+      if (sp && z.out && sp.p > 0) sp.p = clamp(sp.p - 1 / SHOP_FRAMES, 0, 1);
+      else z.p = clamp(z.p + (z.out ? -1 : 1) / ZOOM_FRAMES, 0, 1);
+      if (sp && !z.out && z.p === 1 && sp.p < 1) {
+        sp.p = clamp(sp.p + 1 / SHOP_FRAMES, 0, 1);
+        if (sp.p === 1) { showPause('arcade', 0); tone(1320, 0.12, 'sine', 0.05); tone(1760, 0.2, 'sine', 0.04, 0, 0.12); }   // (in: the shop bell)
+      }
       if (z.out && z.p === 0) z.target = null;
     }
     if (z.target) {
@@ -5369,6 +5379,9 @@
       if (sh) { sh.p = clamp(sh.p + (sh.out ? -1 : 1) / ZOOM_FRAMES, 0, 1); if (sh.out && sh.p === 0) z.ship = null; }
       const se = z.ship ? z.ship.p * z.ship.p * (3 - 2 * z.ship.p) : 0;
       if (se) { k *= 1 + (SHIP_ZOOM - 1) * se; cx += (p.dot[0] - cx) * se; cy += (p.dot[1] - cy) * se; }
+      // (on into a planet's shop: far further in, sliding its spot to the middle)
+      const he = z.shop ? z.shop.p * z.shop.p * (3 - 2 * z.shop.p) : 0;
+      if (he) { k *= 1 + (SHOP_ZOOM - 1) * he; cx += (p.shop[0] - cx) * he; cy += (p.shop[1] - cy) * he; }
       // on into the spaceships hiding inside one another (Saturn's deep ones): each level blows everything so far up
       // 5 times more round its green pixel (at: beside the ship before it), which slides to the middle (f) and grows
       // into the next ship
@@ -5429,6 +5442,8 @@
         deepDotAt = [c[0] + next.off[0], c[1] + next.off[1]];
         ctx.fillStyle = '#5fd068'; ctx.fillRect(Math.round(deepDotAt[0] - 1), Math.round(deepDotAt[1] - 1), 2, 2);
       }
+      // (the shop fades in over the storm for the last part of the way in, and out first on the way back)
+      if (z.shop && z.shop.p > 0.55) { ctx.globalAlpha = Math.min(1, (z.shop.p - 0.55) / 0.35); drawJupiterShop(); ctx.globalAlpha = 1; }
       return;
     }
     // (the mother ship's entrance shakes everything but its banners)
@@ -5458,6 +5473,121 @@
     if (shake) ctx.restore();
     if (mother.state === 'coming') drawArrivalFront();
     if (mother.state === 'exploding') drawMotherBoomFront();
+  }
+  // ----- Jupiter's shop (the user asked 2026-11-02: clicking Jupiter zooms way in to a shop, an old-cartoon kind of
+  // shop, with an alien who doesn't sell anything yet) -----
+  // A click on Jupiter zooms in on it as on any planet, then on and on down into its Great Red Spot, and the storm
+  // fades into a cosy wooden shop: plank walls, a round brass porthole with the storm swirling past outside, a lamp
+  // swinging from the ceiling, empty shelves with cobwebs, and a counter with an old brass till and a COMING SOON
+  // card. Behind the counter is Gloop, the shopkeeper: a round lavender alien with three eyes, two antennae, a big
+  // grin, a red bow tie and a green vest. He bobs, blinks, and says hello in a speech bubble; click him and he waves
+  // and says something else. Nothing is for sale yet. Back (or Esc, B, or a click on the way in) zooms all the way
+  // back out to space. (arcadeZoom.shop: { p, out }, how far into the shop, 0 to 1 over SHOP_FRAMES, once the zoom
+  // on the planet is all the way in; a planet's shop: the spot to zoom into)
+  const SHOP_FRAMES = 45, SHOP_ZOOM = 14, SHOP_NAME = "Gloop's Shop";
+  const SHOP_LINES = [["I'M GLOOP! WELCOME TO", 'MY SHOP!'], ['NOTHING FOR SALE YET...', 'COME BACK SOON!'],
+    ['NEW STUFF IS ON ITS WAY', 'FROM ALL OVER SPACE!'], ['MY SHELVES ARE EMPTY,', 'BUT MY HEART IS FULL!']];
+  const GLOOP_COLS = { p: '#b48ae0', r: '#d8c0f4', q: '#7a54a8', o: '#3a1f5a', v: '#3a8a4a' };
+  const GLOOP = {"idle": [".....YY.........YY....", "......o.........o.....", ".......o.......o......", ".........ooooo........", ".......oorrrppoo......", ".....oorrrrpppppoo....", "....orrrrrWWWpppppo...", "....orWWWpWKWpWWWpo...", "....orWKWpWWWpWKWpo...", "...orrWWWpppppWWWpqo..", "....oppppppppppppqo...", "....opppKpppppKqqqo...", "....oppppKKKKKqqqqo...", ".....oopppWppqqqoo....", ".......opppqqqqo......", "......ovRWWWWRvvo.....", ".....ovvRRDDRRvvvo....", "..ooovvvRWWWWRvvvvoo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..oooooooooooooooooo.."], "blink": [".....YY.........YY....", "......o.........o.....", ".......o.......o......", ".........ooooo........", ".......oorrrppoo......", ".....oorrrrpppppoo....", "....orrrrrppppppppo...", "....orppppooopppppo...", "....orooopppppooopo...", "...orrppppppppppppqo..", "....oppppppppppppqo...", "....opppKpppppKqqqo...", "....oppppKKKKKqqqqo...", ".....oopppWppqqqoo....", ".......opppqqqqo......", "......ovRWWWWRvvo.....", ".....ovvRRDDRRvvvo....", "..ooovvvRWWWWRvvvvoo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..oooooooooooooooooo.."], "wave": [".....YY.........YY....", "......o.........o.....", ".......o.......o......", ".........ooooo........", ".......oorrrppoo......", ".....oorrrrpppppoooooo", "....orrrrrWWWppppppppo", "....orWWWpWKWpWWWppppo", "....orWKWpWWWpWKWpppo.", "...orrWWWpppppWWWpqpo.", "....oppppppppppppqqpo.", "....opppKpppppKqqqqpo.", "....oppppKKKKKqqqqopo.", ".....oopppWppqqqoo.oo.", ".......opppqqqqo...oo.", "......ovRWWWWRvvo..oo.", ".....ovvRRDDRRvvvo.oo.", "..ooovvvRWWWWRvvvvooo.", "..opvvvvYWWWWWYvvvo...", "..opvvvvvWWWWWvvvvo...", "..opvvvvvWWWWWvvvvo...", "..opvvvvYWWWWWYvvvo...", "..opvvvvvWWWWWvvvvo...", "..ooooooooooooooooo..."]};
+  const bakeWith = (rows, cols) => {
+    const c = document.createElement('canvas'); c.width = rows[0].length; c.height = rows.length;
+    const g = c.getContext('2d');
+    rows.forEach((row, y) => [...row].forEach((ch, x) => { const col = cols[ch] || PAL[ch]; if (ch !== '.' && col) { g.fillStyle = col; g.fillRect(x, y, 1, 1); } }));
+    return c;
+  };
+  let gloopPics = null, shopBg = null, shop = { line: 0, waveT: 0 };
+  const inShop = () => !!(arcadeZoom.shop && arcadeZoom.shop.p === 1 && arcadeZoom.target && !arcadeZoom.out);
+  // (Gloop's box on the screen, drawn twice his size behind the counter)
+  const GLOOP_X = 98, GLOOP_Y = 144;
+  function onGloop(e) {
+    const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * PW, y = (e.clientY - r.top) / r.height * PH;
+    return x >= GLOOP_X && x < GLOOP_X + 44 && y >= GLOOP_Y && y < 192;
+  }
+  function shopClick(e) {
+    if (!onGloop(e)) return;
+    shop.line = (shop.line + 1) % SHOP_LINES.length; shop.waveT = 40;
+    tone(520, 0.08, 'sine', 0.05, 380); tone(780, 0.1, 'sine', 0.04, 200, 0.09);   // (a happy alien warble)
+  }
+  // the still parts of the shop, built once: the walls, beam, shelves, porthole's brass ring, counter, till and card
+  function buildShopBg() {
+    shopBg = document.createElement('canvas'); shopBg.width = PW; shopBg.height = PH;
+    const c = shopBg.getContext('2d'), rect = (col, x, y, w, h) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
+    for (let x = 0; x < PW; x += 12) {
+      rect(x / 12 % 2 ? '#61391f' : '#6b4226', x, 0, 12, PH); rect('#3e2414', x, 0, 1, PH);
+      for (const y of [34, 150]) rect('#2a160a', x + 6, y, 1, 1);
+    }
+    rect('#3e2414', 0, 0, PW, 7); rect('#5e3a20', 0, 7, PW, 1);
+    // (the porthole: a brass ring with four bolts; the storm inside is drawn each frame)
+    for (let y = -20; y <= 20; y++) for (let x = -20; x <= 20; x++) {
+      const d = Math.hypot(x, y);
+      if (d <= 20 && d > 16) rect(d > 18.5 ? '#8a6a20' : '#c8a040', 46 + x, 84 + y, 1, 1);
+    }
+    for (const [x, y] of [[46, 65], [46, 103], [27, 84], [65, 84]]) rect('#5a4010', x, y, 2, 2);
+    // (two empty shelves on brackets, with cobwebs in the corners and a little dust bunny)
+    for (const y of [70, 104]) {
+      rect('#3e2414', 148, y + 6, 84, 2); rect('#8a5a30', 148, y, 84, 6); rect('#a87040', 148, y, 84, 1);
+      for (const bx of [156, 220]) for (let i = 0; i < 6; i++) rect('#5e3a20', bx, y + 6 + i, 6 - i, 1);
+    }
+    for (let i = 0; i < 7; i++) { rect('#c8c8d8', 231, 63 + i, 1, 1); rect('#c8c8d8', 225 + i, 69, 1, 1); rect('#b0b0c0', 231 - i, 63 + i, 1, 1); }
+    rect('#9a9aa8', 228, 66, 1, 1); rect('#9a9aa8', 229, 67, 1, 1); rect('#9a9aa8', 227, 67, 1, 1);
+    rect('#9a9aa8', 170, 101, 4, 3); rect('#b0b0c0', 171, 100, 2, 1);
+    // (the counter: a lighter top, panelled front with a gold trim)
+    rect('#3e2414', 0, 189, PW, 1); rect('#b87a44', 0, 190, PW, 4); rect('#8a5a30', 0, 194, PW, 3); rect('#c8a040', 0, 197, PW, 1);
+    rect('#7a4a28', 0, 198, PW, PH - 198);
+    for (let x = 8; x < PW; x += 58) { rect('#5e3a20', x, 206, 46, 40); rect('#6b4226', x + 2, 208, 42, 36); }
+    // (the till: brass, with a little display, rows of keys, a crank and a drawer)
+    rect('#6a4a10', 24, 158, 46, 32); rect('#c8a040', 25, 159, 44, 30); rect('#e8c060', 25, 159, 44, 2);
+    rect('#2a2a20', 34, 150, 26, 10); rect('#6a4a10', 33, 149, 28, 1);
+    for (let r = 0; r < 3; r++) for (let k = 0; k < 6; k++) rect('#f4e9a8', 28 + k * 6, 164 + r * 6, 4, 4);
+    rect('#8a6a20', 26, 182, 42, 6); rect('#c8a040', 44, 184, 6, 2);
+    rect('#6a4a10', 70, 166, 6, 2); rect('#e8282f', 75, 163, 3, 3);
+    // (the card on the counter)
+    rect('#3e2414', 169, 165, 44, 25); rect('#fff6e0', 170, 166, 42, 23);
+  }
+  function drawJupiterShop() {
+    if (!shopBg) buildShopBg();
+    if (!gloopPics) gloopPics = Object.fromEntries(Object.entries(GLOOP).map(([k, v]) => [k, bakeWith(v, GLOOP_COLS)]));
+    const t = spaceT;
+    ctx.drawImage(shopBg, 0, 0);
+    // the storm outside the porthole: red and orange bands swirling past
+    const storm = ['#a8341e', '#c8482e', '#e8785a', '#f0a070', '#c8583a', '#e8c9a0'];
+    for (let y = -16; y <= 16; y++) for (let x = -16; x <= 16; x++) {
+      if (x * x + y * y > 16 * 16) continue;
+      const band = Math.floor((y + 16 + Math.sin((x + t * 0.6) / 5) * 2.5 + Math.sin((x - t * 0.3) / 9) * 1.5) / 4);
+      ctx.fillStyle = storm[((band % storm.length) + storm.length) % storm.length]; ctx.fillRect(46 + x, 84 + y, 1, 1);
+    }
+    ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(36, 74, 4, 2); ctx.fillRect(34, 77, 2, 2);   // (a glint on the glass)
+    // the lamp, swinging a little on its cord, and its warm glow
+    const lx = Math.round(120 + Math.sin(t / 50) * 3);
+    ctx.fillStyle = '#2a160a';
+    for (let y = 8; y < 46; y++) ctx.fillRect(Math.round(120 + (lx - 120) * (y - 8) / 38), y, 1, 1);
+    ctx.globalAlpha = 0.1; ctx.fillStyle = '#ffe08a';
+    for (const r of [56, 40, 26]) { ctx.beginPath(); ctx.arc(lx, 74, r, 0, Math.PI * 2); ctx.fill(); }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#c8a040'; ctx.fillRect(lx - 9, 53, 18, 2);
+    ctx.fillStyle = '#2f6a4a'; ctx.fillRect(lx - 4, 46, 8, 2); ctx.fillRect(lx - 6, 48, 12, 2); ctx.fillRect(lx - 8, 50, 16, 3);
+    ctx.fillStyle = '#fff6c8'; ctx.fillRect(lx - 2, 55, 4, 2);
+    // (specks of dust drifting in the lamplight)
+    ctx.fillStyle = '#ffe9b0';
+    for (let i = 0; i < 7; i++) ctx.fillRect(Math.round(100 + (i * 37 + Math.sin(t / 30 + i) * 6) % 40), Math.round(60 + (t * 0.15 + i * 23) % 80), 1, 1);
+    // Gloop: bobbing, blinking now and then, waving when clicked, behind the counter (which is drawn over his middle)
+    if (shop.waveT > 0) shop.waveT--;
+    const pic = shop.waveT ? gloopPics.wave : t % 200 < 8 ? gloopPics.blink : gloopPics.idle, bob = Math.round(Math.sin(t / 25));
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, PW, 190); ctx.clip();
+    ctx.drawImage(pic, GLOOP_X, GLOOP_Y + bob, 44, 48);
+    ctx.restore();
+    // (his hands resting on the counter top: the right one is up while he waves)
+    ctx.fillStyle = GLOOP_COLS.o; ctx.fillRect(GLOOP_X + 2, 186, 8, 5); if (!shop.waveT) ctx.fillRect(GLOOP_X + 34, 186, 8, 5);
+    ctx.fillStyle = GLOOP_COLS.p; ctx.fillRect(GLOOP_X + 3, 187, 6, 3); if (!shop.waveT) ctx.fillRect(GLOOP_X + 35, 187, 6, 3);
+    // (the card says COMING SOON, and the till shows nothing rung up)
+    drawText('COMING', 191, 169, 'black', 'center'); drawText('SOON!', 191, 179, 'red', 'center');
+    drawText('000', 47, 152, 'green', 'center');
+    // his speech bubble, with a tail down to his head
+    const [l1, l2] = SHOP_LINES[shop.line], bw = Math.max(l1.length, l2.length) * 6 + 12, bx = Math.round(120 - bw / 2);
+    ctx.fillStyle = '#3e2414'; ctx.fillRect(bx - 1, 109, bw + 2, 28);
+    ctx.fillStyle = '#fff6e0'; ctx.fillRect(bx, 110, bw, 26);
+    for (let i = 0; i < 6; i++) { ctx.fillStyle = '#3e2414'; ctx.fillRect(124 + i, 136 + i, 8 - i * 2 + 2, 1); ctx.fillStyle = '#fff6e0'; ctx.fillRect(125 + i, 136 + i, Math.max(0, 8 - i * 2), 1); }
+    drawText(l1, 120, 113, 'black', 'center'); drawText(l2, 120, 124, 'black', 'center');
   }
   // ----- Earth's mini-game: Banana Catch (Play on Earth in The Arcade) -----
   // The pug that pressed Play stands on the grass wearing a bowl on its head, and Big Bruno walks back and forth
