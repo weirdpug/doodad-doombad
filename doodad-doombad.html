@@ -4639,8 +4639,8 @@
   }
   // ----- The Arcade: out in space, reached by clicking the night sky on the main menu -----
   // A deep sky with a faint nebula, lots of stars and planets hanging in it (built once, like the castle
-  // scene): a big ringed one, a red one, a blue and green one with its little moon, a small purple one, and a big
-  // striped one with a red storm (Jupiter, the user asked 2026-11-02).
+  // scene): a big ringed one, a red one, a blue and green one with its little moon, a small purple one, and Jupiter,
+  // striped, with its Great Red Spot and four moons (the user asked 2026-11-02).
   // On top, some stars twinkle and every few seconds a shooting star streaks past. (The Arcade is opened
   // like the Store from the main menu, so the game is 'paused' and frame stands still: spaceT counts instead.)
   const spaceBg = document.createElement('canvas');
@@ -4666,11 +4666,9 @@
     { name: 'Earth', x: 182, y: 196, r: 18, cols: ['#9fb4ff', '#2f5bff', '#1d2f8c'], game: 'banana', dot: [157, 208] },
     { name: 'The Moon', x: 214, y: 172, r: 6, cols: ['#eef0f6', '#b4b8c8', '#7f8396'], game: 'race', dot: [204, 163] },
     { name: 'Pluto', x: 32, y: 222, r: 7, cols: ['#d8a6e8', '#9c5ab8', '#5a2c7a'], stripe: '#7a3c9a', game: 'showdown', dot: [43, 214] },
-    // (Jupiter: bands of cream, tan and rust, each with its lit and shadowed colour, top to bottom, and its great red
-    // storm, spot: where, from its middle; no game of its own yet, so Play starts the main game)
-    { name: 'Jupiter', x: 172, y: 124, r: 17, cols: ['#fff2dc', '#d49a6a', '#7a4a2e'], spot: [6, 5], dot: [194, 108],
-      bands: [['#f0dcc0', '#a8846a'], ['#c88a5e', '#7a4a2e'], ['#f4e4cc', '#ad8c72'], ['#b8744a', '#6e3e22'], ['#ead2ae', '#a08060'],
-        ['#d49a6a', '#7e5232'], ['#f0dcc0', '#a8846a'], ['#b8744a', '#6e3e22'], ['#e8c9a0', '#9a7a5a']] },
+    // (Jupiter: drawn by jupiter() in buildSpaceBg, as like the real one as its size allows; no game of its own yet,
+    // so Play starts the main game)
+    { name: 'Jupiter', x: 172, y: 124, r: 17, cols: ['#fff2dc', '#d49a6a', '#7a4a2e'], jupiter: true, dot: [194, 108] },
     // the alien mother ship: not a planet, but it works like one once it has come (mother: see drawMother)
     // (drawn 2.5 times its sprite's size, 120 pixels across, so it really is giant: r is half that, and a click
     // counts anywhere in its box; no green pixel or alien spaceship by it: the user asked for none)
@@ -5199,23 +5197,43 @@
         for (const d of [0, 2]) dot(col, Math.round(cx + Math.cos(t) * (rx - d)), Math.round(cy + Math.sin(t) * (ry - d / 4)));
       }
     };
-    // a banded giant: stripes across it (a little wavy), each its own colour, darker on the shadowed side and paler
-    // right at the lit edge, and a red storm with a lighter middle
-    const banded = p => {
-      const { x: cx, y: cy, r, bands } = p;
-      for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) {
-        if (x * x + y * y > r * r) continue;
-        const l = (x + y) / (r * 1.4), wy = y + Math.round(Math.sin((cx + x) / 4) * 0.8);
-        const [lit, dark] = bands[clamp(Math.floor((wy + r) / (2 * r + 1) * bands.length), 0, bands.length - 1)];
-        dot(l > 0.45 ? dark : l < -0.6 ? p.cols[0] : lit, cx + x, cy + y);
+    // Jupiter, redrawn as like the real one as 34 pixels allow (the user asked 2026-11-02): a little squashed (wider
+    // than tall, as it spins so fast); its pale zones and darker belts at their real latitudes (JUP_BANDS: each
+    // colour and how far down it goes, north to south, as a fraction of the way from the middle to a pole), with
+    // wavy, swirling edges: greyish polar regions, thin temperate belts, the broad rusty North Equatorial Belt, the
+    // bright cream Equatorial Zone with blue-grey festoons trailing into it, the South Equatorial Belt in two parts
+    // with a paler lane between, and below it the Great Red Spot in its pale hollow, plus two small white storms
+    // further south. Its edge darkens all round (limb darkening), with a little shade on the lower right like the
+    // other planets, and its four big moons (Callisto, Ganymede, Io, Europa) sit in a line beside it.
+    const JUP_BANDS = [[-0.78, '#a8988a'], [-0.67, '#c4ad94'], [-0.57, '#e6d6bc'], [-0.47, '#b89474'], [-0.33, '#efe2c8'],
+      [-0.25, '#b87a52'], [-0.1, '#9a5434'], [0.13, '#f6ead2'], [0.2, '#946040'], [0.26, '#c49a78'], [0.34, '#8e5434'],
+      [0.5, '#ecdcc0'], [0.6, '#b08a6a'], [0.74, '#e2d2b8'], [9, '#a49482']];
+    const jupiter = p => {
+      const { x: cx, y: cy } = p, rx = 17, ry = 16;
+      const mix = (hex, k, w) => '#' + [1, 3, 5].map(i => Math.round(clamp(parseInt(hex.slice(i, i + 2), 16) * k + (w || 0) * 255, 0, 255)).toString(16).padStart(2, '0')).join('');
+      for (let y = -ry; y <= ry; y++) for (let x = -rx; x <= rx; x++) {
+        const nx = x / rx, ny = y / ry, d = Math.hypot(nx, ny);
+        if (d > 1.02) continue;
+        const lat = ny + 0.035 * Math.sin(x * 0.8 + ny * 9) + 0.02 * Math.sin(x * 0.31 + 1.7);
+        const col = JUP_BANDS.find(([to]) => lat < to)[1], l = (nx + ny) / 1.4;
+        let k = d > 0.93 ? 0.7 : d > 0.8 ? 0.86 : 1;
+        if (l > 0.62) k *= 0.8;
+        dot(mix(col, k, l < -0.5 && d <= 0.93 ? 0.06 : 0), cx + x, cy + y);
       }
-      const [sx, sy] = p.spot;
-      dot('#a8341e', cx + sx - 3, cy + sy - 1, 7, 3); dot('#a8341e', cx + sx - 2, cy + sy - 2, 5, 5);
-      dot('#c8482e', cx + sx - 2, cy + sy - 1, 5, 3); dot('#e8785a', cx + sx - 1, cy + sy, 2, 1);
+      // (festoons: blue-grey wisps trailing from the belt's lower edge into the bright equator)
+      for (const fx of [-11, -4, 3, 10]) { dot('#7c7e94', cx + fx, cy - 2); dot('#8e90a4', cx + fx + 1, cy - 1); }
+      // (the Great Red Spot, in its pale hollow, just below the South Equatorial Belt)
+      dot('#f4e8d4', cx + 1, cy + 5, 9, 5); dot('#f4e8d4', cx, cy + 6, 11, 3);
+      dot('#b4482e', cx + 2, cy + 6, 7, 3); dot('#b4482e', cx + 3, cy + 5, 5, 5);
+      dot('#c8583a', cx + 3, cy + 6, 5, 3); dot('#dc7a56', cx + 4, cy + 7, 3, 1);
+      // (two small white storms further south)
+      dot('#fbf6ec', cx - 7, cy + 11, 2, 1); dot('#fbf6ec', cx, cy + 11, 2, 1);
+      // (its four big moons, in a line: Callisto, Ganymede, Io, Europa)
+      dot('#7a7066', cx - 31, cy); dot('#b0a490', cx - 22, cy + 1); dot('#e8d060', cx + 23, cy - 1); dot('#e8e4d8', cx + 29, cy);
     };
     for (const p of SPACE_PLANETS) {
       if (p.mother) continue;   // (the mother ship is drawn over space when it comes: drawMother)
-      if (p.bands) { banded(p); continue; }
+      if (p.jupiter) { jupiter(p); continue; }
       if (p.ring) ring(p.x, p.y, p.ring[0], p.ring[1], '#d9a066', false);
       ball(p.x, p.y, p.r, p.cols, p.stripe);
       if (p.ring) ring(p.x, p.y, p.ring[0], p.ring[1], '#f4e9a8', true);
