@@ -888,6 +888,14 @@
     rocket_fly2: ["...RR.........", "...RWWWWWWWa..", "..FaWWWBBWWWR.", "YFYaWWBVBWWWRR", "..FaWWWBBWWWR.", "...RWWWWWWWa..", "...RR........."],
   });
   SPRITES.rocket_pet = SPRITES.rocket_fly1;
+  // Cookie and Pepper (a pet, the user asked 2026-11-02): two hens that go everywhere together, one pet: Pepper, dark
+  // grey with white speckles, behind, and Cookie, golden brown, in front; plain heads with no comb or wattles (the user
+  // asked for no red on their heads or chins), yellow beaks, orange legs stepping out of time with each other.
+  Object.assign(SPRITES, {
+    chickens_walk1: [".......II..........LL..", "......IIII........LLLL.", "K.....IWKYY.A.....LKLYY", "KK....IIIY..AA....LLLY.", "KII..IIII...AOO..LLLL..", "KIIcIIIcII..AOOOOOLLLL.", ".IIIKKKIcI...OOOAAAOLL.", "..IcIIIII.....OOOOOOO..", "...F...F........F..F..."],
+    chickens_walk2: [".......II..........LL..", "......IIII........LLLL.", "K.....IWKYY.A.....LKLYY", "KK....IIIY..AA....LLLY.", "KII..IIII...AOO..LLLL..", "KIIcIIIcII..AOOOOOLLLL.", ".IIIKKKIcI...OOOAAAOLL.", "..IcIIIII.....OOOOOOO..", "....F..F.......F...F..."],
+  });
+  SPRITES.chickens_pet = SPRITES.chickens_walk1;
   // Earth's mini-game (Banana Catch): the bowl the pug wears on its head to catch bananas in (white rim, blue
   // bowl), a banana (yellow, with a brown stem, the darker underside orange; two frames so it tumbles as it
   // falls: the second one upside down), and a banana squashed flat on the floor.
@@ -1167,7 +1175,11 @@
     { key: 'zorp', name: 'Zorp the Alien', alt: 'A little green alien in a tiny flying saucer', kind: 'fly', locked: () => !unlocks.alien,
       hint: 'Locked! Blow up the mother ship to unlock this pet.' },
     { key: 'rocket', name: 'Rocket', alt: 'A little white rocket with a red nose and a flame', kind: 'fly', locked: () => !unlocks.space,
-      hint: 'Locked! Go to space to unlock the Rocket.' }];
+      hint: 'Locked! Go to space to unlock the Rocket.' },
+    // (price: unlocked with that many of the pressing pug's coins, once, for every pug; its card shows it, not a
+    // shadow, with Unlock and the price; are: two of them)
+    { key: 'chickens', name: 'Cookie and Pepper', alt: 'Two hens, a speckled dark grey one and a golden one', kind: 'walk', are: true,
+      price: 20, locked: () => !unlocks.chickens }];
   // the Customize sections with things to choose: which of a pug's looks each sets, its things, the
   // button's words while it isn't / is chosen, and what the screen says after
   const LOOK_SECTIONS = {
@@ -1180,7 +1192,7 @@
     // (max: things that can be chosen together, up to that many at once; the slot is then a list. Pets have no
     // limit: as many as you like, the user asked 2026-10-31, after 3 at a time)
     pets: { slot: 'pets', list: PETS, pic: 'pet', off: 'Bring', on: 'Send home', max: Infinity,
-      put: (who, n) => `${n.name} is following ${who}!`, took: (who, n) => `${who} sent ${n.name} home.`,
+      put: (who, n) => `${n.name} ${n.are ? 'are' : 'is'} following ${who}!`, took: (who, n) => `${who} sent ${n.name} home.`,
       full: who => `${who} can't bring any more pets! Send one home first.` },
   };
   function loadLooks() {
@@ -2179,7 +2191,7 @@
       // (a small pet's picture is drawn bigger, as big as fits the card)
       if (s) { img.src = s.toDataURL(); img.style.setProperty('--w', s.width * (sec.slot === 'pets' ? Math.max(1, Math.floor(18 / s.height)) : 1)); }
       n.picUrl = img.src;
-      if (n.locked) n.lockUrl = sprite(n.key + '_' + sec.pic, false, 'shadow').toDataURL();
+      if (n.locked && !n.price) n.lockUrl = sprite(n.key + '_' + sec.pic, false, 'shadow').toDataURL();
     } catch (e) {}
     pic.append(img);
     name.textContent = n.name;
@@ -2191,8 +2203,8 @@
   function renderLooks() {
     for (const sec of Object.values(LOOK_SECTIONS)) for (const n of sec.list) {
       const on = lookOn(storeBy, sec, n.key), locked = !!(n.locked && n.locked());
-      n.wearBtn.textContent = locked ? 'Locked' : on ? sec.on : sec.off;
-      n.wearBtn.setAttribute('aria-label', locked ? 'Locked' : `${on ? sec.on : sec.off} ${n.name}`);
+      n.wearBtn.textContent = locked ? (n.price ? `Unlock: ${n.price} coins` : 'Locked') : on ? sec.on : sec.off;
+      n.wearBtn.setAttribute('aria-label', locked ? (n.price ? `Unlock ${n.name} for ${n.price} coins` : 'Locked') : `${on ? sec.on : sec.off} ${n.name}`);
       if (n.lockUrl) { const src = locked ? n.lockUrl : n.picUrl; if (n.img.src !== src) n.img.src = src; n.nameEl.textContent = locked ? '???' : n.name; }
       n.wearBtn.classList.toggle('on', on);
       n.card.hidden = n.view !== pauseView;
@@ -2203,8 +2215,20 @@
   function wearLook(n, by) {
     const sec = LOOK_SECTIONS[n.view];
     if (phase !== 'paused' || pauseView !== n.view) return;
+    const id = joined[by] ? by : 0, name = LOOK[id].name;
+    if (n.locked && n.locked() && n.price) {
+      // (bought with the pressing pug's coins: unlocked for every pug, and it comes along with this one right away)
+      storeBy = id;
+      const need = n.price - coins[id];
+      if (need > 0) { ovText.textContent = `${name} needs ${need} more coin${need === 1 ? '' : 's'} to unlock ${n.name}.`; sfx.nope(); renderLooks(); return; }
+      coins[id] -= n.price; saveCoins(); updateHud(true);
+      unlock(n.key);
+      if (!lookOn(id, sec, n.key)) { looks[id][sec.slot] = [...looks[id][sec.slot], n.key]; saveLooks(); }
+      ovText.textContent = `${name} unlocked ${n.name} for ${n.price} coins! ${sec.put(name, n)}`; sfx.oneUp();
+      renderLooks(); return;
+    }
     if (n.locked && n.locked()) { ovText.textContent = n.hint; sfx.nope(); return; }
-    const id = joined[by] ? by : 0, name = LOOK[id].name, on = lookOn(id, sec, n.key);
+    const on = lookOn(id, sec, n.key);
     storeBy = id;
     if (sec.max) {
       const list = looks[id][sec.slot];
