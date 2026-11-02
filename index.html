@@ -4643,7 +4643,8 @@
   }
   // ----- The Arcade: out in space, reached by clicking the night sky on the main menu -----
   // A deep sky with a faint nebula, lots of stars and planets hanging in it (built once, like the castle
-  // scene): a big ringed one, a red one, a blue and green one with its little moon, and a small purple one.
+  // scene): a big ringed one, a red one, a blue and green one with its little moon, a small purple one, and a big
+  // striped one with a red storm (Jupiter, the user asked 2026-11-02).
   // On top, some stars twinkle and every few seconds a shooting star streaks past. (The Arcade is opened
   // like the Store from the main menu, so the game is 'paused' and frame stands still: spaceT counts instead.)
   const spaceBg = document.createElement('canvas');
@@ -4669,6 +4670,11 @@
     { name: 'Earth', x: 182, y: 196, r: 18, cols: ['#9fb4ff', '#2f5bff', '#1d2f8c'], game: 'banana', dot: [157, 208] },
     { name: 'The Moon', x: 214, y: 172, r: 6, cols: ['#eef0f6', '#b4b8c8', '#7f8396'], game: 'race', dot: [204, 163] },
     { name: 'Pluto', x: 32, y: 222, r: 7, cols: ['#d8a6e8', '#9c5ab8', '#5a2c7a'], stripe: '#7a3c9a', game: 'showdown', dot: [43, 214] },
+    // (Jupiter: bands of cream, tan and rust, each with its lit and shadowed colour, top to bottom, and its great red
+    // storm, spot: where, from its middle; no game of its own yet, so Play starts the main game)
+    { name: 'Jupiter', x: 172, y: 124, r: 17, cols: ['#fff2dc', '#d49a6a', '#7a4a2e'], spot: [6, 5], dot: [194, 108],
+      bands: [['#f0dcc0', '#a8846a'], ['#c88a5e', '#7a4a2e'], ['#f4e4cc', '#ad8c72'], ['#b8744a', '#6e3e22'], ['#ead2ae', '#a08060'],
+        ['#d49a6a', '#7e5232'], ['#f0dcc0', '#a8846a'], ['#b8744a', '#6e3e22'], ['#e8c9a0', '#9a7a5a']] },
     // the alien mother ship: not a planet, but it works like one once it has come (mother: see drawMother)
     // (drawn 2.5 times its sprite's size, 120 pixels across, so it really is giant: r is half that, and a click
     // counts anywhere in its box; no green pixel or alien spaceship by it: the user asked for none)
@@ -5197,8 +5203,23 @@
         for (const d of [0, 2]) dot(col, Math.round(cx + Math.cos(t) * (rx - d)), Math.round(cy + Math.sin(t) * (ry - d / 4)));
       }
     };
+    // a banded giant: stripes across it (a little wavy), each its own colour, darker on the shadowed side and paler
+    // right at the lit edge, and a red storm with a lighter middle
+    const banded = p => {
+      const { x: cx, y: cy, r, bands } = p;
+      for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) {
+        if (x * x + y * y > r * r) continue;
+        const l = (x + y) / (r * 1.4), wy = y + Math.round(Math.sin((cx + x) / 4) * 0.8);
+        const [lit, dark] = bands[clamp(Math.floor((wy + r) / (2 * r + 1) * bands.length), 0, bands.length - 1)];
+        dot(l > 0.45 ? dark : l < -0.6 ? p.cols[0] : lit, cx + x, cy + y);
+      }
+      const [sx, sy] = p.spot;
+      dot('#a8341e', cx + sx - 3, cy + sy - 1, 7, 3); dot('#a8341e', cx + sx - 2, cy + sy - 2, 5, 5);
+      dot('#c8482e', cx + sx - 2, cy + sy - 1, 5, 3); dot('#e8785a', cx + sx - 1, cy + sy, 2, 1);
+    };
     for (const p of SPACE_PLANETS) {
       if (p.mother) continue;   // (the mother ship is drawn over space when it comes: drawMother)
+      if (p.bands) { banded(p); continue; }
       if (p.ring) ring(p.x, p.y, p.ring[0], p.ring[1], '#d9a066', false);
       ball(p.x, p.y, p.r, p.cols, p.stripe);
       if (p.ring) ring(p.x, p.y, p.ring[0], p.ring[1], '#f4e9a8', true);
