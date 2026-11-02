@@ -5385,7 +5385,8 @@
       if (se) { k *= 1 + (SHIP_ZOOM - 1) * se; cx += (p.dot[0] - cx) * se; cy += (p.dot[1] - cy) * se; }
       // (on into a planet's shop: far further in, sliding its spot to the middle)
       const he = z.shop ? z.shop.p * z.shop.p * (3 - 2 * z.shop.p) : 0;
-      if (he) { k *= 1 + (SHOP_ZOOM - 1) * he; cx += (p.shop[0] - cx) * he; cy += (p.shop[1] - cy) * he; }
+      // (zoomed about the spot itself, so it glides straight to the middle as it grows, never off to the side)
+      if (he) { const k0 = k; k *= 1 + (SHOP_ZOOM - 1) * he; const f = (1 - he) * k0 / k; cx = p.shop[0] - (p.shop[0] - cx) * f; cy = p.shop[1] - (p.shop[1] - cy) * f; }
       // on into the spaceships hiding inside one another (Saturn's deep ones): each level blows everything so far up
       // 5 times more round its green pixel (at: beside the ship before it), which slides to the middle (f) and grows
       // into the next ship
@@ -5505,7 +5506,12 @@
     ['MY TILL HAS NEVER', 'ONCE GONE DING...'], ['I WROTE COMING SOON', 'A LONG LONG TIME AGO...'], ['I HAD A CUSTOMER ONCE.', 'IT WAS A DREAM...'],
     ['EVEN THE SPIDER', 'MOVED OUT...'], ['MY BOW TIE IS', 'FOR NOBODY...'], ['MY THIRD EYE HAS', 'NOTHING TO LOOK AT...'],
     ['SOMETIMES I TALK', 'TO MY LAMP...'], ['I DUST THE SHELVES.', 'THERE IS NOTHING ON THEM...'], ['I MISS JUPITER...', "AND I'M ON JUPITER..."],
-    ['MY ANTENNAE ARE TOO', 'SAD TO STAND UP...'], ['THE STORM OUTSIDE', 'NEVER EVER STOPS...'], ['I PRACTICE SAYING HELLO.', 'NOBODY HEARS IT...']];
+    ['MY ANTENNAE ARE TOO', 'SAD TO STAND UP...'], ['THE STORM OUTSIDE', 'NEVER EVER STOPS...'], ['I PRACTICE SAYING HELLO.', 'NOBODY HEARS IT...'],
+    ['I BAKED A CAKE FOR MY', 'GRAND OPENING...'], ['NOBODY CAME. I ATE', 'IT ALL BY MYSELF...'], ['I SAID HI TO A ROCK.', 'IT DID NOT SAY HI...'],
+    ['MY ONLY FRIEND IS', 'THE DUST BUNNY...'], ['I PUT UP A SIGN.', 'THE STORM ATE IT...'], ['I COUNT THE PLANKS.', 'THERE ARE STILL 20...'],
+    ['I WAVE AT EVERY', 'SPACESHIP. NONE STOP...'], ['MY ICE CREAM MELTED', 'BEFORE I COULD SELL IT...'], ['EVEN MY TEAR', 'LOOKS LONELY...'],
+    ['THE MOTHER SHIP', 'NEVER VISITS ME...'], ['I HAVE THREE EYES', 'AND ALL THREE ARE SAD...'], ['SOME DAYS I JUST', 'STARE AT THE WALL...'],
+    ['NOBODY KNOWS', 'MY BIRTHDAY...'], ['I SING TO THE STORM.', 'IT JUST ROARS BACK...']];
   // (line: what he is saying; tearT: a tear rolling down, frames left)
   let gloopPics = null, shopBg = null, shop = { line: 0, tearT: 0 };
   const SHOP_TEAR = 50;
@@ -5561,7 +5567,7 @@
   function drawJupiterShop() {
     if (!shopBg) buildShopBg();
     if (!gloopPics) gloopPics = Object.fromEntries(Object.entries(GLOOP).map(([k, v]) => [k, bakeWith(v, GLOOP_COLS)]));
-    const t = spaceT;
+    const t = spaceT, a = ctx.globalAlpha;   // (a: how far the shop has faded in, so all of it fades together)
     ctx.drawImage(shopBg, 0, 0);
     // the storm outside the porthole: red and orange bands swirling past
     const storm = ['#a8341e', '#c8482e', '#e8785a', '#f0a070', '#c8583a', '#e8c9a0'];
@@ -5574,16 +5580,16 @@
     // the lamp, swinging a little on its cord, and its warm glow
     const lx = Math.round(120 + Math.sin(t / 50) * 3);
     ctx.fillStyle = '#2a160a';
-    for (let y = 8; y < 46; y++) ctx.fillRect(Math.round(120 + (lx - 120) * (y - 8) / 38), y, 1, 1);
-    ctx.globalAlpha = 0.1; ctx.fillStyle = '#ffe08a';
-    for (const r of [56, 40, 26]) { ctx.beginPath(); ctx.arc(lx, 74, r, 0, Math.PI * 2); ctx.fill(); }
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = '#c8a040'; ctx.fillRect(lx - 9, 53, 18, 2);
-    ctx.fillStyle = '#2f6a4a'; ctx.fillRect(lx - 4, 46, 8, 2); ctx.fillRect(lx - 6, 48, 12, 2); ctx.fillRect(lx - 8, 50, 16, 3);
-    ctx.fillStyle = '#fff6c8'; ctx.fillRect(lx - 2, 55, 4, 2);
+    for (let y = 8; y < 66; y++) ctx.fillRect(Math.round(120 + (lx - 120) * (y - 8) / 58), y, 1, 1);
+    ctx.globalAlpha = a * 0.1; ctx.fillStyle = '#ffe08a';
+    for (const r of [56, 40, 26]) { ctx.beginPath(); ctx.arc(lx, 94, r, 0, Math.PI * 2); ctx.fill(); }
+    ctx.globalAlpha = a;
+    ctx.fillStyle = '#c8a040'; ctx.fillRect(lx - 9, 73, 18, 2);
+    ctx.fillStyle = '#2f6a4a'; ctx.fillRect(lx - 4, 66, 8, 2); ctx.fillRect(lx - 6, 68, 12, 2); ctx.fillRect(lx - 8, 70, 16, 3);
+    ctx.fillStyle = '#fff6c8'; ctx.fillRect(lx - 2, 75, 4, 2);
     // (specks of dust drifting in the lamplight)
     ctx.fillStyle = '#ffe9b0';
-    for (let i = 0; i < 7; i++) ctx.fillRect(Math.round(100 + (i * 37 + Math.sin(t / 30 + i) * 6) % 40), Math.round(60 + (t * 0.15 + i * 23) % 80), 1, 1);
+    for (let i = 0; i < 7; i++) ctx.fillRect(Math.round(100 + (i * 37 + Math.sin(t / 30 + i) * 6) % 40), Math.round(80 + (t * 0.15 + i * 23) % 60), 1, 1);
     // Gloop: slumped behind the counter (which is drawn over his middle), sinking and rising slowly with his sighs,
     // blinking slowly now and then; every so often (or when clicked) a tear rolls down from his left eye
     if (shop.tearT > 0) shop.tearT--;
