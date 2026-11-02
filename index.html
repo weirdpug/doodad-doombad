@@ -1274,7 +1274,7 @@
     showControllerHelp(); updateHud(true);
     // (in the Store opened from the main menu no game is running: it just shows the pugs still here)
     // (in the Colosseum its pug fights on for the computer, and the fight pauses to say so)
-    if ((arena || race || snake) && fromTitle && phase === 'mini') { pauseMini(`Player ${id + 1}'s controller disconnected. Press A on a controller to bring them back.`); return; }
+    if ((arena || race || dig) && fromTitle && phase === 'mini') { pauseMini(`Player ${id + 1}'s controller disconnected. Press A on a controller to bring them back.`); return; }
     if (fromTitle) { if (phase === 'paused') showPause(pauseView, menuSel); return; }
     if (phase === 'play' || phase === 'paused' || phase === 'win') {
       // if everyone left was sitting out, the team is out: that costs a heart and the level restarts
@@ -1614,11 +1614,11 @@
     // X or Enter also swings the sword)
     if (phase === 'mini') {
       const km = keyMap[e.code];
-      const swing = arena && (e.code === 'KeyX' || e.key === 'Enter');
+      const swing = (arena || dig) && (e.code === 'KeyX' || e.key === 'Enter');   // (on Mars, a bark)
       // (in the Colosseum a keyboard that hasn't joined yet joins as the next player, as in the main game)
-      if ((arena || race || snake) && (km || swing) && !e.repeat) claimKeyboard(true);
+      if ((arena || race || dig) && (km || swing) && !e.repeat) claimKeyboard(true);
       if (km) { e.preventDefault(); keys[km] = true; }
-      if (swing && !e.repeat) { e.preventDefault(); arena.kbAtk = true; }
+      if (swing && !e.repeat) { e.preventDefault(); (arena || dig).kbAtk = true; }
       if ((e.key === 'Escape' || e.key === 'p' || e.key === 'P') && !e.repeat) pauseMini();
       return;
     }
@@ -1690,7 +1690,7 @@
   addEventListener('blur', releaseAll);
 
   // the touch buttons count as the keyboard: the same pug, and they join the same way its keys do
-  document.getElementById('barkBtn').addEventListener('pointerdown', e => { e.preventDefault(); initAudio(); if (phase === 'mini' && (arena || race || snake)) { if (arena && claimKeyboard(true)) arena.kbAtk = true; return; } if (claimKeyboard(true) === true) doBark(pById(kbSlot)); });
+  document.getElementById('barkBtn').addEventListener('pointerdown', e => { e.preventDefault(); initAudio(); if (phase === 'mini' && (arena || race || dig)) { if ((arena || dig) && claimKeyboard(true)) (arena || dig).kbAtk = true; return; } if (claimKeyboard(true) === true) doBark(pById(kbSlot)); });
   document.querySelectorAll('.pad button[data-k]').forEach(btn => {
     const k = btn.dataset.k;
     const on = e => {
@@ -1767,7 +1767,7 @@
       // it over. During the level-clear banner, the pause waits for the next level to start.
       else if ((phase === 'play' || phase === 'paused') && !fromTitle) p1Lost();
       // (the keyboard can only take Player 1 back if it isn't already someone else)
-      else if (phase === 'mini' && snake && !snake.endT) pauseSnake(`Player 1's controller disconnected. ${kbSlot === null || kbSlot === 0 ? 'Press a key, or A on a controller,' : 'Press A on a controller'} to take Player 1 back.`);
+      else if (phase === 'mini' && dig && !dig.endT) pauseDig(`Player 1's controller disconnected. ${kbSlot === null || kbSlot === 0 ? 'Press a key, or A on a controller,' : 'Press A on a controller'} to take Player 1 back.`);
       else if (phase === 'mini' && race && !race.endT) pauseRace(`Player 1's controller disconnected. ${kbSlot === null || kbSlot === 0 ? 'Press a key, or A on a controller,' : 'Press A on a controller'} to take Player 1 back.`);
       else if (phase === 'mini' && arena && !arena.result) pauseArena(`Player 1's controller disconnected. ${kbSlot === null || kbSlot === 0 ? 'Press a key, or A on a controller,' : 'Press A on a controller'} to take Player 1 back.`);
       else if (phase === 'win') p1LostAtWin = true;
@@ -2211,9 +2211,9 @@
     // the Moon Race's, the same way (Back goes to The Arcade, zoomed in on the Moon)
     racePause: () => [{ label: 'Resume', act: () => resumeGame() }, { label: 'Back', act: () => backFromRace() }],
     raceOver: () => [{ label: 'Race again', act: by => startRace(by) }, { label: 'Back', act: () => backFromRace() }],
-    // Pug Train's, the same way (Back goes to The Arcade, zoomed in on Mars)
-    snakePause: () => [{ label: 'Resume', act: () => resumeGame() }, { label: 'Back', act: () => backFromSnake() }],
-    snakeOver: () => [{ label: 'Play again', act: by => startSnake(by) }, { label: 'Back', act: () => backFromSnake() }],
+    // Mars Dig's, the same way (Back goes to The Arcade, zoomed in on Mars)
+    digPause: () => [{ label: 'Resume', act: () => resumeGame() }, { label: 'Back', act: () => backFromDig() }],
+    digOver: () => [{ label: 'Play again', act: by => startDig(by) }, { label: 'Back', act: () => backFromDig() }],
     arcade: () => [
       ...(arcadeZoom.target && !arcadeZoom.out && !onShip() ? [{ label: 'Play', act: by => playFromArcade(by) }] : []),
       // (zoomed in on the spaceship, Back zooms out to Saturn first)
@@ -2240,8 +2240,8 @@
     // (the Store and Necklaces show the bag or look of the pug that opened them)
     if ((store || neck) && by !== undefined && joined[by]) storeBy = by;
     if (!joined[storeBy]) storeBy = kbBy();
-    const bpause = /^(banana|arena|race|snake)Pause$/.test(view), bover = /^(banana|arena|race|snake)Over$/.test(view);
-    ovTitle.textContent = bpause ? 'Paused' : view === 'arenaOver' ? arenaWords().title : view === 'raceOver' ? raceWords().title : view === 'snakeOver' ? snakeWords().title : bover ? 'Splat!' : arcade ? (onShip() ? 'Alien Spaceship' : arcadeZoom.target && !arcadeZoom.out ? arcadeZoom.target.name : 'The Arcade') : store ? 'Store' : part ? part.name : custom ? 'Customize' : 'Paused';
+    const bpause = /^(banana|arena|race|dig)Pause$/.test(view), bover = /^(banana|arena|race|dig)Over$/.test(view);
+    ovTitle.textContent = bpause ? 'Paused' : view === 'arenaOver' ? arenaWords().title : view === 'raceOver' ? raceWords().title : view === 'digOver' ? digWords().title : bover ? 'Splat!' : arcade ? (onShip() ? 'Alien Spaceship' : arcadeZoom.target && !arcadeZoom.out ? arcadeZoom.target.name : 'The Arcade') : store ? 'Store' : part ? part.name : custom ? 'Customize' : 'Paused';
     // (Necklaces keeps a line for what was just put on, and with 2-4 pugs, whose look it is)
     ovText.hidden = arcade || (custom && !neck);
     ovText.textContent = note || (store
@@ -2251,8 +2251,8 @@
       : view === 'arenaPause' ? (arena && arena.gun ? 'Pluto Showdown. Blast the other pugs: the last pug standing wins!' : 'The Colosseum. Swing your sword: the last pug standing wins!')
       : view === 'racePause' ? 'The Moon Race. Steer round the craters and be first to the flag!'
       : view === 'raceOver' ? raceWords().text
-      : view === 'snakePause' ? 'Pug Train. Gobble the bones, and don\'t bump into anything!'
-      : view === 'snakeOver' ? snakeWords().text
+      : view === 'digPause' ? 'Mars Dig. Dig for bones and crystals, bark to make the Martians dizzy, then boop them. Look out for falling rocks!'
+      : view === 'digOver' ? digWords().text
       : view === 'arenaOver' ? arenaWords().text
       : bpause ? 'Banana Catch. Catch every banana in your bowl!'
       : bover && banana ? `A banana hit the floor! You caught ${banana.score} banana${banana.score === 1 ? '' : 's'}. Best: ${banana.best}.`
@@ -2477,8 +2477,9 @@
     if (fromTitle && pauseView === 'arenaOver') return backFromArena();
     if (fromTitle && pauseView === 'racePause') { releaseAll(); phase = 'mini'; hideOverlay(); return; }
     if (fromTitle && pauseView === 'raceOver') return backFromRace();
-    if (fromTitle && pauseView === 'snakePause') { releaseAll(); phase = 'mini'; hideOverlay(); return; }
-    if (fromTitle && pauseView === 'snakeOver') return backFromSnake();
+    // (back on Mars, a bark button still held from the menu doesn't bark)
+    if (fromTitle && pauseView === 'digPause') { releaseAll(); if (dig) dig.pugs.forEach(p => { p.prevBark = true; }); phase = 'mini'; hideOverlay(); return; }
+    if (fromTitle && pauseView === 'digOver') return backFromDig();
     if (fromTitle) return backToTitle();   // (the Store or Customize opened from the main menu goes back there)
     releaseAll(); phase = 'play'; hideOverlay();
   }
@@ -3376,7 +3377,7 @@
       }
     } else if (phase === 'title') {
       updateApe(); updateBarrels(); barrels = barrels.filter(b => !b.dead);
-    } else if (phase === 'mini') { if (arena) stepArena(); else if (race) stepRace(); else if (snake) stepSnake(); else stepBanana(); }
+    } else if (phase === 'mini') { if (arena) stepArena(); else if (race) stepRace(); else if (dig) stepDig(); else stepBanana(); }
     else if (phase === 'boom' && --shipBoomT <= 0) endShipBoom();   // (the spaceship's explosion picture, 5 seconds)
     // pets fly along with their pugs while a level plays and during the level-clear banner
     if (phase === 'play' || phase === 'win') for (const p of players) movePets(p);
@@ -4656,7 +4657,7 @@
         { off: [-44, -16], spr: 'ufo5' }, { off: [6, -38], spr: 'ufo6' },
         { off: [-6, 38], spr: 'ufo7' }, { off: [50, 2], spr: 'ufo8' },
         { off: [-50, -2], spr: 'ufo9' }, { off: [34, -32], spr: 'ufo10' }] },
-    { name: 'Mars', x: 192, y: 66, r: 10, cols: ['#ff8a6a', '#e8282f', '#a8141f'], game: 'snake', dot: [206, 54] },
+    { name: 'Mars', x: 192, y: 66, r: 10, cols: ['#ff8a6a', '#e8282f', '#a8141f'], game: 'dig', dot: [206, 54] },
     { name: 'Earth', x: 182, y: 196, r: 18, cols: ['#9fb4ff', '#2f5bff', '#1d2f8c'], game: 'banana', dot: [157, 208] },
     { name: 'The Moon', x: 214, y: 172, r: 6, cols: ['#eef0f6', '#b4b8c8', '#7f8396'], game: 'race', dot: [204, 163] },
     { name: 'Pluto', x: 32, y: 222, r: 7, cols: ['#d8a6e8', '#9c5ab8', '#5a2c7a'], stripe: '#7a3c9a', game: 'showdown', dot: [43, 214] },
@@ -4792,9 +4793,9 @@
   let motherCalled = false;
   function codeCome() {
     if (mother.state !== 'gone') return;
-    const titleScreen = phase === 'paused' && fromTitle && pauseView !== 'arcade' && !/^(banana|arena|race|snake)/.test(pauseView);
+    const titleScreen = phase === 'paused' && fromTitle && pauseView !== 'arcade' && !/^(banana|arena|race|dig)/.test(pauseView);
     if (phase === 'title' || titleScreen) { motherCalled = true; scrollSky(1, kbBy()); return; }   // (the Store, Customize too)
-    if (phase === 'mini' || (phase === 'paused' && fromTitle && /^(banana|arena|race|snake)/.test(pauseView))) backToArcade();   // (a mini-game: out to space)
+    if (phase === 'mini' || (phase === 'paused' && fromTitle && /^(banana|arena|race|dig)/.test(pauseView))) backToArcade();   // (a mini-game: out to space)
     if (phase === 'mini' || (phase === 'paused' && fromTitle && pauseView === 'arcade')) startMotherEntrance();
   }
   const M_PORTAL = 100, M_EMERGE = 160, M_ARRIVE = 300, MOTHER_FRAMES = 450, MOTHER_SCALE = 2.5;
@@ -5117,7 +5118,7 @@
     return Math.hypot(x - sx, y - sy) <= 8;
   }
   // A planet's Play button: a planet with its own game plays it (Earth: Banana Catch; the mother ship: the
-  // Colosseum; the Moon: the Moon Race; Pluto: Pluto Showdown, the Colosseum's fight with ray guns; Mars: Pug Train);
+  // Colosseum; the Moon: the Moon Race; Pluto: Pluto Showdown, the Colosseum's fight with ray guns; Mars: Mars Dig);
   // the others start a new game, the same as Start on the main menu (each is meant to get its own game later)
   function playFromArcade(by) {
     if (!(fromTitle && pauseView === 'arcade')) return;
@@ -5125,7 +5126,7 @@
     if (arcadeZoom.target && arcadeZoom.target.game === 'arena') { startArena(by); return; }   // (the mother ship: the Colosseum)
     if (arcadeZoom.target && arcadeZoom.target.game === 'race') { startRace(by); return; }   // (the Moon: the Moon Race)
     if (arcadeZoom.target && arcadeZoom.target.game === 'showdown') { startArena(by, true); return; }   // (Pluto: Pluto Showdown)
-    if (arcadeZoom.target && arcadeZoom.target.game === 'snake') { startSnake(by); return; }   // (Mars: Pug Train)
+    if (arcadeZoom.target && arcadeZoom.target.game === 'dig') { startDig(by); return; }   // (Mars: Mars Dig)
     fromTitle = false; phase = 'title';
     startClicked();
   }
@@ -5362,7 +5363,7 @@
     try { best = Math.max(0, Math.floor(+localStorage.getItem(BANANA_BEST_KEY)) || 0); } catch (e) {}
     banana = { id: joined[by] ? by : 0, x: PW / 2, face: 1, anim: 0, moving: false, score: 0, best, items: [], plus: [],
       bruno: { x: PW / 2, dir: 1, throwT: 50, holdT: 0 }, lastTarget: PW / 2, lost: 0, splat: null, startT: 100, time: 0, fasterT: 0 };
-    arena = race = snake = null;
+    arena = race = dig = null;
     try { initAudio(); } catch (e) {}
     releaseAll(); fromTitle = true; phase = 'mini'; hideOverlay();
   }
@@ -5504,7 +5505,7 @@
   const arenaBg = document.createElement('canvas');
   let arena = null, arenaBgReady = false;
   function startArena(by, gun) {
-    banana = race = snake = null;
+    banana = race = dig = null;
     arena = { gun: !!gun, bolts: [], startT: 110, fightT: 0, result: null, endT: 0, kbAtk: false, prev: [{}, {}, {}, {}], sparks: [],
       pugs: [0, 1, 2, 3].map(i => ({ id: i, cpu: !joined[i], x: ARENA_X[i], y: ARENA_GROUND, vx: 0, vy: 0, kx: 0, ground: true,
         face: i < 2 ? 1 : -1, hp: ARENA_HP, hurtT: 0, swingT: 0, hitIds: [], cool: 0, anim: 0, moving: false, dropT: 0, ko: false, out: false, spin: 0, climbT: 0, climbX: 0 })) };
@@ -5520,7 +5521,7 @@
   // whether a player drives pug id: its controller, or the keyboard (the keyboard drives Player 1's pug until it
   // joins as someone else, unless a controller has Player 1); a pug nobody drives fights for the computer
   const arenaDriven = id => joined[id] && (ownerOf(id) !== undefined || kbSlot === id || (id === 0 && kbSlot === null));
-  const pauseMini = note => arena ? pauseArena(note) : race ? pauseRace(note) : snake ? pauseSnake(note) : pauseBanana();
+  const pauseMini = note => arena ? pauseArena(note) : race ? pauseRace(note) : dig ? pauseDig(note) : pauseBanana();
   // back to The Arcade, zoomed in on the mother ship
   function backFromArena() {
     const gun = arena && arena.gun;
@@ -5841,7 +5842,7 @@
   }
   let race = null;
   function startRace(by) {
-    banana = arena = snake = null;
+    banana = arena = dig = null;
     const id = joined[by] ? by : 0;
     race = { by: id, startT: RACE_COUNT, goT: 0, endT: 0, placed: 0, camD: 0, dust: [],
       cars: [0, 1, 2, 3].map(i => ({ id: i, cpu: !joined[i], d: 0, x: raceMid(0) + [-30, -10, 10, 30][i], v: 0, spin: 0, boost: 0, place: 0,
@@ -6032,155 +6033,432 @@
     if (g.startT > 0) banner(g.startT > 120 ? '3' : g.startT > 60 ? '2' : '1', 110, 'gold', 2);
     else if (g.goT > 0) banner('GO!', 110, 'gold', 2);
   }
-  // ----- Mars's game: Pug Train (Play on Mars in The Arcade; the user asked 2026-11-01 for a game like Snake) -----
-  // Each pug in the game trots across the red Martian desert, a square at a time, never stopping, and the player
-  // steers it. Every bone it gobbles adds a puppy to the line trotting behind it. Running into the edge, a rock, its
-  // own line or another pug's line puts it out (two heads meeting both go out). It speeds up as the line grows. The
-  // game is over once every pug is out; the longest line (a pug's bones) is kept in the browser as the best.
-  // Arrows or WASD (a controller's stick or D-pad) steer; Esc or P (or Menu) pauses. (Played from The Arcade like
-  // Banana Catch, in its phase 'mini': fromTitle stays on, and Back goes to The Arcade, zoomed in on Mars. A pug
-  // that joins during a game gets a line of its own.)
-  const SN_CELL = 8, SN_COLS = 30, SN_ROWS = 32, SN_TOP = 24, SN_BEST_KEY = 'doodad-doombad-mars-best';
-  const SN_DIRS = { up: [0, -1], right: [1, 0], down: [0, 1], left: [-1, 0] }, SN_OPP = { up: 'down', down: 'up', left: 'right', right: 'left' };
-  const SN_ROCKS = [[6, 9], [7, 9], [22, 7], [23, 7], [14, 15], [15, 15], [14, 16], [5, 24], [24, 23], [25, 23]];   // (rocks to steer round)
-  const SN_START = [{ x: 4, y: 4, dir: 'right' }, { x: 25, y: 27, dir: 'left' }, { x: 25, y: 4, dir: 'down' }, { x: 4, y: 27, dir: 'up' }];
-  {
-    // a pug's head from above (facing up, turned for the other ways), a puppy from above, and a bone
-    const turn = rows => rows[0].split('').map((_, x) => rows.map(r => r[x]).reverse().join(''));
-    let head = ['.K....K.', '.TTTTTT.', 'TWKTTKWT', 'TTTTTTTT', 'TTKKKKTT', '.TTKKTT.', '..TTTT..', '........'];
-    for (const d of ['up', 'right', 'down', 'left']) { SPRITES['sn_head_' + d] = head; head = turn(head); }
-    let pup = ['..K..K..', '.TTTTTT.', '.TTTTTT.', 'TTTJJTTT', 'TTTJJTTT', '.TTTTTT.', '.T.TT.T.', '........'];
-    for (const d of ['up', 'right', 'down', 'left']) { SPRITES['sn_pup_' + d] = pup; pup = turn(pup); }
-    SPRITES.sn_bone = ['........', 'WW....WW', 'WWWWWWWW', '.WWWWWW.', 'WWWWWWWW', 'WW....WW', '........', '........'];
-  }
-  const marsBg = document.createElement('canvas');
-  let snake = null, marsBgReady = false;
-  function startSnake(by) {
+  // ----- Mars's game: Mars Dig (Play on Mars in The Arcade; the user asked 2026-11-02 for a digging game in place of
+  // Pug Train) -----
+  // A cut-away of Mars: a strip of dusty sky on top and red soil below, darker the deeper it goes. Each player's pug
+  // starts on the surface and digs wherever it goes (a tunnel opens behind it), finding buried bones (10) and deep
+  // crystals (50). Green Martian blobs wait in pockets underground; after a while each comes hunting along the
+  // tunnels, or, when no tunnel leads to a pug, burrows slowly through the soil after one, and one touching a pug
+  // costs it a life. A bark (Space, X or Enter; A, B or Y on a controller) rings down the tunnel ahead (never through
+  // soil) and makes a blob dizzy, and a pug that walks into a dizzy blob boops it (100, and 20 more for every row
+  // deeper). Rocks sit in the soil: dig out the square under one and it wobbles, then drops, squashing whatever is
+  // below (300 a blob, doubling for each more, to the pug that dug under it). When every blob is gone the level is
+  // clear and the next has more of them, quicker. Each pug has 3 lives; the game is over once all are out, and the
+  // best score is kept in the browser. Arrows or WASD (a controller's stick or D-pad) dig; Esc or P (or Menu) pauses.
+  // (Played from The Arcade like the other planets' games, in its phase 'mini': fromTitle stays on, and Back goes to
+  // The Arcade, zoomed in on Mars. A pug that joins during a game is dropped in at the surface.)
+  const DG_CELL = 16, DG_COLS = 15, DG_ROWS = 16, DG_TOP = 24, DG_BEST_KEY = 'doodad-doombad-mars-dig-best';
+  const DG_DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }, DG_OPP = { up: 'down', down: 'up', left: 'right', right: 'left' };
+  const DG_START = [7, 9, 5, 11];   // (each pug's column on the surface)
+  Object.assign(SPRITES, {
+    // a Martian blob: one big eye, an antenna and stubby feet (two steps), and dizzy, with crossed eyes (greens 2 and 4
+    // are the hills' greens, from the palette)
+    dg_blob1: [".......YY.......", "........2.......", "........2.......", ".....gggggg.....", "...gg4444gggg...", "..gg4WWWWWggg2..", "..g4WWWWWWWgg2..", ".gg4WWKKWWWgg22.", ".gggWWKKWWWgg22.", ".ggggWWWWWggg22.", ".gggggggggggg22.", ".ggggKKKKKggg22.", "..gggKPPKgggg2..", "..2gggggggggg2..", "..22.22..22.22..", "................"],
+    dg_blob2: ["......YY........", ".......2........", "........2.......", ".....gggggg.....", "...gg4444gggg...", "..gg4WWWWWggg2..", "..g4WWWWWWWgg2..", ".gg4WWKKWWWgg22.", ".gggWWKKWWWgg22.", ".ggggWWWWWggg22.", ".gggggggggggg22.", ".ggggKKKKKggg22.", "..gggKPPKgggg2..", "..2gggggggggg2..", ".22..22..22..22.", "................"],
+    dg_blob_dizzy: [".......YY.......", "........2.......", "........2.......", ".....gggggg.....", "...gg4444gggg...", "..gg4WWWWWggg2..", "..g4WKWWWKWgg2..", ".gg4WWKWKWWgg22.", ".gggWWWKWWWgg22.", ".ggggWKWKWggg22.", ".gggggggggggg22.", ".gggKgKgKgggg22.", "..gggKgKggggg2..", "..2gggggggggg2..", "..22.22..22.22..", "................"],
+    dg_bone: ['........', 'WW....WW', 'WWWWWWWW', '.WWWWWW.', 'WWWWWWWW', 'WW....WW', '........', '........'],
+    dg_gem: ['........', '..CWWC..', '.CWCCCB.', 'CCCCCCBB', '.CCCCBB.', '..CCBB..', '...BB...', '........'],
+  });
+  const digBg = document.createElement('canvas'), digSoil = document.createElement('canvas');
+  let dig = null, digBgReady = false;
+  const dgRnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+  const dgIn = (cx, cy) => cx >= 0 && cy >= 0 && cx < DG_COLS && cy < DG_ROWS;
+  // (a rock in that square: resting, wobbling, or falling through it)
+  const dgRock = (cx, cy) => dig.rocks.some(r => r.cx === cx && (Math.floor(r.y / DG_CELL) === cy || Math.ceil(r.y / DG_CELL) === cy));
+  // (the square an actor goes into, going that way from where it is)
+  const digAhead = (a, d) => d === 'right' ? [Math.floor(a.x / DG_CELL) + 1, a.y / DG_CELL] : d === 'left' ? [Math.ceil(a.x / DG_CELL) - 1, a.y / DG_CELL]
+    : d === 'down' ? [a.x / DG_CELL, Math.floor(a.y / DG_CELL) + 1] : [a.x / DG_CELL, Math.ceil(a.y / DG_CELL) - 1];
+  function startDig(by) {
     banana = arena = race = null;
     let best = 0;
-    try { best = Math.max(0, Math.floor(+localStorage.getItem(SN_BEST_KEY)) || 0); } catch (e) {}
-    snake = { startT: 90, endT: 0, best, pugs: [], bones: [] };
-    for (let i = 0; i < 4; i++) if (arenaDriven(i) || i === (joined[by] ? by : 0)) snakePug(i);
-    for (let i = 0; i < snake.pugs.length + 1; i++) snakeBone();
+    try { best = Math.max(0, Math.floor(+localStorage.getItem(DG_BEST_KEY)) || 0); } catch (e) {}
+    dig = { level: 0, best, pugs: [], kbAtk: false, startT: 0, clearT: 0, endT: 0, rocks: [], blobs: [], items: [], waves: [], bits: [], pops: [] };
+    for (let i = 0; i < 4; i++) if (arenaDriven(i) || i === (joined[by] ? by : 0)) digPug(i);
+    digLevel();
     try { initAudio(); } catch (e) {}
     releaseAll(); fromTitle = true; phase = 'mini'; hideOverlay();
   }
-  function snakePug(id) {
-    const s = SN_START[id], [dx, dy] = SN_DIRS[s.dir];
-    snake.pugs.push({ id, dir: s.dir, next: s.dir, alive: true, timer: 0, grow: 0, score: 0, fade: 0,
-      cells: [0, 1, 2].map(k => ({ x: s.x - dx * k, y: s.y - dy * k, dir: s.dir })) });
+  function digPug(id) {
+    const p = { id, lives: 3, score: 0, x: DG_START[id] * DG_CELL, y: 0, dir: null, face: 'right', acc: 0, dead: 0, out: false, inv: 0,
+      barkCD: 0, prevBark: true, moving: false, steps: 0 };
+    dig.pugs.push(p);
+    return p;
   }
-  // (a square nobody is on, and no rock or bone)
-  const snakeTaken = (x, y) => SN_ROCKS.some(([rx, ry]) => rx === x && ry === y) || snake.bones.some(b => b.x === x && b.y === y) || snake.pugs.some(p => p.alive && p.cells.some(c => c.x === x && c.y === y));
-  function snakeBone() {
-    for (let k = 0; k < 200; k++) {
-      const x = Math.floor(Math.random() * SN_COLS), y = Math.floor(Math.random() * SN_ROWS);
-      if (!snakeTaken(x, y)) { snake.bones.push({ x, y }); return; }
+  function digRespawn(p) { Object.assign(p, { x: DG_START[p.id] * DG_CELL, y: 0, dir: null, acc: 0, dead: 0, inv: 120 }); }
+  // A new level: fresh soil, the blobs' pockets (three squares in a row, across or down, deep and apart), the rocks
+  // (each on solid soil, so none falls by itself), the bones and the crystals (deep down), and the pugs back up top
+  function digLevel() {
+    const g = dig;
+    g.level++;
+    g.dug = Array.from({ length: DG_ROWS }, (_, y) => Array(DG_COLS).fill(y === 0));
+    g.rocks = []; g.blobs = []; g.items = []; g.waves = []; g.bits = []; g.pops = [];
+    g.startT = 100; g.clearT = 0;
+    g.walk = Math.min(1.1, 0.6 + 0.08 * (g.level - 1)); g.burrow = Math.min(0.55, 0.25 + 0.04 * (g.level - 1));
+    buildDigSoil();
+    const pockets = [], want = Math.min(2 + g.level, 7);
+    for (let k = 0; k < 600 && pockets.length < want; k++) {
+      const across = Math.random() < 0.5, x = dgRnd(0, across ? DG_COLS - 3 : DG_COLS - 1), y = dgRnd(5, across ? DG_ROWS - 1 : DG_ROWS - 3);
+      const cells = [0, 1, 2].map(i => across ? [x + i, y] : [x, y + i]);
+      if (pockets.some(q => q.some(([qx, qy]) => cells.some(([cx, cy]) => Math.abs(qx - cx) + Math.abs(qy - cy) < 4)))) continue;
+      pockets.push(cells);
     }
-  }
-  function pauseSnake(note) {
-    if (phase !== 'mini' || !snake || snake.endT) return;
-    releaseAll(); phase = 'paused'; showPause('snakePause', 0, note);
-  }
-  function backFromSnake() {
-    showPause('arcade', 0);
-    arcadeZoom = { target: SPACE_PLANETS.find(p => p.game === 'snake'), p: 1, out: false, ship: null };
-    showPause('arcade', 0);
-  }
-  // which way a player is steering: its controller, and the keyboard for the keyboard's pug (never straight back)
-  function snakeSteer(p) {
-    const pad = padHeld[p.id] || {}, kb = kbSlot !== null ? p.id === kbSlot : p.id === 0 && ownerOf(0) === undefined;
-    for (const d of ['up', 'down', 'left', 'right']) if ((pad[d] || (kb && keys[d])) && d !== SN_OPP[p.dir]) { p.next = d; return; }
-  }
-  function snakeOut(p) {
-    p.alive = false; p.fade = 40;
-    noise(0.3, 0.18, 2500, 200); sfx.die();
-  }
-  function stepSnake() {
-    const g = snake;
-    if (g.startT > 0) g.startT--;
-    for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.pugs.some(p => p.id === i)) snakePug(i);
+    for (const cells of pockets) {
+      for (const [x, y] of cells) g.dug[y][x] = true;
+      const [x0, y0] = cells[0], [x2, y2] = cells[2];
+      digSoil.getContext('2d').clearRect(x0 * DG_CELL + 1, y0 * DG_CELL + 1, (x2 - x0 + 1) * DG_CELL - 2, (y2 - y0 + 1) * DG_CELL - 2);
+      g.blobs.push({ x: cells[1][0] * DG_CELL, y: cells[1][1] * DG_CELL, dir: null, wants: [], acc: 0, t: dgRnd(0, 30), dizzy: 0, pop: 0,
+        calm: Math.max(90, 330 - 30 * (g.level - 1)) + dgRnd(0, 240), burrowing: false });
+    }
+    const soil = (x, y) => !g.dug[y][x] && !g.rocks.some(r => r.cx === x && r.y === y * DG_CELL) && !g.items.some(i => i.cx === x && i.cy === y);
+    for (let k = 0; k < 600 && g.rocks.length < 4 + Math.min(2, g.level >> 1); k++) {
+      const x = dgRnd(0, DG_COLS - 1), y = dgRnd(2, DG_ROWS - 4);
+      if (!soil(x, y) || g.dug[y + 1][x] || g.rocks.some(r => Math.abs(r.cx - x) + Math.abs(r.y / DG_CELL - y) < 3)) continue;
+      g.rocks.push({ cx: x, y: y * DG_CELL, state: 'rest', t: 0, by: null, kills: 0 });
+    }
+    for (let k = 0; k < 600 && g.items.length < 8; k++) {
+      const gem = g.items.length >= 6, x = dgRnd(0, DG_COLS - 1), y = dgRnd(gem ? 10 : 2, DG_ROWS - 1);
+      if (soil(x, y)) g.items.push({ cx: x, cy: y, kind: gem ? 'gem' : 'bone' });
+    }
     for (const p of g.pugs) {
-      if (!p.alive) { if (p.fade > 0) p.fade--; continue; }
-      if (g.startT > 0 || g.endT) continue;
-      snakeSteer(p);
-      // (a square at a time: every 9 frames at first, down to every 4 as the line grows)
-      if (++p.timer < Math.max(4, 9 - Math.floor(p.score / 4))) continue;
-      p.timer = 0; p.dir = p.next;
-      const [dx, dy] = SN_DIRS[p.dir], h = p.cells[0], x = h.x + dx, y = h.y + dy;
-      const tailMoves = p.grow === 0;
-      const hit = x < 0 || y < 0 || x >= SN_COLS || y >= SN_ROWS || SN_ROCKS.some(([rx, ry]) => rx === x && ry === y)
-        || g.pugs.some(o => o.alive && o.cells.some((c, k) => c.x === x && c.y === y && !(o === p && tailMoves && k === o.cells.length - 1)));
-      if (hit) {
-        // (two heads meeting square on: both are out)
-        for (const o of g.pugs) if (o !== p && o.alive && o.cells[0].x === x && o.cells[0].y === y) snakeOut(o);
-        snakeOut(p); continue;
-      }
-      p.cells.unshift({ x, y, dir: p.dir });
-      const bi = g.bones.findIndex(b => b.x === x && b.y === y);
-      if (bi >= 0) { g.bones.splice(bi, 1); p.grow++; p.score++; sfx.coin(); snakeBone(); }
-      if (p.grow > 0) p.grow--; else p.cells.pop();
-    }
-    if (!g.endT && g.pugs.length && g.pugs.every(p => !p.alive)) g.endT = 90;
-    if (g.endT && --g.endT === 0) {
-      const top = Math.max(...g.pugs.map(p => p.score));
-      if (top > g.best) { g.best = top; try { localStorage.setItem(SN_BEST_KEY, String(top)); } catch (e) {} }
-      phase = 'paused'; showPause('snakeOver', 0);
+      if (p.dead) { p.dead = 0; if (p.lives <= 0) p.out = true; }
+      if (!p.out) { digRespawn(p); p.inv = 0; }
     }
   }
-  function snakeWords() {
-    if (!snake) return { title: 'Pug Train', text: '' };
-    const ps = snake.pugs;
-    if (ps.length === 1) return { title: `${ps[0].score} bone${ps[0].score === 1 ? '' : 's'}!`, text: `${LOOK[ps[0].id].name}'s line grew to ${ps[0].cells.length} pugs. Best: ${snake.best} bone${snake.best === 1 ? '' : 's'}.` };
+  // the red soil, in layers (lighter near the top, darker deeper, with wavy edges) and speckled; nothing above it
+  function buildDigSoil() {
+    const H = PH - DG_TOP;
+    digSoil.width = PW; digSoil.height = H;
+    const c = digSoil.getContext('2d'), img = c.createImageData(PW, H), d = img.data;
+    const rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+    const LAYERS = [['#d0703a', '#e48c54', '#a8501e'], ['#b8501e', '#cc6a34', '#8a3812'], ['#9a3814', '#b04a22', '#6e2a0c'], ['#7a2a0e', '#8e3a18', '#561e08']].map(l => l.map(rgb));
+    const seed = Math.random() * 10;
+    for (let y = DG_CELL; y < H; y++) for (let x = 0; x < PW; x++) {
+      const layer = clamp(Math.floor((y - DG_CELL + Math.sin(x / 11 + seed) * 4 + Math.sin(x / 5 + seed * 2)) / 60), 0, 3);
+      const h = ((x * 73856093) ^ (y * 19349663)) >>> 0, k = h % 29 === 0 ? 1 : h % 13 === 0 ? 2 : 0;
+      const col = y === DG_CELL ? rgb('#f0a868') : LAYERS[layer][k], i = (y * PW + x) * 4;
+      d[i] = col[0]; d[i + 1] = col[1]; d[i + 2] = col[2]; d[i + 3] = 255;
+    }
+    c.putImageData(img, 0, 0);
+  }
+  // the score bar, the dusty butterscotch sky with a pale sun and far-off mesas, and the dark of the tunnels
+  function buildDigBg() {
+    digBg.width = PW; digBg.height = PH;
+    const c = digBg.getContext('2d'), rect = (col, x, y, w, h) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
+    rect('#14141a', 0, 0, PW, DG_TOP);
+    ['#c88a5e', '#d49a6a', '#deaa78', '#e6b886'].forEach((col, i) => rect(col, 0, DG_TOP + i * 4, PW, 4));
+    rect('#f6e6c8', 197, DG_TOP + 3, 5, 5); rect('#f6e6c8', 196, DG_TOP + 4, 7, 3);
+    for (const [x, w, h] of [[14, 34, 6], [64, 18, 4], [120, 44, 5], [186, 26, 7]]) { rect('#b4703e', x, DG_TOP + 16 - h, w, h); rect('#c27e4a', x + 2, DG_TOP + 16 - h, w - 4, 1); }
+    rect('#241008', 0, DG_TOP + DG_CELL, PW, PH - DG_TOP - DG_CELL);
+    for (let i = 0; i < 160; i++) rect('#311710', (i * 97 + 5) % PW, DG_TOP + DG_CELL + (i * 59) % (PH - DG_TOP - DG_CELL), 1, 1);
+  }
+  function pauseDig(note) {
+    if (phase !== 'mini' || !dig || dig.endT) return;
+    releaseAll(); phase = 'paused'; showPause('digPause', 0, note);
+  }
+  function backFromDig() {
+    showPause('arcade', 0);
+    arcadeZoom = { target: SPACE_PLANETS.find(p => p.game === 'dig'), p: 1, out: false, ship: null };
+    showPause('arcade', 0);
+  }
+  // what a player wants: the ways held on its controller (and the keyboard, for the keyboard's pug), a turn first,
+  // and a bark (a fresh press only, so holding the button barks once)
+  function digInput(p) {
+    const g = dig, pad = padHeld[p.id] || {}, kb = kbSlot !== null ? p.id === kbSlot : p.id === 0 && ownerOf(0) === undefined;
+    const held = k => !!pad[k] || (kb && keys[k]);
+    const barkNow = !!pad.jump || !!pad.bark || !!pad.toss || (kb && keys.jump);
+    const bark = (barkNow && !p.prevBark) || (kb && g.kbAtk);
+    p.prevBark = barkNow;
+    const across = d => p.dir && (DG_DIRS[d][0] === 0) !== (DG_DIRS[p.dir][0] === 0);
+    return { wants: ['up', 'down', 'left', 'right'].filter(held).sort((a, b) => across(b) - across(a)), bark };
+  }
+  // which way an actor goes next: at a grid point, the first way it wants that it can go; between grid points, only
+  // along its line (straight back, or on to the next grid point to turn there)
+  function digWay(a, wants, canGo) {
+    if (!wants.length) return null;
+    if (a.x % DG_CELL === 0 && a.y % DG_CELL === 0) return wants.find(d => canGo(...digAhead(a, d))) || null;
+    return wants[0] === a.dir || wants[0] === DG_OPP[a.dir] ? wants[0] : a.dir;
+  }
+  // (the soil where an actor is, dug away, a pixel short of its square's edges so the tunnels have walls)
+  const digPaint = a => digSoil.getContext('2d').clearRect(a.x + 1, a.y + 1, DG_CELL - 2, DG_CELL - 2);
+  // a square dug out (the rock above it, if any, will drop: whoever dug it gets the points for what it squashes)
+  function digDug(cx, cy, by) {
+    dig.dug[cy][cx] = true;
+    const r = dig.rocks.find(r => r.state === 'rest' && r.cx === cx && r.y === (cy - 1) * DG_CELL);
+    if (r) r.by = by;
+  }
+  function digPop(x, y, n) { dig.pops.push({ x, y, n, t: 40 }); }
+  function digBits(x, y, cols, n, up) {
+    for (let i = 0; i < n; i++) dig.bits.push({ x, y, vx: (Math.random() - 0.5) * 2, vy: -Math.random() * (up || 1.5), t: 14 + dgRnd(0, 10), col: cols[i % cols.length] });
+  }
+  function stepDigPug(p) {
+    const g = dig, inp = digInput(p);
+    if (p.out) return;
+    if (p.dead) { if (--p.dead === 0) { if (p.lives <= 0) p.out = true; else digRespawn(p); } return; }
+    if (p.inv) p.inv--;
+    if (p.barkCD) p.barkCD--;
+    if (inp.bark && !p.barkCD) digBark(p);
+    const canGo = (cx, cy) => dgIn(cx, cy) && !dgRock(cx, cy);
+    let d = digWay(p, inp.wants, canGo), moved = false;
+    if (d) {
+      const [ax, ay] = digAhead(p, d), fresh = dgIn(ax, ay) && !g.dug[ay][ax];
+      p.acc += fresh ? 0.8 : 1.25;
+      while (p.acc >= 1 && d) {
+        p.acc--;
+        p.x += DG_DIRS[d][0]; p.y += DG_DIRS[d][1]; p.dir = d; moved = true; p.steps++;
+        if (d === 'left' || d === 'right') p.face = d;
+        digPaint(p);
+        if (fresh && p.steps % 6 === 0) { digBits(p.x + 8 + DG_DIRS[d][0] * 8, p.y + 8 + DG_DIRS[d][1] * 8, ['#d0703a', '#8a3812'], 2); noise(0.05, 0.03, 1400, 500); }
+        if (p.x % DG_CELL === 0 && p.y % DG_CELL === 0) { digArrive(p); d = digWay(p, inp.wants, canGo); }
+      }
+    } else p.acc = 0;
+    p.moving = moved;
+  }
+  // a pug reaches the middle of a square: dug, and whatever was buried there is its
+  function digArrive(p) {
+    const g = dig, cx = p.x / DG_CELL, cy = p.y / DG_CELL;
+    if (!g.dug[cy][cx]) digDug(cx, cy, p.id);
+    const i = g.items.findIndex(it => it.cx === cx && it.cy === cy);
+    if (i < 0) return;
+    const it = g.items.splice(i, 1)[0], n = it.kind === 'gem' ? 50 : 10;
+    p.score += n; digPop(p.x + 8, p.y, n);
+    if (it.kind === 'gem') sfx.oneUp(); else sfx.coin();
+  }
+  // a bark: a ring of sound down the tunnel the pug faces, up to three and a half squares, stopped by soil and rocks;
+  // the first blob it reaches goes dizzy (the squares the pug is in count as dug, so a half-dug one doesn't stop it)
+  function digBark(p) {
+    p.barkCD = 24;
+    sfx.bark(LOOK[p.id].bark);
+    const own = [[Math.floor(p.x / DG_CELL), Math.floor(p.y / DG_CELL)], [Math.ceil(p.x / DG_CELL), Math.ceil(p.y / DG_CELL)]];
+    dig.waves.push({ x: p.x + 8, y: p.y + 8, d: p.dir || p.face, dist: 0, own, fx: p.x + 8, fy: p.y + 8 });
+  }
+  function stepDigWaves() {
+    const g = dig;
+    for (const w of g.waves) {
+      w.dist += 3;
+      const [dx, dy] = DG_DIRS[w.d], fx = w.x + dx * w.dist, fy = w.y + dy * w.dist, cx = Math.floor(fx / DG_CELL), cy = Math.floor(fy / DG_CELL);
+      const open = dgIn(cx, cy) && (g.dug[cy][cx] || w.own.some(([ox, oy]) => ox === cx && oy === cy)) && !dgRock(cx, cy);
+      if (w.dist > 56 || !open) { w.dead = true; continue; }
+      w.fx = fx; w.fy = fy;
+      const b = g.blobs.find(b => !b.pop && fx >= b.x - 2 && fx <= b.x + DG_CELL + 2 && fy >= b.y - 2 && fy <= b.y + DG_CELL + 2);
+      if (b) { b.dizzy = 200; w.dead = true; sfx.stun(); }
+    }
+    g.waves = g.waves.filter(w => !w.dead);
+  }
+  // (the first step along the tunnels to the nearest pug, or null when no tunnel leads to one)
+  function digPath(cx, cy, targets) {
+    const g = dig, seen = new Set([cx + ',' + cy]), q = [[cx, cy, null]];
+    const goal = new Set(targets.map(p => Math.round(p.x / DG_CELL) + ',' + Math.round(p.y / DG_CELL)));
+    while (q.length) {
+      const [x, y, first] = q.shift();
+      if (first && goal.has(x + ',' + y)) return first;
+      for (const d of ['up', 'down', 'left', 'right']) {
+        const nx = x + DG_DIRS[d][0], ny = y + DG_DIRS[d][1], k = nx + ',' + ny;
+        if (!dgIn(nx, ny) || seen.has(k) || !g.dug[ny][nx] || dgRock(nx, ny)) continue;
+        seen.add(k); q.push([nx, ny, first || d]);
+      }
+    }
+    return null;
+  }
+  // A blob: calm at first, wandering about its pocket; then it hunts the nearest pug along the tunnels, or burrows
+  // after it through the soil (slowly) when no tunnel leads there. Dizzy, it can't move or hurt anyone.
+  function stepBlob(b) {
+    const g = dig;
+    b.t++;
+    if (b.pop) { if (--b.pop === 0) b.gone = true; return; }
+    if (b.dizzy) { if (--b.dizzy === 0) b.calm = 40; return; }
+    if (b.calm) b.calm--;
+    if (b.x % DG_CELL === 0 && b.y % DG_CELL === 0) {
+      const cx = b.x / DG_CELL, cy = b.y / DG_CELL, targets = g.pugs.filter(p => !p.out && !p.dead);
+      const open = d => { const [x, y] = [cx + DG_DIRS[d][0], cy + DG_DIRS[d][1]]; return dgIn(x, y) && g.dug[y][x] && !dgRock(x, y); };
+      b.burrowing = false;
+      if (!b.calm && targets.length) {
+        const step = digPath(cx, cy, targets);
+        if (step) b.wants = [step];
+        else {
+          const t = targets.reduce((m, p) => Math.abs(p.x - b.x) + Math.abs(p.y - b.y) < Math.abs(m.x - b.x) + Math.abs(m.y - b.y) ? p : m);
+          const dx = Math.round(t.x / DG_CELL) - cx, dy = Math.round(t.y / DG_CELL) - cy;
+          const h = dx > 0 ? 'right' : 'left', v = dy > 0 ? 'down' : 'up';
+          b.wants = (Math.abs(dx) >= Math.abs(dy) ? [dx && h, dy && v] : [dy && v, dx && h]).filter(Boolean);
+          b.burrowing = true;
+        }
+      } else {
+        const ways = ['up', 'down', 'left', 'right'].filter(open), on = ways.filter(d => d !== DG_OPP[b.dir]);
+        b.wants = b.dir && ways.includes(b.dir) && Math.random() < 0.85 ? [b.dir] : on.length ? [on[dgRnd(0, on.length - 1)]] : ways;
+      }
+    }
+    const d = digWay(b, b.wants, (x, y) => dgIn(x, y) && !dgRock(x, y) && (b.burrowing || g.dug[y][x]));
+    if (!d) return;
+    b.acc += b.burrowing ? g.burrow : g.walk;
+    while (b.acc >= 1) {
+      b.acc--;
+      b.x += DG_DIRS[d][0]; b.y += DG_DIRS[d][1]; b.dir = d;
+      if (b.burrowing) { digPaint(b); if (b.t % 9 === 0) digBits(b.x + 8, b.y + 8, ['#b8501e', '#6e2a0c'], 1); }
+      if (b.x % DG_CELL === 0 && b.y % DG_CELL === 0) {
+        const cx = b.x / DG_CELL, cy = b.y / DG_CELL;
+        if (!g.dug[cy][cx]) digDug(cx, cy, null);
+        b.acc = 0; break;
+      }
+    }
+  }
+  // A rock: once the square under it is dug it wobbles for a moment, then drops until soil, another rock or the
+  // bottom stops it, squashing any pug or blob it meets on the way, and crumbles where it lands
+  function stepRock(r) {
+    const g = dig;
+    if (r.state === 'rest') {
+      const cy = r.y / DG_CELL;
+      if (cy + 1 < DG_ROWS && g.dug[cy + 1][r.cx]) { r.state = 'wobble'; r.t = 45; sfx.rumble(); }
+    } else if (r.state === 'wobble') {
+      if (--r.t <= 0) r.state = 'fall';
+    } else if (r.state === 'fall') {
+      for (let k = 0; k < 4; k++) {
+        if (r.y % DG_CELL === 0) {
+          const below = r.y / DG_CELL + 1;
+          if (below >= DG_ROWS || !g.dug[below][r.cx] || g.rocks.some(o => o !== r && o.cx === r.cx && Math.floor(o.y / DG_CELL) === below)) {
+            r.state = 'land'; r.t = 20; sfx.thud();
+            digBits(r.cx * DG_CELL + 8, r.y + 12, ['#7a3a22', '#a85a38', '#3a1608'], 10, 2.5);
+            break;
+          }
+        }
+        r.y++;
+        const X = r.cx * DG_CELL;
+        for (const p of g.pugs) if (!p.out && !p.dead && !p.inv && Math.abs(p.x - X) < 12 && Math.abs(p.y - r.y) < 12) digHurt(p);
+        for (const b of g.blobs) if (!b.pop && Math.abs(b.x - X) < 12 && Math.abs(b.y - r.y) < 12) {
+          b.pop = 30; b.squashed = true; r.kills++;
+          const n = 300 * 2 ** (r.kills - 1), by = g.pugs.find(p => p.id === r.by);
+          if (by) { by.score += n; digPop(b.x + 8, b.y, n); }
+          sfx.smash();
+        }
+      }
+    } else if (--r.t <= 0) r.gone = true;
+  }
+  function digHurt(p) {
+    p.lives--; p.dead = 70; sfx.die();
+    for (const b of dig.blobs) b.calm = Math.max(b.calm, 120);   // (a moment's peace for everyone after)
+  }
+  function stepDig() {
+    const g = dig;
+    for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.pugs.some(p => p.id === i)) digPug(i).inv = 120;
+    for (const b of g.bits) { b.vy += 0.15; b.x += b.vx; b.y += b.vy; b.t--; }
+    g.bits = g.bits.filter(b => b.t > 0);
+    for (const n of g.pops) n.t--;
+    g.pops = g.pops.filter(n => n.t > 0);
+    if (g.endT) {
+      if (--g.endT === 0) {
+        const top = Math.max(...g.pugs.map(p => p.score));
+        if (top > g.best) { g.best = top; try { localStorage.setItem(DG_BEST_KEY, String(top)); } catch (e) {} }
+        phase = 'paused'; showPause('digOver', 0);
+      }
+      return;
+    }
+    if (g.startT > 0 || g.clearT > 0) {
+      for (const p of g.pugs) digInput(p);   // (keeping track of the bark button, so one held now doesn't bark later)
+      g.kbAtk = false;
+      if (g.startT > 0) g.startT--;
+      if (g.clearT > 0 && --g.clearT === 0) digLevel();
+      return;
+    }
+    for (const p of g.pugs) stepDigPug(p);
+    g.kbAtk = false;
+    stepDigWaves();
+    for (const b of g.blobs) stepBlob(b);
+    for (const r of g.rocks) stepRock(r);
+    // (a blob touching a pug: a dizzy one is booped, any other knocks the pug out)
+    for (const p of g.pugs) {
+      if (p.out || p.dead) continue;
+      for (const b of g.blobs) {
+        if (b.pop || Math.abs(p.x - b.x) >= 11 || Math.abs(p.y - b.y) >= 11) continue;
+        if (b.dizzy) {
+          const n = 100 + 20 * Math.round(b.y / DG_CELL);
+          b.pop = 24; p.score += n; digPop(b.x + 8, b.y, n); sfx.pop();
+          digBits(b.x + 8, b.y + 8, ['#5fd068', '#b4f08a', '#ffffff'], 10, 2.5);
+        } else if (!p.inv) { digHurt(p); break; }
+      }
+    }
+    g.blobs = g.blobs.filter(b => !b.gone);
+    g.rocks = g.rocks.filter(r => !r.gone);
+    if (!g.blobs.length) { g.clearT = 150; sfx.win(); }
+    else if (g.pugs.length && g.pugs.every(p => p.out)) g.endT = 90;
+  }
+  function digWords() {
+    if (!dig) return { title: 'Mars Dig', text: '' };
+    const ps = dig.pugs;
+    if (ps.length === 1) return { title: `${ps[0].score} points!`, text: `${LOOK[ps[0].id].name} dug down to level ${dig.level}. Best: ${dig.best}.` };
     const top = Math.max(...ps.map(p => p.score)), win = ps.filter(p => p.score === top);
-    return { title: win.length > 1 ? 'A tie!' : `${LOOK[win[0].id].name} wins!`, text: ps.map(p => `${LOOK[p.id].name} ${p.score}`).join(', ') + `. Best: ${snake.best} bone${snake.best === 1 ? '' : 's'}.` };
+    return { title: win.length > 1 ? 'A tie!' : `${LOOK[win[0].id].name} wins!`, text: ps.map(p => `${LOOK[p.id].name} ${p.score}`).join(', ') + `. Level ${dig.level}. Best: ${dig.best}.` };
   }
-  // the red Martian desert: rusty sand with lighter dunes and dark pebbles, and its rocks
-  function buildMarsBg() {
-    marsBg.width = PW; marsBg.height = PH;
-    const c = marsBg.getContext('2d');
-    const rect = (col, x, y, w, h) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
-    rect('#a83c16', 0, 0, PW, PH);
-    for (let y = SN_TOP; y < PH; y++) {
-      const w = Math.sin(y / 9) * 30 + Math.sin(y / 23) * 50;
-      rect('#b84a1e', Math.round(60 + w), y, 70, 1); rect('#c25a2a', Math.round(150 - w * 0.6), y, 30, 1);
-    }
-    for (let i = 0; i < 140; i++) rect(i % 3 ? '#7a2a10' : '#d87a48', (i * 97 + 5) % PW, SN_TOP + (i * 59) % (PH - SN_TOP), 1, 1);
-    for (const [x, y] of SN_ROCKS) {
-      const X = x * SN_CELL, Y = SN_TOP + y * SN_CELL;
-      rect('#4a1e0c', X, Y + 1, 8, 7); rect('#6e2c14', X + 1, Y, 6, 6); rect('#8a3e1e', X + 1, Y, 4, 2);
-    }
-    rect('#14141a', 0, 0, PW, SN_TOP);
+  function drawDigRock(x, y) {
+    const r = (col, a, b, w, h) => { ctx.fillStyle = col; ctx.fillRect(x + a, y + b, w, h); };
+    r('#3a1608', 2, 3, 12, 12); r('#3a1608', 1, 5, 14, 8);
+    r('#7a3a22', 3, 4, 10, 10); r('#7a3a22', 2, 6, 12, 6);
+    r('#a85a38', 4, 5, 5, 3); r('#c87a52', 5, 5, 2, 1); r('#5a2412', 9, 10, 3, 2);
   }
-  function drawSnake() {
-    if (!marsBgReady) { buildMarsBg(); marsBgReady = true; }
-    const g = snake;
-    ctx.drawImage(marsBg, 0, 0);
-    for (const b of g.bones) blit('sn_bone', b.x * SN_CELL, SN_TOP + b.y * SN_CELL);
-    for (const p of g.pugs) {
-      if (!p.alive && p.fade <= 0) continue;
-      if (!p.alive && Math.floor(p.fade / 4) % 2) continue;   // (blinking away once out)
-      const sw = LOOK[p.id].swap;
-      for (let k = p.cells.length - 1; k >= 0; k--) {
-        const c = p.cells[k];
-        blit((k === 0 ? 'sn_head_' : 'sn_pup_') + (k === 0 ? p.dir : c.dir), c.x * SN_CELL, SN_TOP + c.y * SN_CELL, false, sw);
+  function drawDig() {
+    if (!digBgReady) { buildDigBg(); digBgReady = true; }
+    const g = dig, T = DG_TOP;
+    ctx.drawImage(digBg, 0, 0);
+    ctx.drawImage(digSoil, 0, T);
+    for (const it of g.items) blit(it.kind === 'gem' ? 'dg_gem' : 'dg_bone', it.cx * DG_CELL + 4, T + it.cy * DG_CELL + 4);
+    // (rocks: shaking before they drop, breaking apart where they land)
+    for (const r of g.rocks) {
+      const x = r.cx * DG_CELL + (r.state === 'wobble' && frame % 6 < 3 ? 1 : 0), y = T + r.y;
+      if (r.state !== 'land') drawDigRock(x, y);
+      else if (r.t > 10) { ctx.save(); ctx.beginPath(); ctx.rect(x, y + 20 - r.t, DG_CELL, DG_CELL); ctx.clip(); drawDigRock(x, y + (20 - r.t) / 2); ctx.restore(); }
+    }
+    for (const b of g.blobs) {
+      const x = Math.round(b.x), y = T + Math.round(b.y);
+      if (b.pop) {
+        // (booped: a burst of green; squashed by a rock: flattened)
+        if (b.squashed) { const s = sprite('dg_blob1'); if (s) ctx.drawImage(s, x - 2, y + 11, DG_CELL + 4, 5); }
+        else { ctx.fillStyle = '#b4f08a'; for (let a = 0; a < 8; a++) { const an = a / 8 * Math.PI * 2, rr = (24 - b.pop) * 0.7 + 2; ctx.fillRect(Math.round(x + 8 + Math.cos(an) * rr), Math.round(y + 8 + Math.sin(an) * rr), 2, 2); } }
+        continue;
       }
-      // (a ring in its player's colour round the head, so each player can find their pug)
-      const h = p.cells[0];
-      ctx.fillStyle = PAL[LOOK[p.id].mark];
-      ctx.fillRect(h.x * SN_CELL - 1, SN_TOP + h.y * SN_CELL - 1, SN_CELL + 2, 1); ctx.fillRect(h.x * SN_CELL - 1, SN_TOP + h.y * SN_CELL + SN_CELL, SN_CELL + 2, 1);
+      const dizzy = b.dizzy && !(b.dizzy < 50 && frame % 8 < 4);
+      blit(dizzy ? 'dg_blob_dizzy' : Math.floor(b.t / 10) % 2 ? 'dg_blob2' : 'dg_blob1', x, y, b.dir === 'left');
+      if (b.dizzy) for (let k = 0; k < 3; k++) {
+        const an = frame / 8 + k * 2.1;
+        ctx.fillStyle = '#ffcc3d'; ctx.fillRect(Math.round(x + 8 + Math.cos(an) * 6), Math.round(y + 1 + Math.sin(an) * 2), 1, 1);
+      }
     }
-    g.pugs.forEach((p, i) => drawText(`P${p.id + 1} ${p.score}`, 4 + i * 59, 4, LOOK[p.id].tag));
-    drawText('BEST ' + Math.max(g.best, ...g.pugs.map(p => p.score)), 4, 14);
-    if (g.startT > 0) banner('GET THE BONES!', 120, 'gold');
-    if (g.endT) banner(g.pugs.length > 1 ? 'GAME OVER' : 'OUCH!', 120, 'pink', 2);
+    // (the pugs: walking along, climbing up and down shafts, flat when knocked out, blinking just after)
+    for (const p of g.pugs) {
+      if (p.out) continue;
+      const sw = LOOK[p.id].swap, x = Math.round(p.x), y = T + Math.round(p.y);
+      if (p.dead) { if (Math.floor(p.dead / 6) % 2 || p.dead > 40) blit('player_dead', x, y + 6, p.face === 'left', sw); continue; }
+      if (p.inv && Math.floor(p.inv / 4) % 2) continue;
+      const step = Math.floor(p.steps / 5) % 2;
+      if ((p.dir === 'up' || p.dir === 'down') && p.y > 0) blit(step ? 'player_climb2' : 'player_climb1', x + 2, y, false, sw);
+      else blit(p.moving ? (step ? 'player_walk2' : 'player_walk1') : 'player_stand', x, y + 3, p.face === 'left', sw);
+      if (g.pugs.length > 1) drawText('P' + (p.id + 1), x + 8, y - 8, LOOK[p.id].tag, 'center');
+    }
+    // (barks: rings of sound going down the tunnel)
+    ctx.fillStyle = '#fff6c8';
+    for (const w of g.waves) {
+      const [dx, dy] = DG_DIRS[w.d];
+      for (const back of [0, 5]) for (let s = -4; s <= 4; s++) {
+        const bulge = 2 - Math.round(Math.abs(s) / 2) - back, px = dx ? w.fx + dx * bulge : w.fx + s, py = dy ? w.fy + dy * bulge : w.fy + s;
+        ctx.fillRect(Math.round(px), T + Math.round(py), 1, 1);
+      }
+    }
+    for (const b of g.bits) { ctx.fillStyle = b.col; ctx.fillRect(Math.round(b.x), T + Math.round(b.y), 1, 1); }
+    for (const n of g.pops) drawText(String(n.n), n.x, T + n.y - (40 - n.t) * 0.4, 'gold', 'center');
+    // (the score bar: each pug's score and its lives, the level and the best)
+    g.pugs.forEach((p, i) => {
+      drawText(`P${p.id + 1} ${p.score}`, 4 + i * 59, 4, LOOK[p.id].tag);
+      ctx.fillStyle = '#e8282f';
+      for (let k = 0; k < p.lives; k++) ctx.fillRect(4 + i * 59 + k * 5, 15, 3, 3);
+    });
+    const info = `LEVEL ${g.level}  BEST ${Math.max(g.best, ...g.pugs.map(p => p.score))}`;
+    if (g.pugs.length <= 2) drawText(info, PW - 3 - info.length * 6, 14);
+    if (g.startT > 0) { banner('LEVEL ' + g.level, 100, 'gold', 2); if (g.startT < 50) banner('DIG!', 130, 'gold', 2); }
+    if (g.clearT > 0) banner('MARS CLEAR!', 110, 'gold', 2);
+    if (g.endT) banner('GAME OVER', 120, 'pink', 2);
   }
   function draw() {
     // gliding between the main menu and The Arcade, both scenes
     if (skyScroll) { drawSkyScroll(); updateHud(); return; }
-    // Pug Train (and its pause and score screens) has its own scene, and so do the Moon Race and the Colosseum
-    if (snake && (phase === 'mini' || (fromTitle && (pauseView === 'snakePause' || pauseView === 'snakeOver')))) {
-      drawSnake(); updateHud(); return;
+    // Mars Dig (and its pause and score screens) has its own scene, and so do the Moon Race and the Colosseum
+    if (dig && (phase === 'mini' || (fromTitle && (pauseView === 'digPause' || pauseView === 'digOver')))) {
+      drawDig(); updateHud(); return;
     }
     if (race && (phase === 'mini' || (fromTitle && (pauseView === 'racePause' || pauseView === 'raceOver')))) {
       drawRace(); updateHud(); return;
