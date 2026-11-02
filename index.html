@@ -1554,7 +1554,6 @@
   //   C0/\/\E   ("come") calls the alien mother ship into The Arcade (codeCome); on the main menu, up into space first
   //   EXP       blows up all the mother ship's tiny ships at once, and so the mother ship (codeExp), in The Arcade
   //   L0CK      locks again everything that had to be unlocked (Zorp the Alien, and the space things), keeping what you start with (relock)
-  //   SAD       makes Gloop, the shopkeeper inside Jupiter, sad; HAPPY makes him happy again (setGloopMood), on any screen
   // A code's first key still does its usual job if it is a game key (B barks, ZER0's Z jumps), but once a
   // code has begun, its next keys only type the code: the coin code's S doesn't also climb down or pick a
   // menu choice, the skip code's X makes no tacos. A key that doesn't fit, or nothing typed for 25 seconds,
@@ -1562,7 +1561,6 @@
   const CODES = [{ code: 'C0!NS', at: 0, run: () => openCoinBar() }, { code: 'B0O/\\/\\', at: 0, run: () => codeBoom() },
     { code: '|_!FE', at: 0, run: () => toggleSafe() }, { code: '/\\/EXT', at: 0, run: () => skipLevel() },
     { code: 'ZER0', at: 0, run: () => zeroCoins() }, { code: 'C0/\\/\\E', at: 0, run: () => codeCome() },
-    { code: 'SAD', at: 0, run: () => setGloopMood(true) }, { code: 'HAPPY', at: 0, run: () => setGloopMood(false) },
     { code: 'EXP', at: 0, run: () => codeExp() }, { code: 'L0CK', at: 0, run: () => relock() }];
   // The zero code (the user asked for one to reset their coins): every pug's coins are set to 0 and saved.
   // Store things already bought are kept.
@@ -4772,7 +4770,7 @@
       Math.hypot(x - p.x, y - p.y) <= p.r + 3 || (p.ring && Math.abs(x - p.x) <= p.ring[0] + 2 && Math.abs(y - p.y) <= p.ring[1] + 2));
   }
   // (zooming in or out redoes The Arcade's screen: its title, and Play shown or gone)
-  function zoomTo(p) { arcadeZoom = { target: p, p: 0, out: false, ship: null, shop: p.shop ? { p: 0 } : null }; if (p.shop) shop.line = 0; showPause('arcade', 0); sfx.tick(); }
+  function zoomTo(p) { arcadeZoom = { target: p, p: 0, out: false, ship: null, shop: p.shop ? { p: 0 } : null }; showPause('arcade', 0); sfx.tick(); }
   function zoomOut() { if (!arcadeZoom.target || arcadeZoom.out) return; arcadeZoom.out = true; arcadeZoom.ship = arcadeZoom.deep = null; showPause('arcade', 0); sfx.tick(); }
   // (zoomed in on the spaceship, or on the way)
   const onShip = () => !!(arcadeZoom.ship && !arcadeZoom.ship.out);
@@ -5487,57 +5485,22 @@
   // fades into a cosy wooden shop: plank walls, a round brass porthole with the storm swirling past outside, a lamp
   // swinging from the ceiling, empty shelves with cobwebs, and a counter with an old brass till and a COMING SOON
   // card. Behind the counter is Gloop, the shopkeeper: a round lavender alien with three eyes, two antennae, a red
-  // bow tie and a green vest. He has two moods (the user asked 2026-11-02), set by typing SAD or HAPPY (secret codes)
-  // and kept in the browser. Happy (as he starts): antennae up, a big grin, bobbing and blinking, saying happy things
-  // in a speech bubble; a click on him makes him wave and say the next one. Sad: droopy antennae, heavy-lidded eyes
-  // looking down, a frown, slumping slowly, and only sad things to say; now and then a tear rolls down his cheek, and
-  // a click on him makes him sigh, cry one and say the next sad thing. Nothing is for sale yet. Back (or Esc, B, or a click on the way in) zooms all the way
+  // bow tie and a green vest: happy, with his antennae up and a big grin, bobbing and blinking; a click on him makes
+  // him wave. He says nothing (the user asked 2026-11-02, after trying him sad and talking, and SAD/HAPPY codes that
+  // were then taken out again). Nothing is for sale yet. Back (or Esc, B, or a click on the way in) zooms all the way
   // back out to space. (arcadeZoom.shop: { p, out }, how far into the shop, 0 to 1 over SHOP_FRAMES, once the zoom
   // on the planet is all the way in; a planet's shop: the spot to zoom into)
   const SHOP_FRAMES = 45, SHOP_ZOOM = 14, SHOP_NAME = "Gloop's Shop";
   const GLOOP_COLS = { p: '#b48ae0', r: '#d8c0f4', q: '#7a54a8', o: '#3a1f5a', v: '#3a8a4a' };
-  const GLOOP = {"idle": [".....YY.........YY....", "......o.........o.....", ".......o.......o......", ".........ooooo........", ".......oorrrppoo......", ".....oorrrrpppppoo....", "....orrrrrWWWpppppo...", "....orWWWpWKWpWWWpo...", "....orWKWpWWWpWKWpo...", "...orrWWWpppppWWWpqo..", "....oppppppppppppqo...", "....opppKpppppKqqqo...", "....oppppKKKKKqqqqo...", ".....oopppWppqqqoo....", ".......opppqqqqo......", "......ovRWWWWRvvo.....", ".....ovvRRDDRRvvvo....", "..ooovvvRWWWWRvvvvoo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..oooooooooooooooooo.."], "blink": [".....YY.........YY....", "......o.........o.....", ".......o.......o......", ".........ooooo........", ".......oorrrppoo......", ".....oorrrrpppppoo....", "....orrrrrppppppppo...", "....orppppooopppppo...", "....orooopppppooopo...", "...orrppppppppppppqo..", "....oppppppppppppqo...", "....opppKpppppKqqqo...", "....oppppKKKKKqqqqo...", ".....oopppWppqqqoo....", ".......opppqqqqo......", "......ovRWWWWRvvo.....", ".....ovvRRDDRRvvvo....", "..ooovvvRWWWWRvvvvoo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..oooooooooooooooooo.."], "wave": [".....YY.........YY....", "......o.........o.....", ".......o.......o......", ".........ooooo........", ".......oorrrppoo......", ".....oorrrrpppppoooooo", "....orrrrrWWWppppppppo", "....orWWWpWKWpWWWppppo", "....orWKWpWWWpWKWpppo.", "...orrWWWpppppWWWpqpo.", "....oppppppppppppqqpo.", "....opppKpppppKqqqqpo.", "....oppppKKKKKqqqqopo.", ".....oopppWppqqqoo.oo.", ".......opppqqqqo...oo.", "......ovRWWWWRvvo..oo.", ".....ovvRRDDRRvvvo.oo.", "..ooovvvRWWWWRvvvvooo.", "..opvvvvYWWWWWYvvvo...", "..opvvvvvWWWWWvvvvo...", "..opvvvvvWWWWWvvvvo...", "..opvvvvYWWWWWYvvvo...", "..opvvvvvWWWWWvvvvo...", "..ooooooooooooooooo..."], "sad": ["......................", ".....oo.........oo....", "....o..o.......o..o...", "...Y.....ooooo.....Y..", "...Y...oorrrppoo...Y..", ".....oorrrrpppppoo....", "....orrrrrooopppppo...", "....orooopWWWpooopo...", "....orWWWpWKWpWWWpo...", "...orrWKWpppppWKWpqo..", "....oppppppppppppqo...", "....oppppppppppqqqo...", "....oppppKKKKKqqqqo...", ".....oopKppppqKqoo....", ".......opppqqqqo......", "......ovvWWWWWvvo.....", ".....ovvRWWWWRvvvo....", "..ooovvvRRDDRRvvvvoo..", "..opvvvvYRWWRWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..oooooooooooooooooo.."], "sadBlink": ["......................", ".....oo.........oo....", "....o..o.......o..o...", "...Y.....ooooo.....Y..", "...Y...oorrrppoo...Y..", ".....oorrrrpppppoo....", "....orrrrrppppppppo...", "....orppppppppppppo...", "....orppppooopppppo...", "...orrooopppppooopqo..", "....oppppppppppppqo...", "....oppppppppppqqqo...", "....oppppKKKKKqqqqo...", ".....oopKppppqKqoo....", ".......opppqqqqo......", "......ovvWWWWWvvo.....", ".....ovvRWWWWRvvvo....", "..ooovvvRRDDRRvvvvoo..", "..opvvvvYRWWRWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..oooooooooooooooooo.."]};
+  const GLOOP = {"idle": [".....YY.........YY....", "......o.........o.....", ".......o.......o......", ".........ooooo........", ".......oorrrppoo......", ".....oorrrrpppppoo....", "....orrrrrWWWpppppo...", "....orWWWpWKWpWWWpo...", "....orWKWpWWWpWKWpo...", "...orrWWWpppppWWWpqo..", "....oppppppppppppqo...", "....opppKpppppKqqqo...", "....oppppKKKKKqqqqo...", ".....oopppWppqqqoo....", ".......opppqqqqo......", "......ovRWWWWRvvo.....", ".....ovvRRDDRRvvvo....", "..ooovvvRWWWWRvvvvoo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..oooooooooooooooooo.."], "blink": [".....YY.........YY....", "......o.........o.....", ".......o.......o......", ".........ooooo........", ".......oorrrppoo......", ".....oorrrrpppppoo....", "....orrrrrppppppppo...", "....orppppooopppppo...", "....orooopppppooopo...", "...orrppppppppppppqo..", "....oppppppppppppqo...", "....opppKpppppKqqqo...", "....oppppKKKKKqqqqo...", ".....oopppWppqqqoo....", ".......opppqqqqo......", "......ovRWWWWRvvo.....", ".....ovvRRDDRRvvvo....", "..ooovvvRWWWWRvvvvoo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..oooooooooooooooooo.."], "wave": [".....YY.........YY....", "......o.........o.....", ".......o.......o......", ".........ooooo........", ".......oorrrppoo......", ".....oorrrrpppppoooooo", "....orrrrrWWWppppppppo", "....orWWWpWKWpWWWppppo", "....orWKWpWWWpWKWpppo.", "...orrWWWpppppWWWpqpo.", "....oppppppppppppqqpo.", "....opppKpppppKqqqqpo.", "....oppppKKKKKqqqqopo.", ".....oopppWppqqqoo.oo.", ".......opppqqqqo...oo.", "......ovRWWWWRvvo..oo.", ".....ovvRRDDRRvvvo.oo.", "..ooovvvRWWWWRvvvvooo.", "..opvvvvYWWWWWYvvvo...", "..opvvvvvWWWWWvvvvo...", "..opvvvvvWWWWWvvvvo...", "..opvvvvYWWWWWYvvvo...", "..opvvvvvWWWWWvvvvo...", "..ooooooooooooooooo..."]};
   const bakeWith = (rows, cols) => {
     const c = document.createElement('canvas'); c.width = rows[0].length; c.height = rows.length;
     const g = c.getContext('2d');
     rows.forEach((row, y) => [...row].forEach((ch, x) => { const col = cols[ch] || PAL[ch]; if (ch !== '.' && col) { g.fillStyle = col; g.fillRect(x, y, 1, 1); } }));
     return c;
   };
-  const HAPPY_LINES = [["I'M GLOOP! WELCOME TO", 'MY SHOP!'], ['NOTHING FOR SALE YET...', 'COME BACK SOON!'],
-    ['NEW STUFF IS ON ITS WAY', 'FROM ALL OVER SPACE!'], ['MY SHELVES ARE EMPTY', 'BUT MY HEART IS FULL!'], ['WHAT A LOVELY STORM', 'WE ARE HAVING TODAY!'],
-    ['I POLISHED MY TILL.', 'LOOK HOW IT SHINES!'], ['I LOVE MY LITTLE LAMP.', 'IT KEEPS ME COZY!'], ['A CUSTOMER! HOORAY!', 'WELCOME WELCOME!'],
-    ['I HAVE THREE EYES TO', 'SEE YOU THREE TIMES!'], ['THE DUST BUNNY AND I', 'ARE BEST FRIENDS!']];
-  const SAD_LINES = [['NOBODY EVER COMES', 'TO MY SHOP...'], ['I HAVE NOTHING TO SELL.', 'NOT ONE THING...'],
-    ['MY SHELVES ARE EMPTY.', 'JUST LIKE MY HEART...'], ["IT'S SO LONELY", 'INSIDE A STORM...'], ['EVEN MY LAMP', 'LOOKS SAD TODAY...'],
-    // (more, the user asked; the pixel font has letters, digits and ! - : . ' but no commas)
-    ['MY TILL HAS NEVER', 'ONCE GONE DING...'], ['I WROTE COMING SOON', 'A LONG LONG TIME AGO...'], ['I HAD A CUSTOMER ONCE.', 'IT WAS A DREAM...'],
-    ['EVEN THE SPIDER', 'MOVED OUT...'], ['MY BOW TIE IS', 'FOR NOBODY...'], ['MY THIRD EYE HAS', 'NOTHING TO LOOK AT...'],
-    ['SOMETIMES I TALK', 'TO MY LAMP...'], ['I DUST THE SHELVES.', 'THERE IS NOTHING ON THEM...'], ['I MISS JUPITER...', "AND I'M ON JUPITER..."],
-    ['MY ANTENNAE ARE TOO', 'SAD TO STAND UP...'], ['THE STORM OUTSIDE', 'NEVER EVER STOPS...'], ['I PRACTICE SAYING HELLO.', 'NOBODY HEARS IT...'],
-    ['I BAKED A CAKE FOR MY', 'GRAND OPENING...'], ['NOBODY CAME. I ATE', 'IT ALL BY MYSELF...'], ['I SAID HI TO A ROCK.', 'IT DID NOT SAY HI...'],
-    ['MY ONLY FRIEND IS', 'THE DUST BUNNY...'], ['I PUT UP A SIGN.', 'THE STORM ATE IT...'], ['I COUNT THE PLANKS.', 'THERE ARE STILL 20...'],
-    ['I WAVE AT EVERY', 'SPACESHIP. NONE STOP...'], ['MY ICE CREAM MELTED', 'BEFORE I COULD SELL IT...'], ['EVEN MY TEAR', 'LOOKS LONELY...'],
-    ['THE MOTHER SHIP', 'NEVER VISITS ME...'], ['I HAVE THREE EYES', 'AND ALL THREE ARE SAD...'], ['SOME DAYS I JUST', 'STARE AT THE WALL...'],
-    ['NOBODY KNOWS', 'MY BIRTHDAY...'], ['I SING TO THE STORM.', 'IT JUST ROARS BACK...'],
-    ['I MADE A WELCOME MAT.', 'IT IS STILL CLEAN...'], ['MY PHONE NEVER RINGS.', 'I DO NOT HAVE A PHONE...'], ['I TRIED TO SMILE ONCE.', 'MY FACE FORGOT HOW...'],
-    ['THE PUGS NEVER COME', 'TO VISIT GLOOP...'], ['I WROTE MYSELF A LETTER.', 'IT WAS SAD TOO...'], ['MY SOCKS DO NOT MATCH.', 'NOBODY NOTICED...'],
-    ['I HAD A GOLDFISH.', 'IT SWAM AWAY IN SPACE...'], ['THE COOKIE JAR IS EMPTY.', 'I ATE THEM WHILE SAD...'], ['I PLAYED HIDE AND SEEK.', 'NOBODY CAME TO LOOK...'],
-    ['I BOUGHT A PARTY HAT', 'FOR A PARTY OF ONE...'], ['MY POCKETS ARE', 'EMPTY TOO...'], ['I CLAP FOR MYSELF', 'WHEN I OPEN EACH DAY...'],
-    ['EVEN BRUNO HAS MORE', 'FRIENDS THAN ME...'], ['I TOLD A JOKE TODAY.', 'THE LAMP DID NOT LAUGH...'], ['MY TEA WENT COLD.', 'IT WAS ALREADY COLD...'],
-    ['I FOUND A COIN ONCE.', 'IT WAS A BUTTON...'], ['IT RAINS DIAMONDS HERE.', 'I CANNOT CATCH ANY...'], ['MY FAVORITE COLOR', 'IS GRAY NOW...'],
-    ['I DREW A FRIEND.', 'HE ERASED HIMSELF...'], ['ZORP NEVER CALLS', 'ANYMORE...']];
-  // (line: what he is saying; tearT: a tear rolling down, frames left; waveT: frames left of a wave; sad: his mood)
-  const GLOOP_KEY = 'doodad-doombad-gloop';
-  let gloopPics = null, shopBg = null, shop = { line: 0, tearT: 0, waveT: 0, sad: (() => { try { return localStorage.getItem(GLOOP_KEY) === 'sad'; } catch (e) { return false; } })() };
-  const shopLines = () => shop.sad ? SAD_LINES : HAPPY_LINES;
-  // (the SAD and HAPPY codes)
-  function setGloopMood(sad) {
-    shop.sad = sad; shop.line = 0; shop.tearT = 0; shop.waveT = 0;
-    try { if (sad) localStorage.setItem(GLOOP_KEY, 'sad'); else localStorage.removeItem(GLOOP_KEY); } catch (e) {}
-    toast(sad ? 'Gloop is sad...' : 'Gloop is happy again!', '#b48ae0');
-    if (sad) tone(392, 0.35, 'sine', 0.04, -120); else { tone(520, 0.08, 'sine', 0.05, 380); tone(780, 0.1, 'sine', 0.04, 200, 0.09); }
-  }
-  const SHOP_TEAR = 50;
+  // (waveT: frames left of a wave)
+  let gloopPics = null, shopBg = null, shop = { waveT: 0 };
   const inShop = () => !!(arcadeZoom.shop && arcadeZoom.shop.p === 1 && arcadeZoom.target && !arcadeZoom.out);
   // (Gloop's box on the screen, drawn twice his size behind the counter)
   const GLOOP_X = 98, GLOOP_Y = 144;
@@ -5547,9 +5510,7 @@
   }
   function shopClick(e) {
     if (!onGloop(e)) return;
-    shop.line = (shop.line + 1) % shopLines().length;
-    if (shop.sad) { if (!shop.tearT) shop.tearT = SHOP_TEAR; tone(392, 0.35, 'sine', 0.04, -120); tone(294, 0.5, 'sine', 0.035, -90, 0.3); }   // (a sad sigh)
-    else { shop.waveT = 40; tone(520, 0.08, 'sine', 0.05, 380); tone(780, 0.1, 'sine', 0.04, 200, 0.09); }   // (a happy alien warble)
+    shop.waveT = 40; tone(520, 0.08, 'sine', 0.05, 380); tone(780, 0.1, 'sine', 0.04, 200, 0.09);   // (a happy alien warble)
   }
   // the still parts of the shop, built once: the walls, beam, shelves, porthole's brass ring, counter, till and card
   function buildShopBg() {
@@ -5613,34 +5574,19 @@
     // (specks of dust drifting in the lamplight)
     ctx.fillStyle = '#ffe9b0';
     for (let i = 0; i < 7; i++) ctx.fillRect(Math.round(100 + (i * 37 + Math.sin(t / 30 + i) * 6) % 40), Math.round(80 + (t * 0.15 + i * 23) % 60), 1, 1);
-    // Gloop behind the counter (which is drawn over his middle). Happy: bobbing, blinking now and then, waving when
-    // clicked. Sad: slumped, sinking and rising slowly with his sighs, blinking slowly; every so often (or when
-    // clicked) a tear rolls down from his left eye
+    // Gloop behind the counter (which is drawn over his middle): bobbing, blinking now and then, waving when clicked
     if (shop.waveT > 0) shop.waveT--;
-    if (shop.tearT > 0) shop.tearT--;
-    else if (shop.sad && t % 420 === 300) shop.tearT = SHOP_TEAR;
-    const pic = shop.sad ? (t % 260 < 14 ? gloopPics.sadBlink : gloopPics.sad) : shop.waveT ? gloopPics.wave : t % 200 < 8 ? gloopPics.blink : gloopPics.idle;
-    const bob = shop.sad ? Math.round(Math.sin(t / 50) + 0.5) : Math.round(Math.sin(t / 25));
+    const pic = shop.waveT ? gloopPics.wave : t % 200 < 8 ? gloopPics.blink : gloopPics.idle, bob = Math.round(Math.sin(t / 25));
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, PW, 190); ctx.clip();
     ctx.drawImage(pic, GLOOP_X, GLOOP_Y + bob, 44, 48);
-    if (shop.tearT) {
-      const k = 1 - shop.tearT / SHOP_TEAR, tx = GLOOP_X + 12 - Math.round(k * 4), ty = GLOOP_Y + bob + 20 + Math.round(k * 16);
-      ctx.fillStyle = '#9fd8ff'; ctx.fillRect(tx, ty, 2, 3); ctx.fillStyle = '#ffffff'; ctx.fillRect(tx, ty, 1, 1);
-    }
     ctx.restore();
     // (his hands resting on the counter top: the right one is up while he waves)
-    const both = !shop.waveT || shop.sad;
+    const both = !shop.waveT;
     ctx.fillStyle = GLOOP_COLS.o; ctx.fillRect(GLOOP_X + 2, 186, 8, 5); if (both) ctx.fillRect(GLOOP_X + 34, 186, 8, 5);
     ctx.fillStyle = GLOOP_COLS.p; ctx.fillRect(GLOOP_X + 3, 187, 6, 3); if (both) ctx.fillRect(GLOOP_X + 35, 187, 6, 3);
     // (the card says COMING SOON, and the till shows nothing rung up)
     drawText('COMING', 191, 169, 'black', 'center'); drawText('SOON!', 191, 179, 'red', 'center');
     drawText('000', 47, 152, 'green', 'center');
-    // his speech bubble (happy or sad things, as he is), with a tail down to his head
-    const [l1, l2] = shopLines()[shop.line % shopLines().length], bw = Math.max(l1.length, l2.length) * 6 + 12, bx = Math.round(120 - bw / 2);
-    ctx.fillStyle = '#3e2414'; ctx.fillRect(bx - 1, 109, bw + 2, 28);
-    ctx.fillStyle = '#fff6e0'; ctx.fillRect(bx, 110, bw, 26);
-    for (let i = 0; i < 6; i++) { ctx.fillStyle = '#3e2414'; ctx.fillRect(124 + i, 136 + i, 8 - i * 2 + 2, 1); ctx.fillStyle = '#fff6e0'; ctx.fillRect(125 + i, 136 + i, Math.max(0, 8 - i * 2), 1); }
-    drawText(l1, 120, 113, 'black', 'center'); drawText(l2, 120, 124, 'black', 'center');
   }
   // ----- Earth's mini-game: Banana Catch (Play on Earth in The Arcade) -----
   // The pug that pressed Play stands on the grass wearing a bowl on its head, and Big Bruno walks back and forth
