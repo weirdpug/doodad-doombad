@@ -5782,10 +5782,12 @@
   // (A held) and dragged anywhere; let go and he floats off the way he was thrown, spinning. He is only out there in
   // the zoomed-out Arcade; going back into Jupiter puts him back behind his counter, and the main menu clears him.
   // (spaceGloop: where he is, how he drifts and spins, and who holds him (grab, as for Bruno), or null)
+  // (SPACE_GLOOP: how big he is out there, a fraction of his own size: small, the user asked)
+  const SPACE_GLOOP = 0.5;
   let spaceGloop = null, arcadeGrabbed = false;
   function onSpaceGloop(e) {
     const p = titlePoint(e);
-    return !!(p && spaceGloop && Math.hypot(p[0] - spaceGloop.x, p[1] - spaceGloop.y) <= 18);
+    return !!(p && spaceGloop && Math.hypot(p[0] - spaceGloop.x, p[1] - spaceGloop.y) <= 12);   // (a little bigger than he is, to catch)
   }
   ov.addEventListener('pointerdown', e => {
     arcadeGrabbed = false;
@@ -5820,12 +5822,12 @@
       g.x += g.vx; g.y += g.vy; g.vx *= 0.995; g.vy *= 0.995; g.va *= 0.998;
       if (Math.hypot(g.vx, g.vy) < 0.2) { g.vx += Math.cos(spaceT / 90) * 0.01; g.vy += Math.sin(spaceT / 70) * 0.01; }
       if (Math.abs(g.va) < 0.01) g.va += 0.001;
-      if ((g.x < 12 && g.vx < 0) || (g.x > PW - 12 && g.vx > 0)) g.vx = -g.vx;
-      if ((g.y < 20 && g.vy < 0) || (g.y > PH - 22 && g.vy > 0)) g.vy = -g.vy;
+      if ((g.x < 8 && g.vx < 0) || (g.x > PW - 8 && g.vx > 0)) g.vx = -g.vx;
+      if ((g.y < 12 && g.vy < 0) || (g.y > PH - 12 && g.vy > 0)) g.vy = -g.vy;
     }
     g.ang += g.va;
     ctx.save(); ctx.translate(Math.round(g.x), Math.round(g.y)); ctx.rotate(g.ang);
-    ctx.drawImage(gloopPics.sad, -11, -18, 22, 36);
+    ctx.drawImage(gloopPics.sad, -11 * SPACE_GLOOP, -18 * SPACE_GLOOP, 22 * SPACE_GLOOP, 36 * SPACE_GLOOP);
     ctx.restore();
   }
   // ----- Earth's mini-game: Banana Catch (Play on Earth in The Arcade) -----
