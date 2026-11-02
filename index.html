@@ -6527,7 +6527,7 @@
     if (kind === 'rocks') {
       const n = hpRnd(2, 3), objs = [];
       for (let i = 0; i < n; i++) objs.push({ x: i * L / n - 32 + hpRnd(0, 20), w: [16, 16, 24, 32][hpRnd(0, 3)] });
-      return { kind, dir, speed: (0.45 + Math.random() * 0.6) * k, L, objs };
+      return { kind, dir, speed: (0.28 + Math.random() * 0.37) * k, L, objs };   // (slowed at the user's request 2026-11-02)
     }
     if (kind === 'gap') {
       const n = hpRnd(2, 3), objs = [];
