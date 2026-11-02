@@ -5479,23 +5479,27 @@
   // A click on Jupiter zooms in on it as on any planet, then on and on down into its Great Red Spot, and the storm
   // fades into a cosy wooden shop: plank walls, a round brass porthole with the storm swirling past outside, a lamp
   // swinging from the ceiling, empty shelves with cobwebs, and a counter with an old brass till and a COMING SOON
-  // card. Behind the counter is Gloop, the shopkeeper: a round lavender alien with three eyes, two antennae, a big
-  // grin, a red bow tie and a green vest. He bobs, blinks, and says hello in a speech bubble; click him and he waves
-  // and says something else. Nothing is for sale yet. Back (or Esc, B, or a click on the way in) zooms all the way
+  // card. Behind the counter is Gloop, the shopkeeper: a round lavender alien with three eyes, two antennae, a red
+  // bow tie and a green vest. He is sad (the user asked 2026-11-02, in place of a happy Gloop): droopy antennae,
+  // heavy-lidded eyes looking down, a frown, slumping slowly, and he only says sad things, in a speech bubble; now
+  // and then a tear rolls down his cheek, and a click on him makes him sigh, cry one and say the next sad thing.
+  // Nothing is for sale yet. Back (or Esc, B, or a click on the way in) zooms all the way
   // back out to space. (arcadeZoom.shop: { p, out }, how far into the shop, 0 to 1 over SHOP_FRAMES, once the zoom
   // on the planet is all the way in; a planet's shop: the spot to zoom into)
   const SHOP_FRAMES = 45, SHOP_ZOOM = 14, SHOP_NAME = "Gloop's Shop";
-  const SHOP_LINES = [["I'M GLOOP! WELCOME TO", 'MY SHOP!'], ['NOTHING FOR SALE YET...', 'COME BACK SOON!'],
-    ['NEW STUFF IS ON ITS WAY', 'FROM ALL OVER SPACE!'], ['MY SHELVES ARE EMPTY,', 'BUT MY HEART IS FULL!']];
   const GLOOP_COLS = { p: '#b48ae0', r: '#d8c0f4', q: '#7a54a8', o: '#3a1f5a', v: '#3a8a4a' };
-  const GLOOP = {"idle": [".....YY.........YY....", "......o.........o.....", ".......o.......o......", ".........ooooo........", ".......oorrrppoo......", ".....oorrrrpppppoo....", "....orrrrrWWWpppppo...", "....orWWWpWKWpWWWpo...", "....orWKWpWWWpWKWpo...", "...orrWWWpppppWWWpqo..", "....oppppppppppppqo...", "....opppKpppppKqqqo...", "....oppppKKKKKqqqqo...", ".....oopppWppqqqoo....", ".......opppqqqqo......", "......ovRWWWWRvvo.....", ".....ovvRRDDRRvvvo....", "..ooovvvRWWWWRvvvvoo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..oooooooooooooooooo.."], "blink": [".....YY.........YY....", "......o.........o.....", ".......o.......o......", ".........ooooo........", ".......oorrrppoo......", ".....oorrrrpppppoo....", "....orrrrrppppppppo...", "....orppppooopppppo...", "....orooopppppooopo...", "...orrppppppppppppqo..", "....oppppppppppppqo...", "....opppKpppppKqqqo...", "....oppppKKKKKqqqqo...", ".....oopppWppqqqoo....", ".......opppqqqqo......", "......ovRWWWWRvvo.....", ".....ovvRRDDRRvvvo....", "..ooovvvRWWWWRvvvvoo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..oooooooooooooooooo.."], "wave": [".....YY.........YY....", "......o.........o.....", ".......o.......o......", ".........ooooo........", ".......oorrrppoo......", ".....oorrrrpppppoooooo", "....orrrrrWWWppppppppo", "....orWWWpWKWpWWWppppo", "....orWKWpWWWpWKWpppo.", "...orrWWWpppppWWWpqpo.", "....oppppppppppppqqpo.", "....opppKpppppKqqqqpo.", "....oppppKKKKKqqqqopo.", ".....oopppWppqqqoo.oo.", ".......opppqqqqo...oo.", "......ovRWWWWRvvo..oo.", ".....ovvRRDDRRvvvo.oo.", "..ooovvvRWWWWRvvvvooo.", "..opvvvvYWWWWWYvvvo...", "..opvvvvvWWWWWvvvvo...", "..opvvvvvWWWWWvvvvo...", "..opvvvvYWWWWWYvvvo...", "..opvvvvvWWWWWvvvvo...", "..ooooooooooooooooo..."]};
+  const GLOOP = {"idle": ["......................", ".....oo.........oo....", "....o..o.......o..o...", "...Y.....ooooo.....Y..", "...Y...oorrrppoo...Y..", ".....oorrrrpppppoo....", "....orrrrrooopppppo...", "....orooopWWWpooopo...", "....orWWWpWKWpWWWpo...", "...orrWKWpppppWKWpqo..", "....oppppppppppppqo...", "....oppppppppppqqqo...", "....oppppKKKKKqqqqo...", ".....oopKppppqKqoo....", ".......opppqqqqo......", "......ovvWWWWWvvo.....", ".....ovvRWWWWRvvvo....", "..ooovvvRRDDRRvvvvoo..", "..opvvvvYRWWRWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..oooooooooooooooooo.."], "blink": ["......................", ".....oo.........oo....", "....o..o.......o..o...", "...Y.....ooooo.....Y..", "...Y...oorrrppoo...Y..", ".....oorrrrpppppoo....", "....orrrrrppppppppo...", "....orppppppppppppo...", "....orppppooopppppo...", "...orrooopppppooopqo..", "....oppppppppppppqo...", "....oppppppppppqqqo...", "....oppppKKKKKqqqqo...", ".....oopKppppqKqoo....", ".......opppqqqqo......", "......ovvWWWWWvvo.....", ".....ovvRWWWWRvvvo....", "..ooovvvRRDDRRvvvvoo..", "..opvvvvYRWWRWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..oooooooooooooooooo.."]};
   const bakeWith = (rows, cols) => {
     const c = document.createElement('canvas'); c.width = rows[0].length; c.height = rows.length;
     const g = c.getContext('2d');
     rows.forEach((row, y) => [...row].forEach((ch, x) => { const col = cols[ch] || PAL[ch]; if (ch !== '.' && col) { g.fillStyle = col; g.fillRect(x, y, 1, 1); } }));
     return c;
   };
-  let gloopPics = null, shopBg = null, shop = { line: 0, waveT: 0 };
+  const SHOP_LINES = [['NOBODY EVER COMES', 'TO MY SHOP...'], ['I HAVE NOTHING TO SELL.', 'NOT ONE THING...'],
+    ['MY SHELVES ARE EMPTY.', 'JUST LIKE MY HEART...'], ["IT'S SO LONELY", 'INSIDE A STORM...'], ['EVEN MY LAMP', 'LOOKS SAD TODAY...']];
+  // (line: what he is saying; tearT: a tear rolling down, frames left)
+  let gloopPics = null, shopBg = null, shop = { line: 0, tearT: 0 };
+  const SHOP_TEAR = 50;
   const inShop = () => !!(arcadeZoom.shop && arcadeZoom.shop.p === 1 && arcadeZoom.target && !arcadeZoom.out);
   // (Gloop's box on the screen, drawn twice his size behind the counter)
   const GLOOP_X = 98, GLOOP_Y = 144;
@@ -5505,8 +5509,9 @@
   }
   function shopClick(e) {
     if (!onGloop(e)) return;
-    shop.line = (shop.line + 1) % SHOP_LINES.length; shop.waveT = 40;
-    tone(520, 0.08, 'sine', 0.05, 380); tone(780, 0.1, 'sine', 0.04, 200, 0.09);   // (a happy alien warble)
+    if (!shop.tearT) shop.tearT = SHOP_TEAR;
+    shop.line = (shop.line + 1) % SHOP_LINES.length;
+    tone(392, 0.35, 'sine', 0.04, -120); tone(294, 0.5, 'sine', 0.035, -90, 0.3);   // (a sad sigh)
   }
   // the still parts of the shop, built once: the walls, beam, shelves, porthole's brass ring, counter, till and card
   function buildShopBg() {
@@ -5570,19 +5575,25 @@
     // (specks of dust drifting in the lamplight)
     ctx.fillStyle = '#ffe9b0';
     for (let i = 0; i < 7; i++) ctx.fillRect(Math.round(100 + (i * 37 + Math.sin(t / 30 + i) * 6) % 40), Math.round(60 + (t * 0.15 + i * 23) % 80), 1, 1);
-    // Gloop: bobbing, blinking now and then, waving when clicked, behind the counter (which is drawn over his middle)
-    if (shop.waveT > 0) shop.waveT--;
-    const pic = shop.waveT ? gloopPics.wave : t % 200 < 8 ? gloopPics.blink : gloopPics.idle, bob = Math.round(Math.sin(t / 25));
+    // Gloop: slumped behind the counter (which is drawn over his middle), sinking and rising slowly with his sighs,
+    // blinking slowly now and then; every so often (or when clicked) a tear rolls down from his left eye
+    if (shop.tearT > 0) shop.tearT--;
+    else if (t % 420 === 300) shop.tearT = SHOP_TEAR;
+    const pic = t % 260 < 14 ? gloopPics.blink : gloopPics.idle, bob = Math.round(Math.sin(t / 50) + 0.5);
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, PW, 190); ctx.clip();
     ctx.drawImage(pic, GLOOP_X, GLOOP_Y + bob, 44, 48);
+    if (shop.tearT) {
+      const k = 1 - shop.tearT / SHOP_TEAR, tx = GLOOP_X + 12 - Math.round(k * 4), ty = GLOOP_Y + bob + 20 + Math.round(k * 16);
+      ctx.fillStyle = '#9fd8ff'; ctx.fillRect(tx, ty, 2, 3); ctx.fillStyle = '#ffffff'; ctx.fillRect(tx, ty, 1, 1);
+    }
     ctx.restore();
-    // (his hands resting on the counter top: the right one is up while he waves)
-    ctx.fillStyle = GLOOP_COLS.o; ctx.fillRect(GLOOP_X + 2, 186, 8, 5); if (!shop.waveT) ctx.fillRect(GLOOP_X + 34, 186, 8, 5);
-    ctx.fillStyle = GLOOP_COLS.p; ctx.fillRect(GLOOP_X + 3, 187, 6, 3); if (!shop.waveT) ctx.fillRect(GLOOP_X + 35, 187, 6, 3);
+    // (his hands resting limp on the counter top)
+    ctx.fillStyle = GLOOP_COLS.o; ctx.fillRect(GLOOP_X + 2, 186, 8, 5); ctx.fillRect(GLOOP_X + 34, 186, 8, 5);
+    ctx.fillStyle = GLOOP_COLS.p; ctx.fillRect(GLOOP_X + 3, 187, 6, 3); ctx.fillRect(GLOOP_X + 35, 187, 6, 3);
     // (the card says COMING SOON, and the till shows nothing rung up)
     drawText('COMING', 191, 169, 'black', 'center'); drawText('SOON!', 191, 179, 'red', 'center');
     drawText('000', 47, 152, 'green', 'center');
-    // his speech bubble, with a tail down to his head
+    // his speech bubble (only sad things), with a tail down to his head
     const [l1, l2] = SHOP_LINES[shop.line], bw = Math.max(l1.length, l2.length) * 6 + 12, bx = Math.round(120 - bw / 2);
     ctx.fillStyle = '#3e2414'; ctx.fillRect(bx - 1, 109, bw + 2, 28);
     ctx.fillStyle = '#fff6e0'; ctx.fillRect(bx, 110, bw, 26);
