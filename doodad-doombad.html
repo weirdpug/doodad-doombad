@@ -5496,7 +5496,12 @@
     return c;
   };
   const SHOP_LINES = [['NOBODY EVER COMES', 'TO MY SHOP...'], ['I HAVE NOTHING TO SELL.', 'NOT ONE THING...'],
-    ['MY SHELVES ARE EMPTY.', 'JUST LIKE MY HEART...'], ["IT'S SO LONELY", 'INSIDE A STORM...'], ['EVEN MY LAMP', 'LOOKS SAD TODAY...']];
+    ['MY SHELVES ARE EMPTY.', 'JUST LIKE MY HEART...'], ["IT'S SO LONELY", 'INSIDE A STORM...'], ['EVEN MY LAMP', 'LOOKS SAD TODAY...'],
+    // (more, the user asked; the pixel font has letters, digits and ! - : . ' but no commas)
+    ['MY TILL HAS NEVER', 'ONCE GONE DING...'], ['I WROTE COMING SOON', 'A LONG LONG TIME AGO...'], ['I HAD A CUSTOMER ONCE.', 'IT WAS A DREAM...'],
+    ['EVEN THE SPIDER', 'MOVED OUT...'], ['MY BOW TIE IS', 'FOR NOBODY...'], ['MY THIRD EYE HAS', 'NOTHING TO LOOK AT...'],
+    ['SOMETIMES I TALK', 'TO MY LAMP...'], ['I DUST THE SHELVES.', 'THERE IS NOTHING ON THEM...'], ['I MISS JUPITER...', "AND I'M ON JUPITER..."],
+    ['MY ANTENNAE ARE TOO', 'SAD TO STAND UP...'], ['THE STORM OUTSIDE', 'NEVER EVER STOPS...'], ['I PRACTICE SAYING HELLO.', 'NOBODY HEARS IT...']];
   // (line: what he is saying; tearT: a tear rolling down, frames left)
   let gloopPics = null, shopBg = null, shop = { line: 0, tearT: 0 };
   const SHOP_TEAR = 50;
