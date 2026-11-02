@@ -5494,9 +5494,8 @@
   // you leave the shop. Any number can be in the air at once. A burrito that hits the lamp (the user asked) snaps its
   // cord: the lamp drops onto Gloop's head with a clang and knocks him out cold (X eyes, tongue out, stars going round
   // his head), its bulb out, so the shop goes dim. He wobbles there a moment with the lamp on his head like a hat; then
-  // it slides off onto the counter and he tips over and falls down behind the counter, out of sight, stars going
-  // round above it;
-  // after 3 seconds he gets back up, sad (the user asked). The lamp and the dim stay until you leave. He stays sad until you leave the shop; the
+  // he tips over and falls down behind the counter, lamp and all, out of sight, stars going round above it; after 3
+  // seconds he gets back up, sad, but the lamp stays down there (the user asked). The dim stays until you leave. He stays sad until you leave the shop; the
   // next time you come in he is happy and clean again. Nothing is for sale yet. Back (or Esc, B, or a click on the way in) zooms all the way
   // back out to space. (arcadeZoom.shop: { p, out }, how far into the shop, 0 to 1 over SHOP_FRAMES, once the zoom
   // on the planet is all the way in; a planet's shop: the spot to zoom into)
@@ -5515,7 +5514,7 @@
   // (whyT: frames left of his WHY?)
   let gloopPics = null, shopBg = null, shop = { sad: false, tearT: 0, hitT: 0, whyT: 0, ammo: [], mess: [], bits: [], stains: [], lamp: 'up', lampY: 0, lampV: 0, lampX: 120, ko: false, koT: 0 };
   // (lamp: 'up' on its cord, 'fall' (lampY: how far it has dropped, lampV: how fast; lampX: where it snapped), 'down'
-  // on Gloop's head, or 'counter' where it slid off him; ko: knocked out by it, koT: frames since: wobbling with the
+  // on Gloop's head (falling over with him), or 'gone', left behind the counter when he got up; ko: knocked out by it, koT: frames since: wobbling with the
   // lamp on his head until KO_TIP, tipping over until KO_DOWN, lying behind the counter until KO_UP (3 seconds after
   // it hit him), then getting up, sad, until KO_END)
   const SHOP_TEAR = 50, BURRITO_T = 18, KO_TIP = 30, KO_DOWN = 54, KO_UP = 180, KO_END = 204;
@@ -5627,9 +5626,8 @@
     const kt = shop.koT, ease = u => u * u * (3 - 2 * u);
     if (shop.ko) {
       shop.koT++;
-      if (kt === KO_TIP) { shop.lamp = 'counter'; sfx.clank(); }
       if (kt === KO_DOWN - 6) tone(110, 0.3, 'triangle', 0.07, -40);   // (thump, behind the counter)
-      if (kt === KO_UP) tone(392, 0.35, 'sine', 0.04, -120);   // (a sad sigh as he gets up)
+      if (kt === KO_UP) { shop.lamp = 'gone'; tone(392, 0.35, 'sine', 0.04, -120); }   // (a sad sigh as he gets up, without the lamp)
       if (kt >= KO_END) { shop.ko = false; shop.koT = 0; shop.sad = true; shop.tearT = SHOP_TEAR; }
     }
     const fall = !shop.ko || kt < KO_TIP ? 0 : kt < KO_DOWN ? ease((kt - KO_TIP) / (KO_DOWN - KO_TIP)) : kt < KO_UP ? 1 : 1 - ease((kt - KO_UP) / (KO_END - KO_UP));
@@ -5643,14 +5641,13 @@
     ctx.translate(gx + 22, gy + 48 + drop); ctx.rotate(ang);
     ctx.drawImage(pic, -22, -48, 44, 48);
     for (const [mx, my, col] of shop.mess) { ctx.fillStyle = col; ctx.fillRect(-22 + mx, -48 + my, 2, 2); }
+    if (shop.lamp === 'down') lampShade(0, -54, false);   // (the lamp on his head, going over with him)
     if (shop.tearT && !shop.ko) {
       const k = 1 - shop.tearT / SHOP_TEAR, tx = -10 - Math.round(k * 4), ty = -28 + Math.round(k * 16);
       ctx.fillStyle = '#9fd8ff'; ctx.fillRect(tx, ty, 2, 3); ctx.fillStyle = '#ffffff'; ctx.fillRect(tx, ty, 1, 1);
     }
     ctx.restore();
-    // (the lamp on his head like a hat while he wobbles, then on the counter where it slid off; stars go round his
-    // head while he is out, or just above the counter while he lies behind it)
-    if (shop.lamp === 'down') lampShade(gx + 22, gy - 6, false);
+    // (stars go round his head while he is out, or just above the counter while he lies behind it)
     if (shop.ko && kt < KO_UP) for (let k = 0; k < 3; k++) {
       const [cx0, cy0] = kt < KO_TIP ? [gx + 22, gy - 6] : [gx + 52, 184];
       const an = t / 10 + k * 2.1, sx = Math.round(cx0 + Math.cos(an) * 16), sy = Math.round(cy0 + Math.sin(an) * 4);
@@ -5661,7 +5658,6 @@
       ctx.fillStyle = GLOOP_COLS.o; ctx.fillRect(GLOOP_X + 2, 186, 8, 5); ctx.fillRect(GLOOP_X + 34, 186, 8, 5);
       ctx.fillStyle = GLOOP_COLS.p; ctx.fillRect(GLOOP_X + 3, 187, 6, 3); ctx.fillRect(GLOOP_X + 35, 187, 6, 3);
     }
-    if (shop.lamp === 'counter') lampShade(88, 179, false);   // (the lamp, fallen on the counter between the till and him)
     // (the card says COMING SOON, and the till shows nothing rung up)
     drawText('COMING', 191, 169, 'black', 'center'); drawText('SOON!', 191, 179, 'red', 'center');
     drawText('000', 47, 152, 'green', 'center');
