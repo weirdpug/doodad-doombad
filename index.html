@@ -900,6 +900,13 @@
     chickens_walk2: [".......II..........LL..", "......IIII........LLLL.", "K.....IWKYY.A.....LKLYY", "KK....IIIY..AA....LLLY.", "KII..IIII...AOO..LLLL..", "KIIcIIIcII..AOOOOOLLLL.", ".IIIKKKIcI...OOOAAAOLL.", "..IcIIIII.....OOOOOOO..", "....F..F.......F...F..."],
   });
   SPRITES.chickens_pet = SPRITES.chickens_walk1;
+  // Krampis (a pet, the user asked 2026-11-02): a garden gnome, facing right: a tall pointed red hat, a white beard and
+  // hair, a big pink nose, a blue shirt with a brown belt and gold buckle, brown trousers and boots; two steps.
+  Object.assign(SPRITES, {
+    krampis_walk1: ["....R......", "....RR.....", "...RRR.....", "...RRRR....", "..RRRRRR...", ".RRRRRRRR..", "..WSSKSS...", "..WSSSSff..", ".WWWSSWWW..", ".WWWWWWWW..", ".BWWWWWWB..", "BBBWWWWBBB.", ".BBBWWBBB..", "..NNYNNN...", "..AA..AA...", ".NNN..NNN.."],
+    krampis_walk2: ["....R......", "....RR.....", "...RRR.....", "...RRRR....", "..RRRRRR...", ".RRRRRRRR..", "..WSSKSS...", "..WSSSSff..", ".WWWSSWWW..", ".WWWWWWWW..", ".BWWWWWWB..", "BBBWWWWBBB.", ".BBBWWBBB..", "..NNYNNN...", "..AA.AA....", ".NNN.NNN..."],
+  });
+  SPRITES.krampis_pet = SPRITES.krampis_walk1;
   // Earth's mini-game (Banana Catch): the bowl the pug wears on its head to catch bananas in (white rim, blue
   // bowl), a banana (yellow, with a brown stem, the darker underside orange; two frames so it tumbles as it
   // falls: the second one upside down), and a banana squashed flat on the floor.
@@ -1183,7 +1190,8 @@
     // (price: unlocked with that many of the pressing pug's coins, once, for every pug; its card shows it, not a
     // shadow, with Unlock and the price; are: two of them)
     { key: 'chickens', name: 'Cookie and Pepper', alt: 'Two hens, a speckled dark grey one and a golden one', kind: 'walk', are: true,
-      price: 20, locked: () => !unlocks.chickens }];
+      price: 20, locked: () => !unlocks.chickens },
+    { key: 'krampis', name: 'Krampis', alt: 'A garden gnome with a tall red hat and a white beard', kind: 'walk' }];
   // the Customize sections with things to choose: which of a pug's looks each sets, its things, the
   // button's words while it isn't / is chosen, and what the screen says after
   const LOOK_SECTIONS = {
