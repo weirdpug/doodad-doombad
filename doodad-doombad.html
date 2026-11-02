@@ -4768,7 +4768,7 @@
   }
   // (zooming in or out redoes The Arcade's screen: its title, and Play shown or gone)
   function zoomTo(p) { arcadeZoom = { target: p, p: 0, out: false, ship: null, shop: p.shop ? { p: 0 } : null };
-    if (p.shop) Object.assign(shop, { sad: false, tearT: 0, hitT: 0, whyT: 0, ammo: null, mess: [], bits: [] });   // (Gloop happy and clean again)
+    if (p.shop) Object.assign(shop, { sad: false, tearT: 0, hitT: 0, whyT: 0, ammo: [], mess: [], bits: [], stains: [] });   // (Gloop happy and clean again)
     showPause('arcade', 0); sfx.tick(); }
   function zoomOut() { if (!arcadeZoom.target || arcadeZoom.out) return; arcadeZoom.out = true; arcadeZoom.ship = arcadeZoom.deep = null; showPause('arcade', 0); sfx.tick(); }
   // (zoomed in on the spaceship, or on the way)
@@ -5246,7 +5246,7 @@
   // (the mouse pointer turns into a hand over a planet, or a tiny ship)
   ov.addEventListener('pointermove', e => {
     if (!(fromTitle && pauseView === 'arcade')) { if (ov.style.cursor) ov.style.cursor = ''; return; }
-    const c = inShop() ? (onGloop(e) && !e.target.closest('button') ? 'pointer' : '') : arcadeZoom.target || (!e.target.closest('button') && (planetAt(e) || fleetNear(e) >= 0)) ? 'pointer' : '';
+    const c = inShop() ? (e.target.closest('button') ? '' : 'crosshair') : arcadeZoom.target || (!e.target.closest('button') && (planetAt(e) || fleetNear(e) >= 0)) ? 'pointer' : '';
     if (ov.style.cursor !== c) ov.style.cursor = c;
   });
   function buildSpaceBg() {
@@ -5489,7 +5489,9 @@
   // screen, spinning, and splats on his face; beans, rice, salsa and lettuce fly off, some stick to his face, he
   // flinches, and he turns sad: droopy antennae, heavy-lidded eyes looking down, a frown, slumping slowly, with a tear
   // now and then, and asks "WHY?" in a speech bubble (the user asked). Another burrito while he is sad just makes more
-  // mess (and asks again). He stays sad until you leave the shop; the
+  // mess (and asks again). A click anywhere else in the shop (but on a button) throws a burrito there too (the user
+  // asked): it lands on that exact spot and splats, leaving a stain on the wall, the counter or whatever it hit, until
+  // you leave the shop. Any number can be in the air at once. He stays sad until you leave the shop; the
   // next time you come in he is happy and clean again. Nothing is for sale yet. Back (or Esc, B, or a click on the way in) zooms all the way
   // back out to space. (arcadeZoom.shop: { p, out }, how far into the shop, 0 to 1 over SHOP_FRAMES, once the zoom
   // on the planet is all the way in; a planet's shop: the spot to zoom into)
@@ -5502,10 +5504,11 @@
     rows.forEach((row, y) => [...row].forEach((ch, x) => { const col = cols[ch] || PAL[ch]; if (ch !== '.' && col) { g.fillStyle = col; g.fillRect(x, y, 1, 1); } }));
     return c;
   };
-  // (sad: his mood; tearT: a tear rolling down, frames left; hitT: frames left of his flinch; ammo: the burrito in
-  // the air, { t }; mess: the bits stuck to his face, [x, y, colour] from his top left; bits: bits flying off)
+  // (sad: his mood; tearT: a tear rolling down, frames left; hitT: frames left of his flinch; ammo: the burritos in
+  // the air, each { t, at } (at: the spot it was thrown at, or null for Gloop); mess: the bits stuck to his face,
+  // [x, y, colour] from his top left; bits: bits flying off; stains: splats left on the shop, [x, y, colour])
   // (whyT: frames left of his WHY?)
-  let gloopPics = null, shopBg = null, shop = { sad: false, tearT: 0, hitT: 0, whyT: 0, ammo: null, mess: [], bits: [] };
+  let gloopPics = null, shopBg = null, shop = { sad: false, tearT: 0, hitT: 0, whyT: 0, ammo: [], mess: [], bits: [], stains: [] };
   const SHOP_TEAR = 50, BURRITO_T = 18;
   const BURRITO_BITS = ['#8a4a2a', '#f4f0e0', '#e8282f', '#5fd068', '#c8742f'];   // (beans, rice, salsa, lettuce, cheese)
   // (a burrito to throw: a rolled tortilla with its filling showing at one end)
@@ -5517,10 +5520,11 @@
     const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * PW, y = (e.clientY - r.top) / r.height * PH;
     return x >= GLOOP_X && x < GLOOP_X + 44 && y >= GLOOP_Y && y < 192;
   }
+  // (a click in the shop: a burrito thrown at Gloop if it is on him, or at that exact spot)
   function shopClick(e) {
-    if (!onGloop(e)) return;
-    if (shop.ammo) return;   // (one burrito in the air at a time)
-    shop.ammo = { t: 0 }; sfx.toss();
+    if (shop.ammo.length >= 8) return;
+    const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * PW, y = (e.clientY - r.top) / r.height * PH;
+    shop.ammo.push({ t: 0, at: onGloop(e) ? null : [x, y] }); sfx.toss();
   }
   // the still parts of the shop, built once: the walls, beam, shelves, porthole's brass ring, counter, till and card
   function buildShopBg() {
@@ -5571,6 +5575,7 @@
       ctx.fillStyle = storm[((band % storm.length) + storm.length) % storm.length]; ctx.fillRect(46 + x, 84 + y, 1, 1);
     }
     ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(36, 74, 4, 2); ctx.fillRect(34, 77, 2, 2);   // (a glint on the glass)
+    for (const [x, y, col] of shop.stains) { ctx.fillStyle = col; ctx.fillRect(x, y, 2, 2); }   // (burrito splats)
     // the lamp, swinging a little on its cord, and its warm glow
     const lx = Math.round(120 + Math.sin(t / 50) * 3);
     ctx.fillStyle = '#2a160a';
@@ -5606,20 +5611,31 @@
     // (the card says COMING SOON, and the till shows nothing rung up)
     drawText('COMING', 191, 169, 'black', 'center'); drawText('SOON!', 191, 179, 'red', 'center');
     drawText('000', 47, 152, 'green', 'center');
-    // the thrown burrito: up from the bottom of the screen in an arc, spinning and getting smaller as it goes, to
-    // his face, where it splats
-    if (shop.ammo) {
-      const a2 = shop.ammo, u = Math.min(1, ++a2.t / BURRITO_T), fx = GLOOP_X + 22, fy = GLOOP_Y + 18;
+    // the thrown burritos: up from the bottom of the screen in an arc, spinning and getting smaller as they go, to
+    // the spot each was thrown at (or Gloop's face), where it splats
+    for (const a2 of shop.ammo) {
+      const u = Math.min(1, ++a2.t / BURRITO_T), [fx, fy] = a2.at || [GLOOP_X + 22, GLOOP_Y + 18];
       const bx = 150 + (fx - 150) * u, by = 300 + (fy - 300) * u - Math.sin(u * Math.PI) * 40, sc = 2.4 - u * 0.8, b = sprite('thrown_burrito');
       if (b) { ctx.save(); ctx.translate(Math.round(bx), Math.round(by)); ctx.rotate(u * Math.PI * 4); ctx.drawImage(b, -6 * sc, -3 * sc, 12 * sc, 6 * sc); ctx.restore(); }
-      if (u >= 1) {
-        // (splat: he flinches and turns sad, some of it sticks to his face, the rest flies off)
-        shop.ammo = null; shop.sad = true; shop.hitT = 20; shop.tearT = SHOP_TEAR; shop.whyT = 150;
+      if (u < 1) continue;
+      a2.done = true;
+      for (let i = 0; i < 12; i++) shop.bits.push({ x: fx, y: fy, vx: (Math.random() - 0.5) * 4, vy: -1 - Math.random() * 2.5, t: 30, col: BURRITO_BITS[i % BURRITO_BITS.length] });
+      if (a2.at) {
+        // (on the shop: a splat of tortilla and filling stays where it hit; the oldest go once there are lots)
+        const sx = Math.round(fx), sy = Math.round(fy);
+        for (let i = 0; i < 9; i++) { const an = i / 9 * Math.PI * 2, rr = i % 3 ? 3 : 1; shop.stains.push([sx - 1 + Math.round(Math.cos(an) * rr), sy - 1 + Math.round(Math.sin(an) * rr), i % 3 ? BURRITO_BITS[i % BURRITO_BITS.length] : '#e8a05a']); }
+        if (shop.stains.length > 540) shop.stains.splice(0, shop.stains.length - 540);
+        noise(0.2, 0.14, 1400, 200); tone(140, 0.12, 'square', 0.04, -60);   // (splat)
+        continue;
+      }
+      {
+        // (splat on Gloop: he flinches and turns sad, some of it sticks to his face, the rest flies off)
+        shop.sad = true; shop.hitT = 20; shop.tearT = SHOP_TEAR; shop.whyT = 150;
         for (let i = 0; i < 6 && shop.mess.length < 40; i++) shop.mess.push([8 + Math.floor(Math.random() * 28), 6 + Math.floor(Math.random() * 20), BURRITO_BITS[i % BURRITO_BITS.length]]);
-        for (let i = 0; i < 16; i++) shop.bits.push({ x: fx, y: fy, vx: (Math.random() - 0.5) * 4, vy: -1 - Math.random() * 2.5, t: 30, col: BURRITO_BITS[i % BURRITO_BITS.length] });
         noise(0.25, 0.16, 1400, 200); tone(140, 0.15, 'square', 0.05, -60); tone(392, 0.35, 'sine', 0.04, -120, 0.35); tone(294, 0.5, 'sine', 0.035, -90, 0.65);   // (splat, then a sad sigh)
       }
     }
+    shop.ammo = shop.ammo.filter(a2 => !a2.done);
     for (const b of shop.bits) { b.vy += 0.25; b.x += b.vx; b.y += b.vy; b.t--; ctx.fillStyle = b.col; ctx.fillRect(Math.round(b.x), Math.round(b.y), 2, 2); }
     shop.bits = shop.bits.filter(b => b.t > 0);
     // (WHY?, in a little speech bubble over his head, for a moment after a burrito hits him)
