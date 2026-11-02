@@ -1274,7 +1274,7 @@
     showControllerHelp(); updateHud(true);
     // (in the Store opened from the main menu no game is running: it just shows the pugs still here)
     // (in the Colosseum its pug fights on for the computer, and the fight pauses to say so)
-    if ((arena || race || dig) && fromTitle && phase === 'mini') { pauseMini(`Player ${id + 1}'s controller disconnected. Press A on a controller to bring them back.`); return; }
+    if ((arena || race || dig || hop) && fromTitle && phase === 'mini') { pauseMini(`Player ${id + 1}'s controller disconnected. Press A on a controller to bring them back.`); return; }
     if (fromTitle) { if (phase === 'paused') showPause(pauseView, menuSel); return; }
     if (phase === 'play' || phase === 'paused' || phase === 'win') {
       // if everyone left was sitting out, the team is out: that costs a heart and the level restarts
@@ -1616,7 +1616,7 @@
       const km = keyMap[e.code];
       const swing = (arena || dig) && (e.code === 'KeyX' || e.key === 'Enter');   // (on Mars, a bark)
       // (in the Colosseum a keyboard that hasn't joined yet joins as the next player, as in the main game)
-      if ((arena || race || dig) && (km || swing) && !e.repeat) claimKeyboard(true);
+      if ((arena || race || dig || hop) && (km || swing) && !e.repeat) claimKeyboard(true);
       if (km) { e.preventDefault(); keys[km] = true; }
       if (swing && !e.repeat) { e.preventDefault(); (arena || dig).kbAtk = true; }
       if ((e.key === 'Escape' || e.key === 'p' || e.key === 'P') && !e.repeat) pauseMini();
@@ -1690,7 +1690,7 @@
   addEventListener('blur', releaseAll);
 
   // the touch buttons count as the keyboard: the same pug, and they join the same way its keys do
-  document.getElementById('barkBtn').addEventListener('pointerdown', e => { e.preventDefault(); initAudio(); if (phase === 'mini' && (arena || race || dig)) { if ((arena || dig) && claimKeyboard(true)) (arena || dig).kbAtk = true; return; } if (claimKeyboard(true) === true) doBark(pById(kbSlot)); });
+  document.getElementById('barkBtn').addEventListener('pointerdown', e => { e.preventDefault(); initAudio(); if (phase === 'mini' && (arena || race || dig || hop)) { if ((arena || dig) && claimKeyboard(true)) (arena || dig).kbAtk = true; return; } if (claimKeyboard(true) === true) doBark(pById(kbSlot)); });
   document.querySelectorAll('.pad button[data-k]').forEach(btn => {
     const k = btn.dataset.k;
     const on = e => {
@@ -1768,6 +1768,7 @@
       else if ((phase === 'play' || phase === 'paused') && !fromTitle) p1Lost();
       // (the keyboard can only take Player 1 back if it isn't already someone else)
       else if (phase === 'mini' && dig && !dig.endT) pauseDig(`Player 1's controller disconnected. ${kbSlot === null || kbSlot === 0 ? 'Press a key, or A on a controller,' : 'Press A on a controller'} to take Player 1 back.`);
+      else if (phase === 'mini' && hop && !hop.endT) pauseHop(`Player 1's controller disconnected. ${kbSlot === null || kbSlot === 0 ? 'Press a key, or A on a controller,' : 'Press A on a controller'} to take Player 1 back.`);
       else if (phase === 'mini' && race && !race.endT) pauseRace(`Player 1's controller disconnected. ${kbSlot === null || kbSlot === 0 ? 'Press a key, or A on a controller,' : 'Press A on a controller'} to take Player 1 back.`);
       else if (phase === 'mini' && arena && !arena.result) pauseArena(`Player 1's controller disconnected. ${kbSlot === null || kbSlot === 0 ? 'Press a key, or A on a controller,' : 'Press A on a controller'} to take Player 1 back.`);
       else if (phase === 'win') p1LostAtWin = true;
@@ -2214,6 +2215,8 @@
     // Mars Dig's, the same way (Back goes to The Arcade, zoomed in on Mars)
     digPause: () => [{ label: 'Resume', act: () => resumeGame() }, { label: 'Back', act: () => backFromDig() }],
     digOver: () => [{ label: 'Play again', act: by => startDig(by) }, { label: 'Back', act: () => backFromDig() }],
+    hopPause: () => [{ label: 'Resume', act: () => resumeGame() }, { label: 'Back', act: () => backFromHop() }],
+    hopOver: () => [{ label: 'Play again', act: by => startHop(by) }, { label: 'Back', act: () => backFromHop() }],
     arcade: () => [
       ...(arcadeZoom.target && !arcadeZoom.out && !onShip() ? [{ label: 'Play', act: by => playFromArcade(by) }] : []),
       // (zoomed in on the spaceship, Back zooms out to Saturn first)
@@ -2240,8 +2243,8 @@
     // (the Store and Necklaces show the bag or look of the pug that opened them)
     if ((store || neck) && by !== undefined && joined[by]) storeBy = by;
     if (!joined[storeBy]) storeBy = kbBy();
-    const bpause = /^(banana|arena|race|dig)Pause$/.test(view), bover = /^(banana|arena|race|dig)Over$/.test(view);
-    ovTitle.textContent = bpause ? 'Paused' : view === 'arenaOver' ? arenaWords().title : view === 'raceOver' ? raceWords().title : view === 'digOver' ? digWords().title : bover ? 'Splat!' : arcade ? (onShip() ? 'Alien Spaceship' : arcadeZoom.target && !arcadeZoom.out ? arcadeZoom.target.name : 'The Arcade') : store ? 'Store' : part ? part.name : custom ? 'Customize' : 'Paused';
+    const bpause = /^(banana|arena|race|dig|hop)Pause$/.test(view), bover = /^(banana|arena|race|dig|hop)Over$/.test(view);
+    ovTitle.textContent = bpause ? 'Paused' : view === 'arenaOver' ? arenaWords().title : view === 'raceOver' ? raceWords().title : view === 'digOver' ? digWords().title : view === 'hopOver' ? hopWords().title : bover ? 'Splat!' : arcade ? (onShip() ? 'Alien Spaceship' : arcadeZoom.target && !arcadeZoom.out ? arcadeZoom.target.name : 'The Arcade') : store ? 'Store' : part ? part.name : custom ? 'Customize' : 'Paused';
     // (Necklaces keeps a line for what was just put on, and with 2-4 pugs, whose look it is)
     ovText.hidden = arcade || (custom && !neck);
     ovText.textContent = note || (store
@@ -2253,6 +2256,8 @@
       : view === 'raceOver' ? raceWords().text
       : view === 'digPause' ? 'Mars Dig. Dig for bones and crystals, bark to make the Martians dizzy, then boop them. Look out for falling rocks!'
       : view === 'digOver' ? digWords().text
+      : view === 'hopPause' ? 'Ring Hop. Hop across Saturn\'s rings: dodge the rocks and comets, ride the ice over open space, and keep ahead of the dust storm!'
+      : view === 'hopOver' ? hopWords().text
       : view === 'arenaOver' ? arenaWords().text
       : bpause ? 'Banana Catch. Catch every banana in your bowl!'
       : bover && banana ? `A banana hit the floor! You caught ${banana.score} banana${banana.score === 1 ? '' : 's'}. Best: ${banana.best}.`
@@ -2480,6 +2485,9 @@
     // (back on Mars, a bark button still held from the menu doesn't bark)
     if (fromTitle && pauseView === 'digPause') { releaseAll(); if (dig) dig.pugs.forEach(p => { p.prevBark = true; }); phase = 'mini'; hideOverlay(); return; }
     if (fromTitle && pauseView === 'digOver') return backFromDig();
+    // (back on Saturn, a direction or A still held from the menu doesn't hop)
+    if (fromTitle && pauseView === 'hopPause') { releaseAll(); if (hop) hop.pugs.forEach(p => { p.prev = { up: true, down: true, left: true, right: true }; }); phase = 'mini'; hideOverlay(); return; }
+    if (fromTitle && pauseView === 'hopOver') return backFromHop();
     if (fromTitle) return backToTitle();   // (the Store or Customize opened from the main menu goes back there)
     releaseAll(); phase = 'play'; hideOverlay();
   }
@@ -3377,7 +3385,7 @@
       }
     } else if (phase === 'title') {
       updateApe(); updateBarrels(); barrels = barrels.filter(b => !b.dead);
-    } else if (phase === 'mini') { if (arena) stepArena(); else if (race) stepRace(); else if (dig) stepDig(); else stepBanana(); }
+    } else if (phase === 'mini') { if (arena) stepArena(); else if (race) stepRace(); else if (dig) stepDig(); else if (hop) stepHop(); else stepBanana(); }
     else if (phase === 'boom' && --shipBoomT <= 0) endShipBoom();   // (the spaceship's explosion picture, 5 seconds)
     // pets fly along with their pugs while a level plays and during the level-clear banner
     if (phase === 'play' || phase === 'win') for (const p of players) movePets(p);
@@ -4652,7 +4660,7 @@
     // its alien spaceship, a tiny green pixel beside it is the second (off: where, in screen pixels from the ship's
     // middle; spr: its picture), and zoomed in on that, another green pixel beside it is the third, and so on: the
     // fourth, and on to the tenth; after that they go on for ever, made up as they come: see deepAt)
-    { name: 'Saturn', x: 70, y: 122, r: 24, cols: ['#ffd9a0', '#e8a05a', '#a8743a'], stripe: '#c8742f', ring: [42, 10], dot: [117, 116],
+    { name: 'Saturn', x: 70, y: 122, r: 24, cols: ['#ffd9a0', '#e8a05a', '#a8743a'], stripe: '#c8742f', ring: [42, 10], game: 'hop', dot: [117, 116],
       deep: [{ off: [46, -14], spr: 'ufo2' }, { off: [-46, 12], spr: 'ufo3' }, { off: [44, 16], spr: 'ufo4' },
         { off: [-44, -16], spr: 'ufo5' }, { off: [6, -38], spr: 'ufo6' },
         { off: [-6, 38], spr: 'ufo7' }, { off: [50, 2], spr: 'ufo8' },
@@ -4793,9 +4801,9 @@
   let motherCalled = false;
   function codeCome() {
     if (mother.state !== 'gone') return;
-    const titleScreen = phase === 'paused' && fromTitle && pauseView !== 'arcade' && !/^(banana|arena|race|dig)/.test(pauseView);
+    const titleScreen = phase === 'paused' && fromTitle && pauseView !== 'arcade' && !/^(banana|arena|race|dig|hop)/.test(pauseView);
     if (phase === 'title' || titleScreen) { motherCalled = true; scrollSky(1, kbBy()); return; }   // (the Store, Customize too)
-    if (phase === 'mini' || (phase === 'paused' && fromTitle && /^(banana|arena|race|dig)/.test(pauseView))) backToArcade();   // (a mini-game: out to space)
+    if (phase === 'mini' || (phase === 'paused' && fromTitle && /^(banana|arena|race|dig|hop)/.test(pauseView))) backToArcade();   // (a mini-game: out to space)
     if (phase === 'mini' || (phase === 'paused' && fromTitle && pauseView === 'arcade')) startMotherEntrance();
   }
   const M_PORTAL = 100, M_EMERGE = 160, M_ARRIVE = 300, MOTHER_FRAMES = 450, MOTHER_SCALE = 2.5;
@@ -5127,6 +5135,7 @@
     if (arcadeZoom.target && arcadeZoom.target.game === 'race') { startRace(by); return; }   // (the Moon: the Moon Race)
     if (arcadeZoom.target && arcadeZoom.target.game === 'showdown') { startArena(by, true); return; }   // (Pluto: Pluto Showdown)
     if (arcadeZoom.target && arcadeZoom.target.game === 'dig') { startDig(by); return; }   // (Mars: Mars Dig)
+    if (arcadeZoom.target && arcadeZoom.target.game === 'hop') { startHop(by); return; }   // (Saturn: Ring Hop)
     fromTitle = false; phase = 'title';
     startClicked();
   }
@@ -5363,7 +5372,7 @@
     try { best = Math.max(0, Math.floor(+localStorage.getItem(BANANA_BEST_KEY)) || 0); } catch (e) {}
     banana = { id: joined[by] ? by : 0, x: PW / 2, face: 1, anim: 0, moving: false, score: 0, best, items: [], plus: [],
       bruno: { x: PW / 2, dir: 1, throwT: 50, holdT: 0 }, lastTarget: PW / 2, lost: 0, splat: null, startT: 100, time: 0, fasterT: 0 };
-    arena = race = dig = null;
+    arena = race = dig = hop = null;
     try { initAudio(); } catch (e) {}
     releaseAll(); fromTitle = true; phase = 'mini'; hideOverlay();
   }
@@ -5505,7 +5514,7 @@
   const arenaBg = document.createElement('canvas');
   let arena = null, arenaBgReady = false;
   function startArena(by, gun) {
-    banana = race = dig = null;
+    banana = race = dig = hop = null;
     arena = { gun: !!gun, bolts: [], startT: 110, fightT: 0, result: null, endT: 0, kbAtk: false, prev: [{}, {}, {}, {}], sparks: [],
       pugs: [0, 1, 2, 3].map(i => ({ id: i, cpu: !joined[i], x: ARENA_X[i], y: ARENA_GROUND, vx: 0, vy: 0, kx: 0, ground: true,
         face: i < 2 ? 1 : -1, hp: ARENA_HP, hurtT: 0, swingT: 0, hitIds: [], cool: 0, anim: 0, moving: false, dropT: 0, ko: false, out: false, spin: 0, climbT: 0, climbX: 0 })) };
@@ -5521,7 +5530,7 @@
   // whether a player drives pug id: its controller, or the keyboard (the keyboard drives Player 1's pug until it
   // joins as someone else, unless a controller has Player 1); a pug nobody drives fights for the computer
   const arenaDriven = id => joined[id] && (ownerOf(id) !== undefined || kbSlot === id || (id === 0 && kbSlot === null));
-  const pauseMini = note => arena ? pauseArena(note) : race ? pauseRace(note) : dig ? pauseDig(note) : pauseBanana();
+  const pauseMini = note => arena ? pauseArena(note) : race ? pauseRace(note) : dig ? pauseDig(note) : hop ? pauseHop(note) : pauseBanana();
   // back to The Arcade, zoomed in on the mother ship
   function backFromArena() {
     const gun = arena && arena.gun;
@@ -5842,7 +5851,7 @@
   }
   let race = null;
   function startRace(by) {
-    banana = arena = dig = null;
+    banana = arena = dig = hop = null;
     const id = joined[by] ? by : 0;
     race = { by: id, startT: RACE_COUNT, goT: 0, endT: 0, placed: 0, camD: 0, dust: [],
       cars: [0, 1, 2, 3].map(i => ({ id: i, cpu: !joined[i], d: 0, x: raceMid(0) + [-30, -10, 10, 30][i], v: 0, spin: 0, boost: 0, place: 0,
@@ -6069,7 +6078,7 @@
   const digAhead = (a, d) => d === 'right' ? [Math.floor(a.x / DG_CELL) + 1, a.y / DG_CELL] : d === 'left' ? [Math.ceil(a.x / DG_CELL) - 1, a.y / DG_CELL]
     : d === 'down' ? [a.x / DG_CELL, Math.floor(a.y / DG_CELL) + 1] : [a.x / DG_CELL, Math.ceil(a.y / DG_CELL) - 1];
   function startDig(by) {
-    banana = arena = race = null;
+    banana = arena = race = hop = null;
     let best = 0;
     try { best = Math.max(0, Math.floor(+localStorage.getItem(DG_BEST_KEY)) || 0); } catch (e) {}
     dig = { level: 0, best, pugs: [], kbAtk: false, startT: 0, clearT: 0, endT: 0, rocks: [], blobs: [], items: [], waves: [], bits: [], pops: [] };
@@ -6166,8 +6175,10 @@
     const g = dig, pad = padHeld[p.id] || {}, kb = kbSlot !== null ? p.id === kbSlot : p.id === 0 && ownerOf(0) === undefined;
     const held = k => !!pad[k] || (kb && keys[k]);
     const barkNow = !!pad.jump || !!pad.bark || !!pad.toss || (kb && keys.jump);
-    const bark = (barkNow && !p.prevBark) || (kb && g.kbAtk);
-    p.prevBark = barkNow;
+    // (a controller that has only just joined hasn't reported yet: the press that joined it isn't a bark)
+    const seen = kb || ownerOf(p.id) === undefined || 'jump' in pad;
+    const bark = (seen && barkNow && !p.prevBark) || (kb && g.kbAtk);
+    if (seen) p.prevBark = barkNow;
     const across = d => p.dir && (DG_DIRS[d][0] === 0) !== (DG_DIRS[p.dir][0] === 0);
     return { wants: ['up', 'down', 'left', 'right'].filter(held).sort((a, b) => across(b) - across(a)), bark };
   }
@@ -6247,7 +6258,8 @@
   // (the first step along the tunnels to the nearest pug, or null when no tunnel leads to one)
   function digPath(cx, cy, targets) {
     const g = dig, seen = new Set([cx + ',' + cy]), q = [[cx, cy, null]];
-    const goal = new Set(targets.map(p => Math.round(p.x / DG_CELL) + ',' + Math.round(p.y / DG_CELL)));
+    // (both squares a pug is between: the one it came from is always dug, so a tunnel to it always counts)
+    const goal = new Set(targets.flatMap(p => [Math.floor(p.x / DG_CELL) + ',' + Math.floor(p.y / DG_CELL), Math.ceil(p.x / DG_CELL) + ',' + Math.ceil(p.y / DG_CELL)]));
     while (q.length) {
       const [x, y, first] = q.shift();
       if (first && goal.has(x + ',' + y)) return first;
@@ -6268,7 +6280,7 @@
     if (b.dizzy) { if (--b.dizzy === 0) b.calm = 40; return; }
     if (b.calm) b.calm--;
     if (b.x % DG_CELL === 0 && b.y % DG_CELL === 0) {
-      const cx = b.x / DG_CELL, cy = b.y / DG_CELL, targets = g.pugs.filter(p => !p.out && !p.dead);
+      const cx = b.x / DG_CELL, cy = b.y / DG_CELL, targets = g.pugs.filter(p => !p.out && !p.dead && arenaDriven(p.id));
       const open = d => { const [x, y] = [cx + DG_DIRS[d][0], cy + DG_DIRS[d][1]]; return dgIn(x, y) && g.dug[y][x] && !dgRock(x, y); };
       b.burrowing = false;
       if (!b.calm && targets.length) {
@@ -6279,6 +6291,8 @@
           const dx = Math.round(t.x / DG_CELL) - cx, dy = Math.round(t.y / DG_CELL) - cy;
           const h = dx > 0 ? 'right' : 'left', v = dy > 0 ? 'down' : 'up';
           b.wants = (Math.abs(dx) >= Math.abs(dy) ? [dx && h, dy && v] : [dy && v, dx && h]).filter(Boolean);
+          // (straight in line with it: round the side if a rock is in the way)
+          if (b.wants.length === 1) b.wants.push(...(DG_DIRS[b.wants[0]][0] ? ['up', 'down'] : ['left', 'right']).sort(() => Math.random() - 0.5));
           b.burrowing = true;
         }
       } else {
@@ -6337,7 +6351,7 @@
   }
   function stepDig() {
     const g = dig;
-    for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.pugs.some(p => p.id === i)) digPug(i).inv = 120;
+    for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.pugs.some(p => p.id === i)) { digPug(i).inv = 120; if (kbSlot === i) g.kbAtk = false; }
     for (const b of g.bits) { b.vy += 0.15; b.x += b.vx; b.y += b.vy; b.t--; }
     g.bits = g.bits.filter(b => b.t > 0);
     for (const n of g.pops) n.t--;
@@ -6376,8 +6390,11 @@
     }
     g.blobs = g.blobs.filter(b => !b.gone);
     g.rocks = g.rocks.filter(r => !r.gone);
-    if (!g.blobs.length) { g.clearT = 150; sfx.win(); }
-    else if (g.pugs.length && g.pugs.every(p => p.out)) g.endT = 90;
+    // (the game is over once no pug is left to play: out, or its player gone; a level isn't cleared by a pug going
+    // out on its last life)
+    const done = p => p.out || !arenaDriven(p.id), allDown = g.pugs.every(p => done(p) || (p.dead && p.lives <= 0));
+    if (!g.blobs.length && !allDown) { g.clearT = 150; sfx.win(); }
+    else if (g.pugs.length && g.pugs.every(done)) g.endT = 90;
   }
   function digWords() {
     if (!dig) return { title: 'Mars Dig', text: '' };
@@ -6453,12 +6470,300 @@
     if (g.clearT > 0) banner('MARS CLEAR!', 110, 'gold', 2);
     if (g.endT) banner('GAME OVER', 120, 'pink', 2);
   }
+  // ----- Saturn's game: Ring Hop (Play on Saturn in The Arcade; the user asked 2026-11-02 for a game like Crossy
+  // Road) -----
+  // The pugs hop, a square at a time, up across Saturn's rings, which go on for ever. The rings come in lanes: firm
+  // golden ice (safe, with lumps of rock in the way and now and then a bone, worth 3), dusty lanes where ring rocks
+  // tumble past (one hits: splat), open space with chunks of ice drifting across (ride them: miss and you float off
+  // into space, and a chunk that carries you off the edge takes you with it), and comet lanes, where warning lights
+  // blink a moment before a comet streaks through. The view follows the pug in front, and a dust storm creeps up from
+  // the bottom all the while, so a pug that dawdles or falls behind is swept away. One go each; a pug's score is the
+  // furthest row it reaches, plus its bones. The game is over once every pug is out; the best is kept in the
+  // browser. Arrows or WASD (a controller's stick or D-pad) hop that way, and Space (A) hops forward; Esc or P (or
+  // Menu) pauses. (Played from The Arcade like the other planets' games, in its phase 'mini'; Back goes to The
+  // Arcade, zoomed in on Saturn. A pug that joins during a game starts on the nearest safe lane in view.)
+  const HP_CELL = 16, HP_COLS = 15, HP_TOP = 24, HP_HOP = 7, HP_BEST_KEY = 'doodad-doombad-saturn-best';
+  const HP_START = [7, 8, 6, 9];   // (each pug's column)
+  const HP_WAYS = { up: [0, 1], down: [0, -1], left: [-1, 0], right: [1, 0] };
+  let hop = null;
+  const hpRnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+  // (the screen y of a height in the rings: row r is from r*16 to r*16+16, and cam is the height at the screen's bottom)
+  const hopY = wy => PH - wy + hop.cam;
+  function startHop(by) {
+    banana = arena = race = dig = null;
+    let best = 0;
+    try { best = Math.max(0, Math.floor(+localStorage.getItem(HP_BEST_KEY)) || 0); } catch (e) {}
+    hop = { best, pugs: [], lanes: {}, genTop: -4, run: null, cam: -32, time: 0, startT: 90, endT: 0, pops: [] };
+    for (let r = -4; r <= 3; r++) hop.lanes[r] = { kind: 'safe', blocks: new Set(), bone: null };
+    hop.genTop = 3;
+    for (let i = 0; i < 4; i++) if (arenaDriven(i) || i === (joined[by] ? by : 0)) hopPug(i, 0, HP_START[i]);
+    try { initAudio(); } catch (e) {}
+    releaseAll(); fromTitle = true; phase = 'mini'; hideOverlay();
+  }
+  function hopPug(id, row, col) {
+    const p = { id, row, x: col * HP_CELL, hopping: null, face: 'up', dead: 0, how: null, out: false, far: row, bones: 0, score: 0,
+      prev: { up: true, down: true, left: true, right: true }, queued: null };
+    hop.pugs.push(p);
+    return p;
+  }
+  // The next lane up the rings: runs of the same kind (dusty rock lanes and open space a few deep, comet lanes one
+  // at a time, firm ice between), lanes in a run moving opposite ways, quicker the further up
+  function hopGen(r) {
+    const g = hop, k = 1 + Math.min(1.2, r / 120);
+    if (!g.run || g.run.left <= 0) {
+      const last = g.run ? g.run.kind : 'safe', kinds = ['rocks', 'rocks', 'rocks', 'gap', 'gap', 'comet', 'safe'];
+      const kind = last !== 'safe' && Math.random() < 0.55 ? 'safe' : kinds[hpRnd(0, kinds.length - 1)];
+      g.run = { kind, left: kind === 'rocks' ? hpRnd(1, 4) : kind === 'gap' ? hpRnd(1, 3) : kind === 'comet' ? 1 : hpRnd(1, 2), dir: Math.random() < 0.5 ? -1 : 1 };
+    }
+    g.run.left--;
+    const kind = g.run.kind, L = PW + 64;
+    if (kind === 'safe') {
+      const blocks = new Set(), n = hpRnd(0, 4);
+      for (let i = 0; i < n; i++) blocks.add(hpRnd(0, HP_COLS - 1));
+      const free = [...Array(HP_COLS).keys()].filter(c => !blocks.has(c));
+      return { kind, blocks, bone: Math.random() < 0.2 ? free[hpRnd(0, free.length - 1)] : null };
+    }
+    const dir = g.run.dir = -g.run.dir;
+    if (kind === 'rocks') {
+      const n = hpRnd(2, 3), objs = [];
+      for (let i = 0; i < n; i++) objs.push({ x: i * L / n - 32 + hpRnd(0, 20), w: [16, 16, 24, 32][hpRnd(0, 3)] });
+      return { kind, dir, speed: (0.45 + Math.random() * 0.6) * k, L, objs };
+    }
+    if (kind === 'gap') {
+      const n = hpRnd(2, 3), objs = [];
+      for (let i = 0; i < n; i++) objs.push({ x: i * L / n - 32 + hpRnd(0, 12), w: HP_CELL * hpRnd(2, 4) });
+      return { kind, dir, speed: (0.35 + Math.random() * 0.45) * Math.min(k, 1.6), L, objs };
+    }
+    return { kind: 'comet', dir, state: 'idle', t: hpRnd(60, 240), x: 0 };
+  }
+  const hopLane = r => { while (hop.genTop < r) { hop.genTop++; hop.lanes[hop.genTop] = hopGen(hop.genTop); } return hop.lanes[r]; };
+  function pauseHop(note) {
+    if (phase !== 'mini' || !hop || hop.endT) return;
+    releaseAll(); phase = 'paused'; showPause('hopPause', 0, note);
+  }
+  function backFromHop() {
+    showPause('arcade', 0);
+    arcadeZoom = { target: SPACE_PLANETS.find(p => p.game === 'hop'), p: 1, out: false, ship: null };
+    showPause('arcade', 0);
+  }
+  // a hop the player has just asked for (a fresh press only: one hop a press), from its controller, and the keyboard
+  // for the keyboard's pug; Space or A hops forward
+  function hopInput(p) {
+    const pad = padHeld[p.id] || {}, kb = kbSlot !== null ? p.id === kbSlot : p.id === 0 && ownerOf(0) === undefined;
+    const now = {};
+    for (const d of ['up', 'down', 'left', 'right']) now[d] = !!pad[d] || (kb && keys[d]);
+    now.up = now.up || !!pad.jump || (kb && keys.jump);
+    // (a controller that has only just joined hasn't reported yet: the press that joined it isn't a hop)
+    if (!(kb || ownerOf(p.id) === undefined || 'jump' in pad)) return null;
+    const fresh = ['up', 'left', 'right', 'down'].find(d => now[d] && !p.prev[d]) || null;
+    p.prev = now;
+    return fresh;
+  }
+  // (where a pug is: its row, and its height in the rings, partway between two rows while it hops)
+  const hopRowNow = p => p.hopping ? (p.hopping.t / HP_HOP >= 0.5 ? p.hopping.to : p.hopping.from) : p.row;
+  function hopStart(p, d) {
+    const [dx, dy] = HP_WAYS[d], to = p.row + dy;
+    if (to < -3) return;
+    const lane = hopLane(to);
+    let x = dx ? clamp(p.x + dx * HP_CELL, 0, PW - HP_CELL) : p.x;
+    if (dx && x === p.x) return;
+    if (lane.kind !== 'gap') x = clamp(Math.round(x / HP_CELL) * HP_CELL, 0, PW - HP_CELL);   // (on firm ground, back on the grid)
+    p.face = d;
+    if (lane.kind === 'safe' && lane.blocks.has(Math.round(x / HP_CELL))) { tone(160, 0.05, 'square', 0.03); return; }   // (a lump of rock in the way)
+    p.hopping = { from: p.row, to, x0: p.x, x1: x, t: 0 };
+    tone(520, 0.05, 'square', 0.03, 260);
+  }
+  function hopOut(p, how) {
+    p.dead = how === 'splat' ? 60 : 50; p.how = how; p.hopping = null;
+    if (how === 'space') tone(600, 0.6, 'sine', 0.05, -500); else if (how === 'storm') { noise(0.5, 0.12, 900, 200); sfx.die(); } else { sfx.smash(); sfx.die(); }
+  }
+  // what is under a pug where it is: rocks and comets hit it, open space with no ice under it drops it
+  function hopHit(p, row) {
+    const lane = hopLane(row), a = p.x + 3, b = p.x + 13;
+    if (lane.kind === 'rocks') return lane.objs.some(o => b > o.x + 1 && a < o.x + o.w - 1) ? 'splat' : null;
+    if (lane.kind === 'comet' && lane.state === 'pass') {
+      const lo = lane.dir > 0 ? lane.x - 64 : lane.x, hi = lane.dir > 0 ? lane.x + 16 : lane.x + 80;
+      return b > lo && a < hi ? 'splat' : null;
+    }
+    return null;
+  }
+  const hopIce = (lane, p) => lane.objs.find(o => p.x + 8 >= o.x && p.x + 8 <= o.x + o.w);
+  function stepHop() {
+    const g = hop;
+    for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.pugs.some(p => p.id === i)) {
+      // (a pug joining: on the nearest safe lane a little way up the view, in a free spot)
+      let r = Math.ceil(g.cam / HP_CELL) + 3;
+      while (hopLane(r).kind !== 'safe') r++;
+      const lane = hopLane(r), col = [7, 8, 6, 9, 5, 10, 4, 11, 3, 12].find(c => !lane.blocks.has(c));
+      hopPug(i, r, col === undefined ? 7 : col);
+    }
+    for (const n of g.pops) n.t--;
+    g.pops = g.pops.filter(n => n.t > 0);
+    if (g.endT) {
+      if (--g.endT === 0) {
+        const top = Math.max(...g.pugs.map(p => p.score));
+        if (top > g.best) { g.best = top; try { localStorage.setItem(HP_BEST_KEY, String(top)); } catch (e) {} }
+        phase = 'paused'; showPause('hopOver', 0);
+      }
+      return;
+    }
+    if (g.startT > 0) { g.startT--; for (const p of g.pugs) hopInput(p); return; }
+    g.time++;
+    // (the lanes in view and a little beyond: rocks and ice move along, wrapping round; comets warn, then pass)
+    const r0 = Math.floor(g.cam / HP_CELL) - 2, r1 = Math.floor((g.cam + PH - HP_TOP) / HP_CELL) + 2;
+    const moved = {};
+    for (let r = r0; r <= r1; r++) {
+      const lane = hopLane(r);
+      if (lane.kind === 'rocks' || lane.kind === 'gap') {
+        moved[r] = lane.dir * lane.speed;
+        for (const o of lane.objs) {
+          o.x += moved[r];
+          if (lane.dir > 0 && o.x > PW + 32) o.x -= lane.L;
+          if (lane.dir < 0 && o.x + o.w < -32) o.x += lane.L;
+        }
+      } else if (lane.kind === 'comet') {
+        if (lane.state === 'idle') { if (--lane.t <= 0) { lane.state = 'warn'; lane.t = 70; } }
+        else if (lane.state === 'warn') {
+          if (lane.t % 14 === 0 && r > r0 + 1 && r < r1 - 1) tone(880, 0.06, 'square', 0.025);
+          if (--lane.t <= 0) { lane.state = 'pass'; lane.x = lane.dir > 0 ? -16 : PW; noise(0.6, 0.1, 3000, 400); }
+        } else {
+          lane.x += lane.dir * 9;
+          if (lane.dir > 0 ? lane.x - 64 > PW : lane.x + 80 < 0) { lane.state = 'idle'; lane.t = hpRnd(150, 330); }
+        }
+      }
+    }
+    for (const p of g.pugs) {
+      if (p.out) continue;
+      if (p.dead) { if (--p.dead === 0) p.out = true; continue; }
+      const want = hopInput(p);
+      if (want) { if (p.hopping) p.queued = want; else hopStart(p, want); }
+      if (p.hopping) {
+        const h = p.hopping;
+        if (++h.t >= HP_HOP) {
+          p.row = h.to; p.x = h.x1; p.hopping = null;
+          if (p.row > p.far) p.far = p.row;
+          const lane = hopLane(p.row);
+          if (lane.kind === 'safe' && lane.bone !== null && Math.round(p.x / HP_CELL) === lane.bone) {
+            lane.bone = null; p.bones++; sfx.coin(); g.pops.push({ x: p.x + 8, wy: p.row * HP_CELL + 16, n: 3, t: 40 });
+          }
+          p.score = Math.max(0, p.far) + 3 * p.bones;
+          if (lane.kind === 'gap' && !hopIce(lane, p)) { hopOut(p, 'space'); continue; }
+          if (p.queued) { const q = p.queued; p.queued = null; hopStart(p, q); }
+        } else { h.x0 += moved[h.from] && hopLane(h.from).kind === 'gap' ? moved[h.from] : 0; }
+      } else if (hopLane(p.row).kind === 'gap') {
+        // (riding a chunk of ice: carried along with it, and off the edge with it)
+        p.x += moved[p.row] || 0;
+        if (p.x < -10 || p.x > PW - 6) { hopOut(p, 'space'); continue; }
+      }
+      if (p.hopping) p.x = p.hopping.x0 + (p.hopping.x1 - p.hopping.x0) * (p.hopping.t / HP_HOP);
+      const hit = hopHit(p, hopRowNow(p));
+      if (hit) hopOut(p, hit);
+    }
+    // (the view: up after the pug in front, and creeping up all the while; a pug that drops off the bottom is swept
+    // away by the dust storm)
+    const alive = g.pugs.filter(p => !p.out && !p.dead);
+    if (alive.length) {
+      const lead = Math.max(...alive.map(p => p.row)), want = lead * HP_CELL - 176;
+      if (want > g.cam) g.cam += Math.max(0.5, (want - g.cam) * 0.08);
+    }
+    g.cam += 0.14 + Math.min(0.22, g.time / 18000);
+    for (const p of alive) if (!p.hopping && p.row * HP_CELL < g.cam - 6) hopOut(p, 'storm');
+    for (const r in g.lanes) if (+r < r0 - 4) delete g.lanes[r];
+    if (g.pugs.length && g.pugs.every(p => p.out)) g.endT = 60;
+  }
+  function hopWords() {
+    if (!hop) return { title: 'Ring Hop', text: '' };
+    const ps = hop.pugs, bones = n => `${n} bone${n === 1 ? '' : 's'}`;
+    if (ps.length === 1) return { title: `${ps[0].score} points!`, text: `${LOOK[ps[0].id].name} hopped ${Math.max(0, ps[0].far)} rows and found ${bones(ps[0].bones)}. Best: ${hop.best}.` };
+    const top = Math.max(...ps.map(p => p.score)), win = ps.filter(p => p.score === top);
+    return { title: win.length > 1 ? 'A tie!' : `${LOOK[win[0].id].name} wins!`, text: ps.map(p => `${LOOK[p.id].name} ${p.score}`).join(', ') + `. Best: ${hop.best}.` };
+  }
+  function drawHopLane(r, lane) {
+    const y = Math.round(hopY(r * HP_CELL + HP_CELL)), px = (col, x, yy, w, h) => { ctx.fillStyle = col; ctx.fillRect(Math.round(x), y + yy, w, h); };
+    const seed = n => ((r * 7919 + n * 104729) >>> 0) % 997;
+    if (lane.kind === 'safe') {
+      px(r % 2 ? '#e2c48a' : '#dcbc80', 0, 0, PW, HP_CELL);
+      for (let i = 0; i < 9; i++) px(i % 2 ? '#f0d8a4' : '#c8a46a', seed(i) % PW, seed(i + 50) % 15, 1, 1);
+      for (const c of lane.blocks) {
+        const x = c * HP_CELL;
+        px('#5a4430', x + 2, 4, 12, 11); px('#5a4430', x + 1, 6, 14, 7);
+        px('#8a6a48', x + 3, 5, 10, 9); px('#8a6a48', x + 2, 7, 12, 5); px('#b08a64', x + 4, 6, 4, 2);
+      }
+      if (lane.bone !== null) blit('dg_bone', lane.bone * HP_CELL + 4, y + 4);
+    } else if (lane.kind === 'rocks') {
+      px('#4a3e36', 0, 0, PW, HP_CELL);
+      for (let x = (r * 5) % 16; x < PW; x += 16) px('#6a5a4a', x, 7, 6, 1);
+      for (const o of lane.objs) {
+        // (a ring rock tumbling: its light spot turns as it rolls)
+        px('#2a201a', o.x + 1, 2, o.w - 2, 13); px('#2a201a', o.x, 4, o.w, 9);
+        px('#7a6a5a', o.x + 2, 3, o.w - 4, 11); px('#7a6a5a', o.x + 1, 5, o.w - 2, 7);
+        const spin = ((Math.floor(o.x / 3) % 4) + 4) % 4;
+        px('#a8988a', o.x + 3 + (spin % 2) * (o.w - 10), 4 + (spin >> 1) * 6, 4, 2);
+      }
+    } else if (lane.kind === 'gap') {
+      px('#0b0c1c', 0, 0, PW, HP_CELL);
+      for (let i = 0; i < 6; i++) if ((frame + seed(i)) % 90 < 75) px(i % 3 ? '#9fb4ff' : '#ffffff', seed(i + 9) % PW, seed(i + 20) % 15, 1, 1);
+      for (const o of lane.objs) {
+        px('#5f8fc8', o.x, 4, o.w, 11); px('#9fd8ff', o.x, 3, o.w, 10); px('#eef6ff', o.x + 1, 3, o.w - 2, 2);
+        px('#cfe8ff', o.x + 3, 7, 3, 2);
+      }
+    } else {
+      px('#1d1f3a', 0, 0, PW, HP_CELL);
+      for (let x = 0; x < PW; x += 8) px('#2c2f5a', x, 7, 4, 1);
+      const on = lane.state === 'warn' && frame % 14 < 7;
+      for (const bx of [1, PW - 5]) { px('#55556a', bx + 1, 6, 2, 10); px(on ? '#ff3e6c' : '#5a0f2a', bx, 2, 4, 4); }
+      if (lane.state === 'pass') {
+        // (the comet: a bright head and a long tail of fire behind it)
+        const back = -lane.dir;
+        ['#ffcc3d', '#ff8a1f', '#e8282f', '#5a0f2a'].forEach((col, i) => px(col, lane.x + (back > 0 ? 16 + i * 16 : -16 - i * 16), 4 + i, 16, 8 - i * 2));
+        px('#fff6c8', lane.x + 2, 2, 12, 12); px('#ffffff', lane.x + 4, 4, 8, 8);
+      }
+    }
+  }
+  function drawHop() {
+    const g = hop, T = HP_TOP;
+    ctx.fillStyle = '#14141a'; ctx.fillRect(0, 0, PW, T);
+    ctx.save(); ctx.beginPath(); ctx.rect(0, T, PW, PH - T); ctx.clip();
+    const r0 = Math.floor(g.cam / HP_CELL) - 1, r1 = Math.floor((g.cam + PH - T) / HP_CELL) + 1;
+    for (let r = r1; r >= r0; r--) drawHopLane(r, hopLane(r));
+    // (the pugs, the lower ones in front: facing the way they hop, in the air partway through a hop)
+    for (const p of [...g.pugs].sort((a, b) => b.row - a.row)) {
+      if (p.out) continue;
+      const sw = LOOK[p.id].swap, h = p.hopping, u = h ? h.t / HP_HOP : 0, row = h ? h.from + (h.to - h.from) * u : p.row;
+      let y = Math.round(hopY(row * HP_CELL)) - 1 - Math.round(Math.sin(u * Math.PI) * 5), x = Math.round(p.x);
+      if (p.dead) {
+        if (p.how === 'splat') { blit('player_dead', x, y - 10, p.face === 'left', sw); continue; }
+        if (p.how === 'storm') { if (Math.floor(p.dead / 4) % 2) blit('pug_front', x + 2, y - 16 + (50 - p.dead), false, sw); continue; }
+        const s = sprite('pug_front', false, sw), k = p.dead / 50;   // (floating off into space, smaller and smaller)
+        if (s) ctx.drawImage(s, Math.round(x + 8 - 6 * k), Math.round(y - 8 - 8 * k - (50 - p.dead) * 0.3), Math.max(1, Math.round(12 * k)), Math.max(1, Math.round(16 * k)));
+        continue;
+      }
+      if (p.face === 'up') blit('pug_away', x + 2, y - 16, !!(h && u > 0.5), sw);
+      else if (p.face === 'down') blit('pug_front', x + 2, y - 16, false, sw);
+      else blit(h ? 'player_jump' : 'player_stand', x, y - 13, p.face === 'left', sw);
+      if (g.pugs.length > 1) drawText('P' + (p.id + 1), x + 8, y - 24, LOOK[p.id].tag, 'center');
+    }
+    for (const n of g.pops) drawText(String(n.n), n.x, Math.round(hopY(n.wy)) - (40 - n.t) * 0.4, 'gold', 'center');
+    // (the dust storm creeping up from the bottom)
+    for (let i = 0; i < 10; i++) { ctx.globalAlpha = 0.08 + i * 0.07; ctx.fillStyle = '#c88a5e'; ctx.fillRect(0, PH - 10 + i, PW, 1); }
+    ctx.globalAlpha = 1; ctx.fillStyle = '#e6b886';
+    for (let i = 0; i < 14; i++) ctx.fillRect((i * 37 + frame * (i % 2 ? 2 : -1)) % (PW + 20) - 10, PH - 3 - (i * 5) % 8, 3, 1);
+    ctx.restore();
+    g.pugs.forEach((p, i) => drawText(`P${p.id + 1} ${p.score}`, 4 + i * 59, 4, LOOK[p.id].tag));
+    const info = `BEST ${Math.max(g.best, ...g.pugs.map(p => p.score))}`;
+    if (g.pugs.length <= 2) drawText(info, PW - 3 - info.length * 6, 14);
+    if (g.startT > 0) banner(g.startT > 40 ? 'RING HOP' : 'HOP!', 110, 'gold', 2);
+    if (g.endT) banner('GAME OVER', 120, 'pink', 2);
+  }
   function draw() {
     // gliding between the main menu and The Arcade, both scenes
     if (skyScroll) { drawSkyScroll(); updateHud(); return; }
     // Mars Dig (and its pause and score screens) has its own scene, and so do the Moon Race and the Colosseum
     if (dig && (phase === 'mini' || (fromTitle && (pauseView === 'digPause' || pauseView === 'digOver')))) {
       drawDig(); updateHud(); return;
+    }
+    if (hop && (phase === 'mini' || (fromTitle && (pauseView === 'hopPause' || pauseView === 'hopOver')))) {
+      drawHop(); updateHud(); return;
     }
     if (race && (phase === 'mini' || (fromTitle && (pauseView === 'racePause' || pauseView === 'raceOver')))) {
       drawRace(); updateHud(); return;
