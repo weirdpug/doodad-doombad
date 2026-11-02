@@ -2256,7 +2256,7 @@
       : view === 'raceOver' ? raceWords().text
       : view === 'digPause' ? 'Mars Dig. Dig for bones and crystals, bark to make the Martians dizzy, then boop them. Look out for falling rocks!'
       : view === 'digOver' ? digWords().text
-      : view === 'hopPause' ? 'Ring Hop. Hop across Saturn\'s rings: dodge the rovers and comets, ride the ice over open space, and keep ahead of the dust storm!'
+      : view === 'hopPause' ? 'Ring Hop. Hop across Saturn\'s rings: dodge the rovers and comets, ride the ice over open space, and keep moving, or an alien will beam you up!'
       : view === 'hopOver' ? hopWords().text
       : view === 'arenaOver' ? arenaWords().text
       : bpause ? 'Banana Catch. Catch every banana in your bowl!'
@@ -6476,13 +6476,15 @@
   // golden ice (safe, with lumps of rock in the way and now and then a bone, worth 3), dusty tracks where rovers
   // trundle past (one hits: splat), open space with chunks of ice drifting across (ride them: miss and you float off
   // into space, and a chunk that carries you off the edge takes you with it), and comet lanes, where warning lights
-  // blink a moment before a comet streaks through. The view follows the pug in front, and a dust storm creeps up from
-  // the bottom all the while, so a pug that dawdles or falls behind is swept away. One go each; a pug's score is the
+  // blink a moment before a comet streaks through. The view follows the pug in front and creeps up all the while. A
+  // pug that is too slow, falling to the bottom of the view or going 8 seconds without getting any further up (a
+  // UFO hovers overhead, beeping, for the last 2), is abducted: a UFO swoops down, beams it up and zooms off with it
+  // (the user asked 2026-11-02, in place of a dust storm that swept it away). One go each; a pug's score is the
   // furthest row it reaches, plus its bones. The game is over once every pug is out; the best is kept in the
   // browser. Arrows or WASD (a controller's stick or D-pad) hop that way, and Space (A) hops forward; Esc or P (or
   // Menu) pauses. (Played from The Arcade like the other planets' games, in its phase 'mini'; Back goes to The
   // Arcade, zoomed in on Saturn. A pug that joins during a game starts on the nearest safe lane in view.)
-  const HP_CELL = 16, HP_COLS = 15, HP_TOP = 24, HP_HOP = 7, HP_BEST_KEY = 'doodad-doombad-saturn-best';
+  const HP_CELL = 16, HP_COLS = 15, HP_TOP = 24, HP_HOP = 7, HP_IDLE = 480, HP_BEST_KEY = 'doodad-doombad-saturn-best';
   const HP_START = [7, 8, 6, 9];   // (each pug's column)
   const HP_WAYS = { up: [0, 1], down: [0, -1], left: [-1, 0], right: [1, 0] };
   // the rovers trundling along the dusty tracks, facing right (flipped to go left), each in two turns of its wheels:
@@ -6507,15 +6509,15 @@
     banana = arena = race = dig = null;
     let best = 0;
     try { best = Math.max(0, Math.floor(+localStorage.getItem(HP_BEST_KEY)) || 0); } catch (e) {}
-    hop = { best, pugs: [], lanes: {}, genTop: -4, run: null, cam: -32, time: 0, startT: 90, endT: 0, pops: [] };
-    for (let r = -4; r <= 3; r++) hop.lanes[r] = { kind: 'safe', blocks: new Set(), bone: null };
+    hop = { best, pugs: [], lanes: {}, genTop: -6, run: null, cam: -48, time: 0, startT: 90, endT: 0, pops: [] };
+    for (let r = -6; r <= 3; r++) hop.lanes[r] = { kind: 'safe', blocks: new Set(), bone: null };
     hop.genTop = 3;
     for (let i = 0; i < 4; i++) if (arenaDriven(i) || i === (joined[by] ? by : 0)) hopPug(i, 0, HP_START[i]);
     try { initAudio(); } catch (e) {}
     releaseAll(); fromTitle = true; phase = 'mini'; hideOverlay();
   }
   function hopPug(id, row, col) {
-    const p = { id, row, x: col * HP_CELL, hopping: null, face: 'up', dead: 0, how: null, out: false, far: row, bones: 0, score: 0,
+    const p = { id, row, x: col * HP_CELL, hopping: null, face: 'up', dead: 0, how: null, out: false, far: row, bones: 0, score: 0, idle: 0,
       prev: { up: true, down: true, left: true, right: true }, queued: null };
     hop.pugs.push(p);
     return p;
@@ -6591,8 +6593,10 @@
     tone(520, 0.05, 'square', 0.03, 260);
   }
   function hopOut(p, how) {
-    p.dead = how === 'splat' ? 60 : 50; p.how = how; p.hopping = null;
-    if (how === 'space') tone(600, 0.6, 'sine', 0.05, -500); else if (how === 'storm') { noise(0.5, 0.12, 900, 200); sfx.die(); } else { sfx.smash(); sfx.die(); }
+    p.dead = how === 'splat' ? 60 : how === 'alien' ? 110 : 50; p.how = how; p.hopping = null;
+    // (abducted: where it is on the screen, for the UFO to come down to)
+    if (how === 'alien') { p.abX = Math.round(p.x) + 8; p.abY = Math.round(hopY(p.row * HP_CELL)) - 1; sfx.ufo(); }
+    else if (how === 'space') tone(600, 0.6, 'sine', 0.05, -500); else { sfx.smash(); sfx.die(); }
   }
   // what is under a pug where it is: rocks and comets hit it, open space with no ice under it drops it
   function hopHit(p, row) {
@@ -6651,14 +6655,20 @@
     }
     for (const p of g.pugs) {
       if (p.out) continue;
-      if (p.dead) { if (--p.dead === 0) p.out = true; continue; }
+      if (p.dead) {
+        if (p.how === 'alien' && p.dead === 75) tone(300, 0.7, 'sine', 0.05, 900);   // (the beam)
+        if (p.how === 'alien' && p.dead === 35) noise(0.4, 0.08, 2000, 600);   // (off it zooms)
+        if (--p.dead === 0) p.out = true;
+        continue;
+      }
+      if (++p.idle > HP_IDLE - 120 && p.idle % 30 === 0) tone(1200, 0.05, 'sine', 0.03, -400);   // (a UFO overhead)
       const want = hopInput(p);
       if (want) { if (p.hopping) p.queued = want; else hopStart(p, want); }
       if (p.hopping) {
         const h = p.hopping;
         if (++h.t >= HP_HOP) {
           p.row = h.to; p.x = h.x1; p.hopping = null;
-          if (p.row > p.far) p.far = p.row;
+          if (p.row > p.far) { p.far = p.row; p.idle = 0; }
           const lane = hopLane(p.row);
           if (lane.kind === 'safe' && lane.bone !== null && Math.round(p.x / HP_CELL) === lane.bone) {
             lane.bone = null; p.bones++; sfx.coin(); g.pops.push({ x: p.x + 8, wy: p.row * HP_CELL + 16, n: 3, t: 40 });
@@ -6676,15 +6686,15 @@
       const hit = hopHit(p, hopRowNow(p));
       if (hit) hopOut(p, hit);
     }
-    // (the view: up after the pug in front, and creeping up all the while; a pug that drops off the bottom is swept
-    // away by the dust storm)
+    // (the view: up after the pug in front, and creeping up all the while; a pug at the bottom of it, or one that
+    // hasn't got any further for too long, is abducted)
     const alive = g.pugs.filter(p => !p.out && !p.dead);
     if (alive.length) {
       const lead = Math.max(...alive.map(p => p.row)), want = lead * HP_CELL - 176;
       if (want > g.cam) g.cam += Math.max(0.5, (want - g.cam) * 0.08);
     }
     g.cam += 0.14 + Math.min(0.22, g.time / 18000);
-    for (const p of alive) if (!p.hopping && p.row * HP_CELL < g.cam - 6) hopOut(p, 'storm');
+    for (const p of alive) if (!p.hopping && (p.row * HP_CELL < g.cam + 2 || p.idle > HP_IDLE)) hopOut(p, 'alien');
     for (const r in g.lanes) if (+r < r0 - 4) delete g.lanes[r];
     if (g.pugs.length && g.pugs.every(p => p.out)) g.endT = 60;
   }
@@ -6746,7 +6756,22 @@
       let y = Math.round(hopY(row * HP_CELL)) - 1 - Math.round(Math.sin(u * Math.PI) * 5), x = Math.round(p.x);
       if (p.dead) {
         if (p.how === 'splat') { blit('player_dead', x, y - 10, p.face === 'left', sw); continue; }
-        if (p.how === 'storm') { if (Math.floor(p.dead / 4) % 2) blit('pug_front', x + 2, y - 16 + (50 - p.dead), false, sw); continue; }
+        if (p.how === 'alien') {
+          // (abducted: a UFO swoops down over the pug, which shakes, then floats up its beam, and the UFO zooms off)
+          const t = 110 - p.dead, hx = p.abX, top = p.abY - 40;
+          const uy = t < 35 ? -20 + (top + 20) * (1 - (1 - t / 35) ** 2) : t < 75 ? top : top - (t - 75) ** 2 * 0.35;
+          if (t >= 35 && t < 75 && frame % 4 < 3) {
+            ctx.globalAlpha = 0.35; ctx.fillStyle = '#b4f5c8';
+            for (let yy = Math.round(uy) + 9; yy < p.abY; yy++) { const half = 4 + (yy - uy - 9) * 0.25; ctx.fillRect(Math.round(hx - half), yy, Math.round(half * 2), 1); }
+            ctx.globalAlpha = 1;
+          }
+          if (t < 75) {
+            const k = t < 35 ? 0 : (t - 35) / 40, py = p.abY + (uy + 12 - p.abY) * k, jig = t > 20 && t < 35 ? (frame % 4 < 2 ? 1 : -1) : 0;
+            blit('pug_front', hx - 6 + jig, Math.round(py) - 16, t >= 35 && Math.floor(t / 4) % 2 === 1, sw);
+          }
+          blit('ufo_' + Math.floor(frame / 8) % 2, hx - 11, Math.round(uy));
+          continue;
+        }
         const s = sprite('pug_front', false, sw), k = p.dead / 50;   // (floating off into space, smaller and smaller)
         if (s) ctx.drawImage(s, Math.round(x + 8 - 6 * k), Math.round(y - 8 - 8 * k - (50 - p.dead) * 0.3), Math.max(1, Math.round(12 * k)), Math.max(1, Math.round(16 * k)));
         continue;
@@ -6757,10 +6782,8 @@
       if (g.pugs.length > 1) drawText('P' + (p.id + 1), x + 8, y - 24, LOOK[p.id].tag, 'center');
     }
     for (const n of g.pops) drawText(String(n.n), n.x, Math.round(hopY(n.wy)) - (40 - n.t) * 0.4, 'gold', 'center');
-    // (the dust storm creeping up from the bottom)
-    for (let i = 0; i < 10; i++) { ctx.globalAlpha = 0.08 + i * 0.07; ctx.fillStyle = '#c88a5e'; ctx.fillRect(0, PH - 10 + i, PW, 1); }
-    ctx.globalAlpha = 1; ctx.fillStyle = '#e6b886';
-    for (let i = 0; i < 14; i++) ctx.fillRect((i * 37 + frame * (i % 2 ? 2 : -1)) % (PW + 20) - 10, PH - 3 - (i * 5) % 8, 3, 1);
+    // (a UFO hovering at the top over a pug that has been too slow: the last 2 seconds before it comes down)
+    for (const p of g.pugs) if (!p.out && !p.dead && p.idle > HP_IDLE - 120 && frame % 16 < 12) blit('ufo_' + Math.floor(frame / 8) % 2, Math.round(p.x) - 3, HP_TOP + 2 + Math.round(Math.sin(frame / 6)));
     ctx.restore();
     g.pugs.forEach((p, i) => drawText(`P${p.id + 1} ${p.score}`, 4 + i * 59, 4, LOOK[p.id].tag));
     const info = `BEST ${Math.max(g.best, ...g.pugs.map(p => p.score))}`;
