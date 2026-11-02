@@ -2252,7 +2252,7 @@
       : view === 'raceOver' ? raceWords().text
       : view === 'digPause' ? 'Mars Dig. Dig for bones and crystals, bark to make the Martians dizzy, then boop them. Look out for falling rocks!'
       : view === 'digOver' ? digWords().text
-      : view === 'hopPause' ? 'Ring Hop. Hop across Saturn\'s rings: dodge the rocks and comets, ride the ice over open space, and keep ahead of the dust storm!'
+      : view === 'hopPause' ? 'Ring Hop. Hop across Saturn\'s rings: dodge the rovers and comets, ride the ice over open space, and keep ahead of the dust storm!'
       : view === 'hopOver' ? hopWords().text
       : view === 'arenaOver' ? arenaWords().text
       : bpause ? 'Banana Catch. Catch every banana in your bowl!'
@@ -6469,8 +6469,8 @@
   // ----- Saturn's game: Ring Hop (Play on Saturn in The Arcade; the user asked 2026-11-02 for a game like Crossy
   // Road) -----
   // The pugs hop, a square at a time, up across Saturn's rings, which go on for ever. The rings come in lanes: firm
-  // golden ice (safe, with lumps of rock in the way and now and then a bone, worth 3), dusty lanes where ring rocks
-  // tumble past (one hits: splat), open space with chunks of ice drifting across (ride them: miss and you float off
+  // golden ice (safe, with lumps of rock in the way and now and then a bone, worth 3), dusty tracks where rovers
+  // trundle past (one hits: splat), open space with chunks of ice drifting across (ride them: miss and you float off
   // into space, and a chunk that carries you off the edge takes you with it), and comet lanes, where warning lights
   // blink a moment before a comet streaks through. The view follows the pug in front, and a dust storm creeps up from
   // the bottom all the while, so a pug that dawdles or falls behind is swept away. One go each; a pug's score is the
@@ -6481,6 +6481,20 @@
   const HP_CELL = 16, HP_COLS = 15, HP_TOP = 24, HP_HOP = 7, HP_BEST_KEY = 'doodad-doombad-saturn-best';
   const HP_START = [7, 8, 6, 9];   // (each pug's column)
   const HP_WAYS = { up: [0, 1], down: [0, -1], left: [-1, 0], right: [1, 0] };
+  // the rovers trundling along the dusty tracks, facing right (flipped to go left), each in two turns of its wheels:
+  // a little scout with a solar panel and a camera on a mast, a yellow six-wheeler with a robot arm, a red buggy
+  // with a dish, and a long hauler with a crate of cargo (the user asked 2026-11-02 for rovers in place of rocks)
+  Object.assign(SPRITES, {
+    rover_scout_0: [".........K......", "........KCK.....", ".........K......", "BBBBBBB..K......", "VBVBVBV..K......", ".UUUUUUUUUUUUU..", ".UccccccccccUUY.", ".UcccRRcccccUUU.", ".bbbbbbbbbbbbbb.", "..K....K....K...", ".KHK..KHK..KHK..", "..K....K....K..."],
+    rover_scout_1: [".........K......", "........KCK.....", ".........K......", "BBBBBBB..K......", "VBVBVBV..K......", ".UUUUUUUUUUUUU..", ".UccccccccccUUY.", ".UcccRRcccccUUU.", ".bbbbbbbbbbbbbb.", ".K.K..K.K..K.K..", "..H....H....H...", ".K.K..K.K..K.K.."],
+    rover_six_0: ["..............KK........", "..............KW........", "...............K........", "BBBBBBBBBBBB...K........", "VBVBVBVBVBVB...K....J...", ".YYYYYYYYYYYYYYYYYYYYJJ.", ".YFFFFFFFFFFFFFFFFFYYYJ.", ".YFFFFFFFFFFFFFFFFFYYYYW", ".NNNNNNNNNNNNNNNNNNNNNN.", "...K.......K.......K....", "..KHK.....KHK.....KHK...", "...K.......K.......K...."],
+    rover_six_1: ["..............KK........", "..............KW........", "...............K........", "BBBBBBBBBBBB...K........", "VBVBVBVBVBVB...K....J...", ".YYYYYYYYYYYYYYYYYYYYJJ.", ".YFFFFFFFFFFFFFFFFFYYYJ.", ".YFFFFFFFFFFFFFFFFFYYYYW", ".NNNNNNNNNNNNNNNNNNNNNN.", "..K.K.....K.K.....K.K...", "...H.......H.......H....", "..K.K.....K.K.....K.K..."],
+    rover_buggy_0: ["...........WWW..........", "..........W...W.........", "...........WWW..........", "............K...........", "....RRRRRRRRRRRRR.......", "...RRCCCCRRRCCCCRR......", "..RRRCCCCRRRCCCCRRRRRY..", ".RRRRRRRRRRRRRRRRRRRRRR.", ".DDDDDDDDDDDDDDDDDDDDDD.", "....K..............K....", "...KHK............KHK...", "....K..............K...."],
+    rover_buggy_1: ["...........WWW..........", "..........W...W.........", "...........WWW..........", "............K...........", "....RRRRRRRRRRRRR.......", "...RRCCCCRRRCCCCRR......", "..RRRCCCCRRRCCCCRRRRRY..", ".RRRRRRRRRRRRRRRRRRRRRR.", ".DDDDDDDDDDDDDDDDDDDDDD.", "...K.K............K.K...", "....H..............H....", "...K.K............K.K..."],
+    rover_hauler_0: ["................................", ".NNNNNNNNNNNNNNNN...............", ".NOOOONOOOONOOOON......GGGGGG...", ".NOOOONOOOONOOOON.....GCCCCCG...", ".NOOOONOOOONOOOON.....GCCCCCGG..", ".NNNNNNNNNNNNNNNN.....GGGGGGGGG.", "bbbbbbbbbbbbbbbbbbbbbbGGGGGGGGGY", "bUUUUUUUUUUUUUUUUUUUUUbbbbbbbbbb", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "...K....K....K.........K....K...", "..KHK..KHK..KHK.......KHK..KHK..", "...K....K....K.........K....K..."],
+    rover_hauler_1: ["................................", ".NNNNNNNNNNNNNNNN...............", ".NOOOONOOOONOOOON......GGGGGG...", ".NOOOONOOOONOOOON.....GCCCCCG...", ".NOOOONOOOONOOOON.....GCCCCCGG..", ".NNNNNNNNNNNNNNNN.....GGGGGGGGG.", "bbbbbbbbbbbbbbbbbbbbbbGGGGGGGGGY", "bUUUUUUUUUUUUUUUUUUUUUbbbbbbbbbb", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "..K.K..K.K..K.K.......K.K..K.K..", "...H....H....H.........H....H...", "..K.K..K.K..K.K.......K.K..K.K.."],
+  });
+  const HP_ROVERS = { 16: ['scout'], 24: ['six', 'buggy'], 32: ['hauler'] };
   let hop = null;
   const hpRnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
   // (the screen y of a height in the rings: row r is from r*16 to r*16+16, and cam is the height at the screen's bottom)
@@ -6507,9 +6521,9 @@
   function hopGen(r) {
     const g = hop, k = 1 + Math.min(1.2, r / 120);
     if (!g.run || g.run.left <= 0) {
-      const last = g.run ? g.run.kind : 'safe', kinds = ['rocks', 'rocks', 'rocks', 'gap', 'gap', 'comet', 'safe'];
+      const last = g.run ? g.run.kind : 'safe', kinds = ['rovers', 'rovers', 'rovers', 'gap', 'gap', 'comet', 'safe'];
       const kind = last !== 'safe' && Math.random() < 0.55 ? 'safe' : kinds[hpRnd(0, kinds.length - 1)];
-      g.run = { kind, left: kind === 'rocks' ? hpRnd(1, 4) : kind === 'gap' ? hpRnd(1, 3) : kind === 'comet' ? 1 : hpRnd(1, 2), dir: Math.random() < 0.5 ? -1 : 1 };
+      g.run = { kind, left: kind === 'rovers' ? hpRnd(1, 4) : kind === 'gap' ? hpRnd(1, 3) : kind === 'comet' ? 1 : hpRnd(1, 2), dir: Math.random() < 0.5 ? -1 : 1 };
     }
     g.run.left--;
     const kind = g.run.kind, L = PW + 64;
@@ -6520,9 +6534,12 @@
       return { kind, blocks, bone: Math.random() < 0.2 ? free[hpRnd(0, free.length - 1)] : null };
     }
     const dir = g.run.dir = -g.run.dir;
-    if (kind === 'rocks') {
+    if (kind === 'rovers') {
       const n = hpRnd(2, 3), objs = [];
-      for (let i = 0; i < n; i++) objs.push({ x: i * L / n - 32 + hpRnd(0, 20), w: [16, 16, 24, 32][hpRnd(0, 3)] });
+      for (let i = 0; i < n; i++) {
+        const w = [16, 16, 24, 32][hpRnd(0, 3)], types = HP_ROVERS[w];
+        objs.push({ x: i * L / n - 32 + hpRnd(0, 20), w, type: types[hpRnd(0, types.length - 1)] });
+      }
       return { kind, dir, speed: (0.28 + Math.random() * 0.37) * k, L, objs };   // (slowed at the user's request 2026-11-02)
     }
     if (kind === 'gap') {
@@ -6576,7 +6593,7 @@
   // what is under a pug where it is: rocks and comets hit it, open space with no ice under it drops it
   function hopHit(p, row) {
     const lane = hopLane(row), a = p.x + 3, b = p.x + 13;
-    if (lane.kind === 'rocks') return lane.objs.some(o => b > o.x + 1 && a < o.x + o.w - 1) ? 'splat' : null;
+    if (lane.kind === 'rovers') return lane.objs.some(o => b > o.x + 1 && a < o.x + o.w - 1) ? 'splat' : null;
     if (lane.kind === 'comet' && lane.state === 'pass') {
       const lo = lane.dir > 0 ? lane.x - 64 : lane.x, hi = lane.dir > 0 ? lane.x + 16 : lane.x + 80;
       return b > lo && a < hi ? 'splat' : null;
@@ -6610,7 +6627,7 @@
     const moved = {};
     for (let r = r0; r <= r1; r++) {
       const lane = hopLane(r);
-      if (lane.kind === 'rocks' || lane.kind === 'gap') {
+      if (lane.kind === 'rovers' || lane.kind === 'gap') {
         moved[r] = lane.dir * lane.speed;
         for (const o of lane.objs) {
           o.x += moved[r];
@@ -6686,16 +6703,12 @@
         px('#8a6a48', x + 3, 5, 10, 9); px('#8a6a48', x + 2, 7, 12, 5); px('#b08a64', x + 4, 6, 4, 2);
       }
       if (lane.bone !== null) blit('dg_bone', lane.bone * HP_CELL + 4, y + 4);
-    } else if (lane.kind === 'rocks') {
+    } else if (lane.kind === 'rovers') {
+      // (a dusty track with wheel ruts, and the rovers on it, wheels turning as they go)
       px('#4a3e36', 0, 0, PW, HP_CELL);
-      for (let x = (r * 5) % 16; x < PW; x += 16) px('#6a5a4a', x, 7, 6, 1);
-      for (const o of lane.objs) {
-        // (a ring rock tumbling: its light spot turns as it rolls)
-        px('#2a201a', o.x + 1, 2, o.w - 2, 13); px('#2a201a', o.x, 4, o.w, 9);
-        px('#7a6a5a', o.x + 2, 3, o.w - 4, 11); px('#7a6a5a', o.x + 1, 5, o.w - 2, 7);
-        const spin = ((Math.floor(o.x / 3) % 4) + 4) % 4;
-        px('#a8988a', o.x + 3 + (spin % 2) * (o.w - 10), 4 + (spin >> 1) * 6, 4, 2);
-      }
+      px('#3e332c', 0, 12, PW, 1); px('#3e332c', 0, 14, PW, 1);
+      for (let x = (r * 5) % 16; x < PW; x += 16) px('#6a5a4a', x, 4, 6, 1);
+      for (const o of lane.objs) blit(`rover_${o.type}_${((Math.floor(o.x / 3) % 2) + 2) % 2}`, Math.round(o.x), y + 3, lane.dir < 0);
     } else if (lane.kind === 'gap') {
       px('#0b0c1c', 0, 0, PW, HP_CELL);
       for (let i = 0; i < 6; i++) if ((frame + seed(i)) % 90 < 75) px(i % 3 ? '#9fb4ff' : '#ffffff', seed(i + 9) % PW, seed(i + 20) % 15, 1, 1);
