@@ -2333,7 +2333,7 @@
       : view === 'raceOver' ? raceWords().text
       : view === 'digPause' ? 'Mars Dig. Dig for bones and crystals, bark to make the Martians dizzy, then boop them. Look out for falling rocks!'
       : view === 'digOver' ? digWords().text
-      : view === 'hopPause' ? 'Ring Hop. Hop across Saturn\'s rings: dodge the rovers and comets, ride the ice over open space, and keep moving, or an alien will beam you up!'
+      : view === 'hopPause' ? 'Saturn Scramble. Hop across Saturn\'s rings: dodge the rovers and comets, ride the ice over open space, and keep moving, or an alien will beam you up!'
       : view === 'hopOver' ? hopWords().text
       : view === 'arenaOver' ? arenaWords().text
       : bpause ? 'Banana Catch. Catch every banana in your bowl!'
@@ -5216,7 +5216,7 @@
     if (arcadeZoom.target && arcadeZoom.target.game === 'race') { startRace(by); return; }   // (the Moon: the Moon Race)
     if (arcadeZoom.target && arcadeZoom.target.game === 'showdown') { startArena(by, true); return; }   // (Pluto: Pluto Showdown)
     if (arcadeZoom.target && arcadeZoom.target.game === 'dig') { startDig(by); return; }   // (Mars: Mars Dig)
-    if (arcadeZoom.target && arcadeZoom.target.game === 'hop') { startHop(by); return; }   // (Saturn: Ring Hop)
+    if (arcadeZoom.target && arcadeZoom.target.game === 'hop') { startHop(by); return; }   // (Saturn: Saturn Scramble)
     fromTitle = false; phase = 'title';
     startClicked();
   }
@@ -6589,7 +6589,8 @@
     if (g.clearT > 0) banner('MARS CLEAR!', 110, 'gold', 2);
     if (g.endT) banner('GAME OVER', 120, 'pink', 2);
   }
-  // ----- Saturn's game: Ring Hop (Play on Saturn in The Arcade; the user asked 2026-11-02 for a game like Crossy
+  // ----- Saturn's game: Saturn Scramble (first called Ring Hop; renamed at the user's request) (Play on Saturn in The
+  // Arcade; the user asked 2026-11-02 for a game like Crossy
   // Road) -----
   // The pugs hop, a square at a time, up across Saturn's rings, which go on for ever. The rings come in lanes: firm
   // golden ice (safe, with lumps of rock in the way and now and then a bone, worth 3), dusty tracks where rovers
@@ -6818,7 +6819,7 @@
     if (g.pugs.length && g.pugs.every(p => p.out)) g.endT = 60;
   }
   function hopWords() {
-    if (!hop) return { title: 'Ring Hop', text: '' };
+    if (!hop) return { title: 'Saturn Scramble', text: '' };
     const ps = hop.pugs, bones = n => `${n} bone${n === 1 ? '' : 's'}`;
     if (ps.length === 1) return { title: `${ps[0].score} points!`, text: `${LOOK[ps[0].id].name} hopped ${Math.max(0, ps[0].far)} rows and found ${bones(ps[0].bones)}. Best: ${hop.best}.` };
     const top = Math.max(...ps.map(p => p.score)), win = ps.filter(p => p.score === top);
@@ -6907,7 +6908,7 @@
     g.pugs.forEach((p, i) => drawText(`P${p.id + 1} ${p.score}`, 4 + i * 59, 4, LOOK[p.id].tag));
     const info = `BEST ${Math.max(g.best, ...g.pugs.map(p => p.score))}`;
     if (g.pugs.length <= 2) drawText(info, PW - 3 - info.length * 6, 14);
-    if (g.startT > 0) banner(g.startT > 40 ? 'RING HOP' : 'HOP!', 110, 'gold', 2);
+    if (g.startT > 0) banner(g.startT > 40 ? 'SATURN SCRAMBLE' : 'HOP!', 110, 'gold', 2);
     if (g.endT) banner('GAME OVER', 120, 'pink', 2);
   }
   function draw() {
