@@ -2086,6 +2086,8 @@
     fromTitle = false; phase = 'title';
     mother = { state: 'gone', t: 0 };   // (back on the main menu, the mother ship has gone: the user asked for that)
     spaceGloop = null;   // (and so has Gloop, if he was floating in space)
+    // (unless the mother ship's blast sent him here: then he drops out of the sky onto the grass, and stays)
+    if (gloopOnMenu && !titleGloop) { titleGloop = { gloop: true, x: 34, y: -40, state: 'fall', t: 0, vy: 0, land: 214, box: null, grab: null }; tone(1200, 0.7, 'sine', 0.03, -900); }
     for (const pl of SPACE_PLANETS) { pl.shipGone = false; pl.deepGone = []; }   // (and the blown-up spaceships are back)
     ov.classList.remove('menu-mode', 'arcade-mode'); ov.classList.add('title-mode');
     ovTitle.innerHTML = 'Doodad<br>Doombad'; startBtn.textContent = 'Start'; startBtn.hidden = false;
@@ -4477,6 +4479,7 @@
     if (fc) return { fish: fc };
     const fl = [...fishes].reverse().find(f => f.box && hitBox(f.box, p));
     if (fl) return { leaper: fl };
+    if (titleGloop && titleGloop.box && hitBox(titleGloop.box, p)) return { gloop: titleGloop };
     const f = [...freePugs].reverse().find(f => f.box && hitBox(f.box, p));
     if (f) return { pug: f };
     const c = brunoOut && brunoOut.chase;
@@ -4489,7 +4492,7 @@
     const h = holdableAt(p);
     if (!h) return false;
     if (h.bruno) return grabBruno(p, id, touch);
-    let f = h.pug || h.fish;
+    let f = h.pug || h.fish || h.gloop;
     if (h.chase) { h.chase.gone = true; f = freePug(h.chase.id, h.chase.feet, h.chase.sc); }   // (Bruno has lost it)
     if (h.walker) { pugWalkers.splice(pugWalkers.indexOf(h.walker), 1); f = freePug(h.walker.id, [h.walker.x, h.walker.y], h.walker.sc); }
     if (h.leaper) {
@@ -4500,7 +4503,7 @@
     f.state = 'held'; f.t = 0; f.vy = 0;
     f.grab = { id, touch, dx: p[0] - f.x, dy: p[1] - f.y, x: p[0], y: p[1] };
     try { initAudio(); } catch (e) {}
-    if (f.fish) sfx.bloop(); else sfx.bark(LOOK[f.id].bark * 1.4);   // (a surprised yelp)
+    if (f.fish) sfx.bloop(); else if (f.gloop) tone(330, 0.15, 'sine', 0.04, 200); else sfx.bark(LOOK[f.id].bark * 1.4);   // (a surprised yelp; Gloop's little "wah")
     return true;
   }
   function freePug(id, [x, y], sc) {
@@ -4514,7 +4517,7 @@
     if (ov.style.cursor) ov.style.cursor = '';
   }
   // (the held things: Bruno, the pugs and the fish; whatever a pointer or a controller ('pad' and its player) holds)
-  const holdables = () => [brunoOut, ...freePugs, ...freeFish, spaceGloop];
+  const holdables = () => [brunoOut, ...freePugs, ...freeFish, spaceGloop, titleGloop];
   const heldBy = id => holdables().find(o => o && o.grab && o.grab.id === id);
   const dragHeld = (o, [x, y]) => { o.grab.x = x; o.grab.y = y; };
   const dropHeld = o => o === brunoOut ? dropBruno() : o === spaceGloop ? letGloopGo() : dropFree(o);
@@ -4714,6 +4717,7 @@
     drawBrunoOut();
     drawFreePugs();
     drawFreeFish();
+    if (titleGloop) drawTitleGloop();
     drawFireworks();
   }
   // ----- The Arcade: out in space, reached by clicking the night sky on the main menu -----
@@ -4769,7 +4773,7 @@
   }
   // (zooming in or out redoes The Arcade's screen: its title, and Play shown or gone)
   function zoomTo(p) { arcadeZoom = { target: p, p: 0, out: false, ship: null, shop: p.shop ? { p: 0 } : null };
-    if (p.shop) spaceGloop = null;
+    if (p.shop) { spaceGloop = null; titleGloop = null; gloopOnMenu = false; }
     if (p.shop) Object.assign(shop, { sad: false, tearT: 0, hitT: 0, whyT: 0, ammo: [], mess: [], bits: [], stains: [], lamp: 'up', lampY: 0, lampV: 0, ko: false, koT: 0, window: 'whole', suck: null, gone: false, wind: [] });   // (Gloop happy and clean again)
     showPause('arcade', 0); sfx.tick(); }
   function zoomOut() { if (!arcadeZoom.target || arcadeZoom.out) return; arcadeZoom.out = true; arcadeZoom.ship = arcadeZoom.deep = null; showPause('arcade', 0); sfx.tick(); }
@@ -5082,6 +5086,13 @@
     if (t === MB_DARK) sfx.charge();
     if (t === MB_BLAST) {
       sfx.boom(); sfx.braam(); sfx.aftershock();
+      // (Gloop, if he is floating out here, is blasted away, spinning, right off the screen, all the way to the main
+      // menu: the user asked 2026-11-02)
+      if (spaceGloop) {
+        const g = spaceGloop, dx = g.x - m.x, dy = g.y - m.y, d = Math.hypot(dx, dy) || 1;
+        Object.assign(g, { vx: dx / d * 7, vy: dy / d * 7 - 2, va: 0.5, launched: true, grab: null });
+        gloopOnMenu = true;
+      }
       mother.debris = Array.from({ length: 36 }, (_, i) => {
         const a = mbRand(i + 0.11) * Math.PI * 2, v = 0.5 + mbRand(i + 0.53) * 2.2;
         return { x: m.x + Math.cos(a) * 10, y: m.y + Math.sin(a) * 4, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.75,
@@ -5780,14 +5791,15 @@
   // (spaceGloop: where he is, how he drifts and spins, and who holds him (grab, as for Bruno), or null)
   // (SPACE_GLOOP: how big he is out there, a fraction of his own size: small, the user asked)
   const SPACE_GLOOP = 0.5;
-  let spaceGloop = null, arcadeGrabbed = false;
+  // (gloopOnMenu: the mother ship's blast sent him to the main menu; titleGloop: him there, standing on the grass)
+  let spaceGloop = null, arcadeGrabbed = false, gloopOnMenu = false, titleGloop = null;
   function onSpaceGloop(e) {
     const p = titlePoint(e);
     return !!(p && spaceGloop && Math.hypot(p[0] - spaceGloop.x, p[1] - spaceGloop.y) <= 12);   // (a little bigger than he is, to catch)
   }
   ov.addEventListener('pointerdown', e => {
     arcadeGrabbed = false;
-    if (!(fromTitle && pauseView === 'arcade' && phase === 'paused') || !spaceGloop || arcadeZoom.target || e.target.closest('button') || !onSpaceGloop(e)) return;
+    if (!(fromTitle && pauseView === 'arcade' && phase === 'paused') || !spaceGloop || spaceGloop.launched || arcadeZoom.target || e.target.closest('button') || !onSpaceGloop(e)) return;
     if (e.pointerType === 'mouse' && (e.button !== 0 || e.ctrlKey)) return;
     const p = titlePoint(e);
     spaceGloop.grab = { id: padClickBy !== null ? 'pad' + padClickBy : e.pointerId, touch: e.pointerType === 'touch', dx: p[0] - spaceGloop.x, dy: p[1] - spaceGloop.y, x: p[0], y: p[1] };
@@ -5809,7 +5821,11 @@
   function drawSpaceGloop() {
     const g = spaceGloop;
     if (!gloopPics) gloopPics = Object.fromEntries(Object.entries(GLOOP).map(([k, v]) => [k, bakeWith(v, GLOOP_COLS)]));
-    if (g.grab) {
+    if (g.launched) {
+      // (blasted by the mother ship: straight on and off the screen, gone to the main menu)
+      g.x += g.vx; g.y += g.vy;
+      if (g.x < -24 || g.x > PW + 24 || g.y < -24 || g.y > PH + 24) { spaceGloop = null; return; }
+    } else if (g.grab) {
       // (held: right where the hand is, remembering how fast he was moved, for when he is let go)
       const tx = clamp(g.grab.x - g.grab.dx, 0, PW), ty = clamp(g.grab.y - g.grab.dy, 0, PH);
       g.vx = tx - g.x; g.vy = ty - g.y; g.x = tx; g.y = ty; g.va *= 0.9;
@@ -5825,6 +5841,32 @@
     ctx.save(); ctx.translate(Math.round(g.x), Math.round(g.y)); ctx.rotate(g.ang);
     ctx.drawImage(gloopPics.sad, -11 * SPACE_GLOOP, -18 * SPACE_GLOOP, 22 * SPACE_GLOOP, 36 * SPACE_GLOOP);
     ctx.restore();
+  }
+  // Gloop on the main menu, sent there by the mother ship's blast: sad, he just stands on the grass, blinking now and
+  // then. Like Bruno he can be picked up (mouse, finger, or a controller's square with A held) and dragged anywhere,
+  // dangling and swinging a little; let go, he drops to the ground (with a thud, or a splash in the moat) and stands
+  // there again. (titleGloop: his feet, x and y; state 'fall', 'stand' or 'held'; the rest as for the pugs)
+  function drawTitleGloop() {
+    const g = titleGloop;
+    if (!gloopPics) gloopPics = Object.fromEntries(Object.entries(GLOOP).map(([k, v]) => [k, bakeWith(v, GLOOP_COLS)]));
+    g.t++;
+    let ang = 0;
+    if (g.state === 'held') {
+      g.x = clamp(g.grab.x - g.grab.dx, -10, PW + 10); g.y = clamp(g.grab.y - g.grab.dy, 30, PH + 20);
+      ang = Math.sin(g.t / 4) * 0.15;   // (dangling, swinging his legs)
+    } else if (g.state === 'fall') {
+      g.vy = Math.min(g.vy + 0.35, 7); g.y += g.vy;
+      if (g.y >= g.land) {
+        g.y = g.land; g.state = 'stand';
+        const w = moatNear([g.x, g.y]);
+        if (w) { splash(w[0], w[1]); sfx.splash(); }
+        else for (let i = 0; i < 6; i++) drops.push({ x: g.x + (i - 2.5) * 2, y: g.y - 1, vx: (i - 2.5) * 0.3, vy: -0.6 - Math.random() * 0.5, t: 12, col: nc(i % 2 ? '#c8a070' : '#9a7a50') });
+        sfx.thud();
+      }
+    }
+    const pic = g.state === 'stand' && g.t % 240 < 10 ? gloopPics.sadBlink : gloopPics.sad;
+    ctx.save(); ctx.translate(Math.round(g.x), Math.round(g.y)); ctx.rotate(ang); ctx.drawImage(pic, -11, -36, 22, 36); ctx.restore();
+    g.box = [Math.round(g.x) - 11, Math.round(g.y) - 36, 22, 36];
   }
   // ----- Earth's mini-game: Banana Catch (Play on Earth in The Arcade) -----
   // The pug that pressed Play stands on the grass wearing a bowl on its head, and Big Bruno walks back and forth
