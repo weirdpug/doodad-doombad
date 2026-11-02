@@ -5498,7 +5498,8 @@
   // you leave the shop. Any number can be in the air at once. A burrito that hits the lamp (the user asked) snaps its
   // cord: the lamp drops onto Gloop's head with a clang and knocks him out cold (X eyes, tongue out, stars going round
   // his head), its bulb out, so the shop goes dim. He wobbles there a moment with the lamp on his head like a hat; then
-  // it slides off onto the counter and he tips over and falls down behind the counter, stars going round above it;
+  // it slides off onto the counter and he tips over and falls down behind the counter, out of sight, stars going
+  // round above it;
   // after 3 seconds he gets back up, sad (the user asked). The lamp and the dim stay until you leave. He stays sad until you leave the shop; the
   // next time you come in he is happy and clean again. Nothing is for sale yet. Back (or Esc, B, or a click on the way in) zooms all the way
   // back out to space. (arcadeZoom.shop: { p, out }, how far into the shop, 0 to 1 over SHOP_FRAMES, once the zoom
@@ -5635,13 +5636,15 @@
       if (kt === KO_UP) tone(392, 0.35, 'sine', 0.04, -120);   // (a sad sigh as he gets up)
       if (kt >= KO_END) { shop.ko = false; shop.koT = 0; shop.sad = true; shop.tearT = SHOP_TEAR; }
     }
-    const ang = !shop.ko ? 0 : kt < KO_TIP ? Math.sin(kt / 3) * 0.06 : kt < KO_DOWN ? ease((kt - KO_TIP) / (KO_DOWN - KO_TIP)) * Math.PI / 2
-      : kt < KO_UP ? Math.PI / 2 : (1 - ease((kt - KO_UP) / (KO_END - KO_UP))) * Math.PI / 2;
+    const fall = !shop.ko || kt < KO_TIP ? 0 : kt < KO_DOWN ? ease((kt - KO_TIP) / (KO_DOWN - KO_TIP)) : kt < KO_UP ? 1 : 1 - ease((kt - KO_UP) / (KO_END - KO_UP));
+    const ang = shop.ko && kt < KO_TIP ? Math.sin(kt / 3) * 0.06 : fall * Math.PI / 2;
+    // (as he tips over he also sinks, so lying down he is right out of sight behind the counter: the user asked)
+    const drop = Math.round(fall * 28);
     const pic = shop.ko && kt < KO_UP ? gloopPics.ko : shop.ko || shop.sad ? (t % 260 < 14 ? gloopPics.sadBlink : gloopPics.sad) : t % 200 < 8 ? gloopPics.blink : gloopPics.idle;
     const bob = shop.ko ? (kt < KO_TIP ? 6 : 0) : shop.sad ? Math.round(Math.sin(t / 50) + 0.5) : Math.round(Math.sin(t / 25)), gx = GLOOP_X + (shop.hitT ? (t % 4 < 2 ? 1 : -1) : 0), gy = GLOOP_Y + bob;
     // (drawn turned about his bottom middle, so he tips over sideways behind the counter, his face stuff with him)
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, PW, 190); ctx.clip();
-    ctx.translate(gx + 22, gy + 48); ctx.rotate(ang);
+    ctx.translate(gx + 22, gy + 48 + drop); ctx.rotate(ang);
     ctx.drawImage(pic, -22, -48, 44, 48);
     for (const [mx, my, col] of shop.mess) { ctx.fillStyle = col; ctx.fillRect(-22 + mx, -48 + my, 2, 2); }
     if (shop.tearT && !shop.ko) {
@@ -5657,9 +5660,11 @@
       const an = t / 10 + k * 2.1, sx = Math.round(cx0 + Math.cos(an) * 16), sy = Math.round(cy0 + Math.sin(an) * 4);
       ctx.fillStyle = '#ffcc3d'; ctx.fillRect(sx - 1, sy, 3, 1); ctx.fillRect(sx, sy - 1, 1, 3);
     }
-    // (his hands resting on the counter top)
-    ctx.fillStyle = GLOOP_COLS.o; ctx.fillRect(GLOOP_X + 2, 186, 8, 5); ctx.fillRect(GLOOP_X + 34, 186, 8, 5);
-    ctx.fillStyle = GLOOP_COLS.p; ctx.fillRect(GLOOP_X + 3, 187, 6, 3); ctx.fillRect(GLOOP_X + 35, 187, 6, 3);
+    // (his hands resting on the counter top, but not while he is falling or down behind it)
+    if (fall < 0.15) {
+      ctx.fillStyle = GLOOP_COLS.o; ctx.fillRect(GLOOP_X + 2, 186, 8, 5); ctx.fillRect(GLOOP_X + 34, 186, 8, 5);
+      ctx.fillStyle = GLOOP_COLS.p; ctx.fillRect(GLOOP_X + 3, 187, 6, 3); ctx.fillRect(GLOOP_X + 35, 187, 6, 3);
+    }
     if (shop.lamp === 'counter') lampShade(88, 179, false);   // (the lamp, fallen on the counter between the till and him)
     // (the card says COMING SOON, and the till shows nothing rung up)
     drawText('COMING', 191, 169, 'black', 'center'); drawText('SOON!', 191, 179, 'red', 'center');
