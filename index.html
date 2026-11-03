@@ -1033,6 +1033,9 @@
   // (gloopBruno: Gloop is doing Bruno's job: each of Bruno's pictures is swapped for Gloop's)
   // (gloopBrunoNext: he went in while Bruno was out, so he takes over once Bruno is back inside: takeOverBruno)
   let gloopBruno = false, gloopBrunoNext = false;
+  // (gloopGlitch: Gloop has been beaten in Bruno's job, and the game is glitching: drawGlitch; glitchT: frames since,
+  // glitchBurst: frames left of a burst, glitchNext: when the next one comes)
+  let gloopGlitch = false, glitchT = 0, glitchBurst = 0, glitchNext = 0;
   function takeOverBruno() { if (gloopBrunoNext) { gloopBruno = true; gloopBrunoNext = false; } }
   const APE_GLOOP = { ape_idle: 'gloop_idle', ape_poundL: 'gloop_poundL', ape_poundR: 'gloop_poundR', ape_throw: 'gloop_throw', ape_back: 'gloop_back',
     bruno_ball0: 'gloop_ball0', bruno_ball1: 'gloop_ball1', bruno_ball2: 'gloop_ball2', bruno_ball3: 'gloop_ball3' };
@@ -3213,6 +3216,7 @@
     h.gone = true; sfx.smash(); burst(h.x, h.y, 'G', 6);
     brunoStun = 9999;   // (stars over him all through the level-clear banner; the next level clears them)
     toast(`${brunoName()} is defeated!`, '#ffcc3d');
+    if (gloopBruno && !gloopGlitch) { gloopGlitch = true; glitchNext = glitchT + 60; }   // (beating Gloop breaks the game: drawGlitch)
     win(pById(h.by) || players[0]);
     return true;
   }
@@ -4789,7 +4793,7 @@
   }
   // (zooming in or out redoes The Arcade's screen: its title, and Play shown or gone)
   function zoomTo(p) { arcadeZoom = { target: p, p: 0, out: false, ship: null, shop: p.shop ? { p: 0 } : null };
-    if (p.shop) { spaceGloop = null; titleGloop = null; gloopOnMenu = false; gloopBruno = false; gloopBrunoNext = false; }   // (back in his shop; Bruno back in his job)
+    if (p.shop) { spaceGloop = null; titleGloop = null; gloopOnMenu = false; gloopBruno = false; gloopBrunoNext = false; stopGlitch(); }   // (back in his shop; Bruno back in his job, and no more glitching)
     if (p.shop) Object.assign(shop, { sad: false, tearT: 0, hitT: 0, whyT: 0, ammo: [], mess: [], bits: [], stains: [], lamp: 'up', lampY: 0, lampV: 0, ko: false, koT: 0, window: 'whole', suck: null, gone: false, wind: [] });   // (Gloop happy and clean again)
     showPause('arcade', 0); sfx.tick(); }
   function zoomOut() { if (!arcadeZoom.target || arcadeZoom.out) return; arcadeZoom.out = true; arcadeZoom.ship = arcadeZoom.deep = null; showPause('arcade', 0); sfx.tick(); }
@@ -5928,6 +5932,52 @@
     gloop_ball2: ["........................", ".........000000.........", "......000999997000......", ".....00999999777700.....", "....0999999977777770....", "...099999997777777770...", "..0099Y999777777777700..", "..0999Y997777777777770..", "..0999997K7777K7777770..", ".099999777KKKK777777770.", ".0999977777777777777780.", ".0999777777777777777880.", ".0997777777777777778880.", ".09777WKW77777WKW788880.", ".07777WWW7WKW7WWW888880.", "..07770007WWW700088880..", "..07777777000778888880..", "..00777777777788888800..", "...077777777788888880...", "....0777777788888880....", ".....00777788888800.....", "......00078808Y000......", ".........000000.........", "........................"],
     gloop_ball3: ["........................", ".........000000.........", "......000799999000......", ".....00777799999900.....", "....0777777799999990....", "...077777777799999990...", "..0077770WW77799YY9900..", "..0777770WK77779999990..", "..0777770WW77777999990..", ".07777777777777K7999990.", ".0877770WW7777K77799990.", ".0887770WK7777K77779990.", ".0088770WW7777K77777990.", ".0888877777777K77777790.", ".0Y888870WW7777K7777770.", "..0888880WK77777777770..", "..0888880WW77777777770..", "..00888888777777777700..", "...088888887777777770...", "....0888888877777770....", ".....00888888777700.....", "......000888887000......", ".........000000.........", "........................"],
   });
+  // Glitching (the user asked 2026-11-02): once Gloop, doing Bruno's job, has been beaten on the boss level, the game
+  // looks like it is breaking, on every screen. Every few seconds comes a burst: strips of the picture slip sideways,
+  // ghost copies smear across it, blocks of junk pixels (magenta, cyan, green, black, white) flick on, now and then
+  // the whole screen flashes inverted, the screen (menus and all) jerks about, and it buzzes and crackles. In
+  // between, a faint bright line rolls down the screen. It stops once Gloop is back in his shop (into Jupiter).
+  const glitchScreen = document.querySelector('.screen');
+  const GLITCH_COLS = ['#ff00ff', '#00ffff', '#00ff66', '#000000', '#ffffff', '#ffcc00'];
+  function drawGlitch() {
+    glitchT++;
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.fillRect(0, (glitchT * 3) % PH, PW, 2);
+    if (!glitchBurst && glitchT >= glitchNext) {
+      glitchBurst = 8 + Math.floor(Math.random() * 22);
+      glitchNext = glitchT + glitchBurst + 90 + Math.floor(Math.random() * 180);
+      noise(0.18, 0.09, 5000, 300); tone(60 + Math.random() * 500, 0.1, 'square', 0.04, Math.random() * 800 - 400);
+    }
+    if (glitchBurst > 0) {
+      glitchBurst--;
+      // (strips of the screen slipping sideways)
+      for (let i = 0, n = 3 + Math.floor(Math.random() * 4); i < n; i++) {
+        const y = Math.floor(Math.random() * PH), h = 2 + Math.floor(Math.random() * 14), dx = Math.round((Math.random() - 0.5) * 34);
+        ctx.drawImage(cv, 0, y, PW, h, dx, y, PW, h);
+      }
+      // (ghost copies smeared across, and the colours splitting)
+      ctx.globalAlpha = 0.3; ctx.globalCompositeOperation = 'lighter';
+      ctx.drawImage(cv, 3 + Math.round(Math.random() * 3), 0); ctx.drawImage(cv, -3 - Math.round(Math.random() * 3), 1);
+      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 0.12;
+      ctx.fillStyle = '#ff00ff'; ctx.fillRect(0, Math.floor(Math.random() * PH), PW, 6 + Math.floor(Math.random() * 20));
+      ctx.fillStyle = '#00ffff'; ctx.fillRect(0, Math.floor(Math.random() * PH), PW, 4 + Math.floor(Math.random() * 16));
+      ctx.globalAlpha = 1;
+      // (junk pixels)
+      for (let i = 0, n = 6 + Math.floor(Math.random() * 10); i < n; i++) {
+        ctx.fillStyle = GLITCH_COLS[Math.floor(Math.random() * GLITCH_COLS.length)];
+        ctx.fillRect(Math.floor(Math.random() * PW), Math.floor(Math.random() * PH), 2 + Math.floor(Math.random() * 18), 1 + Math.floor(Math.random() * 6));
+      }
+      // (now and then the whole screen flashes inverted)
+      if (Math.random() < 0.12) { ctx.globalCompositeOperation = 'difference'; ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, PW, PH); }
+      if (glitchBurst % 4 === 0) tone(80 + Math.random() * 1200, 0.04, 'square', 0.025);
+      if (glitchScreen) glitchScreen.style.transform = `translate(${Math.round((Math.random() - 0.5) * 8)}px, ${Math.round((Math.random() - 0.5) * 4)}px)`;
+    } else if (glitchScreen && glitchScreen.style.transform) glitchScreen.style.transform = '';
+    ctx.restore();
+  }
+  function stopGlitch() {
+    gloopGlitch = false; glitchBurst = 0;
+    if (glitchScreen) glitchScreen.style.transform = '';
+  }
   // ----- Earth's mini-game: Banana Catch (Play on Earth in The Arcade) -----
   // The pug that pressed Play stands on the grass wearing a bowl on its head, and Big Bruno walks back and forth
   // on a girder up top throwing bananas. Catch every banana in the bowl: each one is a point, and they come
@@ -7552,6 +7602,7 @@
       acc += Math.min(100, t - lastT); lastT = t;
       while (acc >= 1000 / 60) { step(); acc -= 1000 / 60; }
       draw();
+      if (gloopGlitch) drawGlitch();
     } catch (e) {
       acc = 0;
       if (loopErrors++ < 3) console.error(e);
