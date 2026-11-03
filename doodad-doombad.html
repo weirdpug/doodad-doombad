@@ -460,6 +460,17 @@
   let boomPicT = 0;              // frames it has left
   cv.width = PW; cv.height = PH;
   const ctx = cv.getContext('2d');
+  // Upside down (the glitching's last trick, see drawGlitch): the game picture is turned round, and so the canvas
+  // reports its corners swapped (right as left, bottom as top, negative size), so everything that turns a click into
+  // a spot on the picture, or a spot into a place on the page (the controller squares), still lands where things are
+  // shown
+  let upsideDown = false;
+  const cvRect = cv.getBoundingClientRect.bind(cv);
+  cv.getBoundingClientRect = () => {
+    const r = cvRect();
+    return upsideDown ? { left: r.right, right: r.left, top: r.bottom, bottom: r.top, x: r.right, y: r.bottom, width: -r.width, height: -r.height } : r;
+  };
+  function setUpsideDown(on) { upsideDown = on; cv.style.transform = on ? 'rotate(180deg)' : ''; }
   ctx.imageSmoothingEnabled = false;
   const px = v => Math.round(v / 2);
 
@@ -1031,7 +1042,8 @@
   let gloopBruno = false, gloopBrunoNext = false;
   // (gloopGlitch: Gloop has been beaten in Bruno's job, and the game is glitching: drawGlitch; glitchT: frames since,
   // glitchBurst: frames left of a burst, glitchNext: when the next one comes)
-  let gloopGlitch = false, glitchT = 0, glitchBurst = 0, glitchNext = 0;
+  // (glitchCleared: levels cleared since the glitching began; at 2 the screen turns upside down)
+  let gloopGlitch = false, glitchT = 0, glitchBurst = 0, glitchNext = 0, glitchCleared = 0;
   function takeOverBruno() { if (gloopBrunoNext) { gloopBruno = true; gloopBrunoNext = false; } }
   const APE_GLOOP = { ape_idle: 'gloop_idle', ape_poundL: 'gloop_poundL', ape_poundR: 'gloop_poundR', ape_throw: 'gloop_throw', ape_back: 'gloop_back',
     bruno_ball0: 'gloop_ball0', bruno_ball1: 'gloop_ball1', bruno_ball2: 'gloop_ball2', bruno_ball3: 'gloop_ball3' };
@@ -2027,7 +2039,7 @@
   // On the main menu a press on the dark night sky at the top (where the stars are) goes to The Arcade instead.
   const inNightSky = e => {
     const pt = e.touches ? e.touches[0] : e, r = cv.getBoundingClientRect();
-    return !!pt && r.height > 0 && (pt.clientY - r.top) / r.height * PH < NIGHT_Y;
+    return !!pt && r.height !== 0 && (pt.clientY - r.top) / r.height * PH < NIGHT_Y;
   };
   const ovPressed = e => {
     // (on the main menu a press anywhere but the night sky never starts the game (only Start does): above the
@@ -2734,6 +2746,8 @@
   function win(p) {
     // a knocked-out partner simply comes back on the next level: no heart lost
     phase = 'win'; winT = 160; winner = p.id; bonusLeft = bonus; sfx.win();
+    // (glitching: two more levels cleared and the screen turns upside down, the user asked, with a big burst)
+    if (gloopGlitch && ++glitchCleared >= 2 && !upsideDown) { setUpsideDown(true); glitchNext = glitchT; noise(0.6, 0.12, 6000, 200); }
     bruno = null;   // if Bruno was out rolling, he is simply back at his spot for the level-clear banner
     // every two levels cleared (levels 2, 4, 6...) give the team an extra heart (no limit)
     if (level % 2 === 0) {
@@ -3212,7 +3226,7 @@
     h.gone = true; sfx.smash(); burst(h.x, h.y, 'G', 6);
     brunoStun = 9999;   // (stars over him all through the level-clear banner; the next level clears them)
     toast(`${brunoName()} is defeated!`, '#ffcc3d');
-    if (gloopBruno && !gloopGlitch) { gloopGlitch = true; glitchNext = glitchT + 60; }   // (beating Gloop breaks the game: drawGlitch)
+    if (gloopBruno && !gloopGlitch) { gloopGlitch = true; glitchNext = glitchT + 60; glitchCleared = -1; }   // (beating Gloop breaks the game: drawGlitch; this level's clear doesn't count)
     win(pById(h.by) || players[0]);
     return true;
   }
@@ -5932,7 +5946,9 @@
   // looks like it is breaking, on every screen. Every few seconds comes a burst: strips of the picture slip sideways,
   // ghost copies smear across it, blocks of junk pixels (magenta, cyan, green, black, white) flick on, now and then
   // the whole screen flashes inverted, the screen (menus and all) jerks about, and it buzzes and crackles. In
-  // between, a faint bright line rolls down the screen. It stops once Gloop is back in his shop (into Jupiter).
+  // between, a faint bright line rolls down the screen. After two more levels are cleared, the game picture turns
+  // upside down (setUpsideDown: the menus stay the right way up; the arrows still move the pugs the same way, which
+  // now looks backwards). It all stops once Gloop is back in his shop (into Jupiter).
   const glitchScreen = document.querySelector('.screen');
   const GLITCH_COLS = ['#ff00ff', '#00ffff', '#00ff66', '#000000', '#ffffff', '#ffcc00'];
   function drawGlitch() {
@@ -5971,7 +5987,7 @@
     ctx.restore();
   }
   function stopGlitch() {
-    gloopGlitch = false; glitchBurst = 0;
+    gloopGlitch = false; glitchBurst = 0; glitchCleared = 0; setUpsideDown(false);
     if (glitchScreen) glitchScreen.style.transform = '';
   }
   // ----- Earth's mini-game: Banana Catch (Play on Earth in The Arcade) -----
