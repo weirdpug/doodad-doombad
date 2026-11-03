@@ -616,6 +616,9 @@
   // The Store's Spicy pepper: a glossy, hooked red chili with a leafy jade cap and a cheeky smile
   // (the same face as the succulent's pot). New reds on digit keys: 5 dark red, 6 light red.
   Object.assign(PAL, { 5: '#a8141f', 6: '#ff6a50' });
+  // Gloop's lavender, light, shade and outline on 7, 8, 9 and 0 (used by him and by some of the mission prizes, whose
+  // Customize cards are made at load, so they are added here, before any picture is made)
+  Object.assign(PAL, { 7: '#b48ae0', 8: '#d8c0f4', 9: '#7a54a8', 0: '#3a1f5a' });
   Object.assign(SPRITES, {
     spicy: ["...........21...","..........32....",".........32.....","......1343321...","....13433333221.","...1326R231RR221","...26WWRR2RRR51.","...56WRKRRKR55D.","...56WRKRRKR55D.","....56PRRRRP55D.","....56RKRRK55D..",".....56RKKR55D..",".5...56RRR55D...",".R5..56RRRR5D...",".R5.56RRRR5D....",".5R6RRRRR5D.....","..D5RRR55D......","...DDDDD........"],
   });
@@ -1399,9 +1402,10 @@
     for (const n of new Set(list.map(n => Math.floor(+n)).filter(n => n > 0))) {
       const view = SECS[Math.floor(seeded(n * 104729 + 7)() * SECS.length)];
       if (n === 2) { swap.mission2 = 'browntux'; continue; }
-      const p = PRIZES.find(p => p.view === view && !won.includes(p.item.key));
+      const p = PRIZES.find(p => p.view === view && !won.includes(p.item.key)) || PRIZES.find(p => !won.includes(p.item.key));
       if (!p) continue;
-      won.push(p.item.key); swap['mission' + n] = p.item.key;
+      won.push(p.item.key);
+      if (p.view === view) swap['mission' + n] = p.item.key;   // (a new thing from another section can't go where the old one was)
     }
     try {
       const saved = JSON.parse(localStorage.getItem(LOOKS_KEY));
@@ -1427,8 +1431,9 @@
       out.won = Array.isArray(m.won) ? [...new Set(m.won.filter(k => prizeOf(k)))] : Array.isArray(m.prizes) ? oldPrizes(m.prizes) : [];
       for (const a of m.active) {
         const need = Math.floor(+a.need), mine = prizeOf(a.prize) && !out.won.includes(a.prize) && !out.active.some(b => b.prize === a.prize);
-        out.active.push({ n: Math.max(1, Math.floor(+a.n) || 1), kind: a.kind, need, have: Math.max(0, Math.min(need, Math.floor(+a.have) || 0)), prize: mine ? a.prize : pickPrize() });
+        out.active.push({ n: Math.max(1, Math.floor(+a.n) || 1), kind: a.kind, need, have: Math.max(0, Math.min(need, Math.floor(+a.have) || 0)), prize: mine ? a.prize : undefined });
       }
+      for (const a of out.active) if (a.prize === undefined) a.prize = pickPrize();   // (after all are in, so none takes another's)
     } else for (let n = 1; n <= 3; n++) out.active.push(newMission(n));
     return out;
   })();
@@ -6224,8 +6229,7 @@
   // girder throwing bananas. Each of Bruno's pictures has a Gloop one the same size, swapped in by sprite() while
   // gloopBruno is on (sad, as he stays (the user asked): droopy antennae, heavy-lidded eyes, a frown; from behind for
   // running back in; rolled up, purple with his sad eyes peeking out, for the roll; a taco is still a taco). Going into Jupiter puts him back in his shop, and Bruno back in his job.
-  // (palette 7, 8, 9, 0: his lavender, light, shade and outline; 2: his vest)
-  Object.assign(PAL, { 7: '#b48ae0', 8: '#d8c0f4', 9: '#7a54a8', 0: '#3a1f5a' });
+  // (palette 7, 8, 9, 0: his lavender, light, shade and outline, added to PAL near the top; 2: his vest)
   Object.assign(SPRITES, {
     gloop_idle: ["....................................", "............00.........00...........", "...........0..0.......0..0..........", "..........Y.....00000.....Y.........", "..........Y...008887700...Y.........", "............0088887777700...........", "...........088888000777770..........", "...........080007WWW700070..........", "...........08WWW7WKW7WWW70..........", "..........088WKW77777WKW790.........", "...........077777777777790..........", "...........077777777779990..........", "...........07777KKKKK99990..........", "............007K77779K900...........", "..............077799990.............", ".............022WWWWW220............", "............022RWWWWR2220...........", ".........000222RRDDRR2222000........", ".........072222YRWWRWY222270........", ".........0722222WWWWW2222270........", ".........0722222WWWWW2222270........", ".........072222YWWWWWY222270........", ".........0722222WWWWW2222270........", ".........0722222WWWWW2222270........", "........07772222WWWWW22227770.......", "........0000NNNNNYYYNNNNN0000.......", "............0nnnnnnnnnnn0...........", "............0nnn0...0nnn0...........", "............0nnn0...0nnn0...........", "............0nnn0...0nnn0...........", "..........KKKKKKK...KKKKKKK.........", "...........KKKKK.....KKKKK.........."],
     gloop_poundL: ["....................................", "........000000.........00...........", "........0770..0.......0..0..........", "........0770....00000.....Y.........", ".........00...008887700...Y.........", ".........00.0088887777700...........", ".........07088888000777770..........", ".........07880007WWW700070..........", ".........0788WWW7WKW7WWW70..........", ".........0788WKW77777WKW790.........", ".........07877777777777790..........", ".........07777777777779990..........", ".........0707777KKKKK99990..........", ".........00.007K77779K900...........", ".........00...077799990.............", ".........00..022WWWWW220............", ".........00.022RWWWWR2220...........", "...........0222RRDDRR2222000........", "...........0222YRWWRWY222270........", "...........02222WWWWW2222270........", "...........02222WWWWW2222270........", "...........0222YWWWWWY222270........", "...........02222WWWWW2222270........", "...........02222WWWWW2222270........", "...........02222WWWWW22227770.......", "...........0NNNNNYYYNNNNN0000.......", "............0nnnnnnnnnnn0...........", "............0nnn0...0nnn0...........", "............0nnn0...0nnn0...........", "............0nnn0...0nnn0...........", "..........KKKKKKK...KKKKKKK.........", "...........KKKKK.....KKKKK.........."],
