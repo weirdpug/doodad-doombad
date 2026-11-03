@@ -1043,7 +1043,8 @@
   // (gloopGlitch: Gloop has been beaten in Bruno's job, and the game is glitching: drawGlitch; glitchT: frames since,
   // glitchBurst: frames left of a burst, glitchNext: when the next one comes)
   // (glitchCleared: levels cleared since the glitching began; at 2 the screen turns upside down)
-  let gloopGlitch = false, glitchT = 0, glitchBurst = 0, glitchNext = 0, glitchCleared = 0;
+  // (oldTV: one level after that, it looks like an old television: drawGlitch)
+  let gloopGlitch = false, glitchT = 0, glitchBurst = 0, glitchNext = 0, glitchCleared = 0, oldTV = false;
   function takeOverBruno() { if (gloopBrunoNext) { gloopBruno = true; gloopBrunoNext = false; } }
   const APE_GLOOP = { ape_idle: 'gloop_idle', ape_poundL: 'gloop_poundL', ape_poundR: 'gloop_poundR', ape_throw: 'gloop_throw', ape_back: 'gloop_back',
     bruno_ball0: 'gloop_ball0', bruno_ball1: 'gloop_ball1', bruno_ball2: 'gloop_ball2', bruno_ball3: 'gloop_ball3' };
@@ -2748,6 +2749,8 @@
     phase = 'win'; winT = 160; winner = p.id; bonusLeft = bonus; sfx.win();
     // (glitching: two more levels cleared and the screen turns upside down, the user asked, with a big burst)
     if (gloopGlitch && ++glitchCleared >= 2 && !upsideDown) { setUpsideDown(true); glitchNext = glitchT; noise(0.6, 0.12, 6000, 200); }
+    // (and one level after that, an old television: hard to see, the user asked)
+    else if (gloopGlitch && glitchCleared >= 3 && !oldTV) { oldTV = true; cv.style.filter = 'blur(0.7px) contrast(0.85) brightness(0.95)'; glitchNext = glitchT; noise(1.4, 0.1, 8000, 2500); }
     bruno = null;   // if Bruno was out rolling, he is simply back at his spot for the level-clear banner
     // every two levels cleared (levels 2, 4, 6...) give the team an extra heart (no limit)
     if (level % 2 === 0) {
@@ -5948,7 +5951,9 @@
   // the whole screen flashes inverted, the screen (menus and all) jerks about, and it buzzes and crackles. In
   // between, a faint bright line rolls down the screen. After two more levels are cleared, the game picture turns
   // upside down (setUpsideDown: the menus stay the right way up; the arrows still move the pugs the same way, which
-  // now looks backwards). It all stops once Gloop is back in his shop (into Jupiter).
+  // now looks backwards). One level after that it turns into an old television (oldTV), everything hard to see: the
+  // colours washed out to a dim grey-green, snow fizzing all over, dark scan lines, a dark band rolling down the
+  // screen, dark corners, and the picture a little blurred. It all stops once Gloop is back in his shop (into Jupiter).
   const glitchScreen = document.querySelector('.screen');
   const GLITCH_COLS = ['#ff00ff', '#00ffff', '#00ff66', '#000000', '#ffffff', '#ffcc00'];
   function drawGlitch() {
@@ -5984,10 +5989,42 @@
       if (glitchBurst % 4 === 0) tone(80 + Math.random() * 1200, 0.04, 'square', 0.025);
       if (glitchScreen) glitchScreen.style.transform = `translate(${Math.round((Math.random() - 0.5) * 8)}px, ${Math.round((Math.random() - 0.5) * 4)}px)`;
     } else if (glitchScreen && glitchScreen.style.transform) glitchScreen.style.transform = '';
+    if (oldTV) {
+      if (!tvSnow) buildTV();
+      // (the colours washed out to a dim grey-green)
+      ctx.globalCompositeOperation = 'saturation'; ctx.globalAlpha = 0.85; ctx.fillStyle = '#808080'; ctx.fillRect(0, 0, PW, PH);
+      ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = 1; ctx.fillStyle = '#b8ccb0'; ctx.fillRect(0, 0, PW, PH);
+      ctx.globalCompositeOperation = 'source-over';
+      // (snow fizzing over it, the dark scan lines, a dark band rolling down, and dark corners)
+      ctx.globalAlpha = 0.45; ctx.drawImage(tvSnow[glitchT % tvSnow.length], -Math.floor(Math.random() * 8), -Math.floor(Math.random() * 8)); ctx.globalAlpha = 1;
+      ctx.drawImage(tvLines, 0, 0);
+      const by = (glitchT * 1.5) % (PH + 40) - 40;
+      ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.fillRect(0, by, PW, 30); ctx.fillStyle = 'rgba(255,255,255,0.07)'; ctx.fillRect(0, by + 30, PW, 3);
+      ctx.drawImage(tvVignette, 0, 0);
+    }
     ctx.restore();
+  }
+  // (the old television's snow (a few frames of it), scan lines and dark corners, made once)
+  let tvSnow = null, tvLines = null, tvVignette = null;
+  function buildTV() {
+    tvSnow = [0, 1, 2, 3].map(() => {
+      const c = document.createElement('canvas'); c.width = PW + 8; c.height = PH + 8;
+      const g = c.getContext('2d'), img = g.createImageData(c.width, c.height), d = img.data;
+      for (let i = 0; i < d.length; i += 4) { const v = Math.random() * 255; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = Math.random() < 0.6 ? 255 : 0; }
+      g.putImageData(img, 0, 0);
+      return c;
+    });
+    tvLines = document.createElement('canvas'); tvLines.width = PW; tvLines.height = PH;
+    const l = tvLines.getContext('2d'); l.fillStyle = 'rgba(0,0,0,0.35)';
+    for (let y = 0; y < PH; y += 2) l.fillRect(0, y, PW, 1);
+    tvVignette = document.createElement('canvas'); tvVignette.width = PW; tvVignette.height = PH;
+    const v = tvVignette.getContext('2d'), gr = v.createRadialGradient(PW / 2, PH / 2, PH * 0.25, PW / 2, PH / 2, PH * 0.75);
+    gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.75)');
+    v.fillStyle = gr; v.fillRect(0, 0, PW, PH);
   }
   function stopGlitch() {
     gloopGlitch = false; glitchBurst = 0; glitchCleared = 0; setUpsideDown(false);
+    oldTV = false; cv.style.filter = '';
     if (glitchScreen) glitchScreen.style.transform = '';
   }
   // ----- Earth's mini-game: Banana Catch (Play on Earth in The Arcade) -----
