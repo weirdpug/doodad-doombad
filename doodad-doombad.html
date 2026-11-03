@@ -4272,8 +4272,11 @@
     try { initAudio(); } catch (e) {}
     sfx.rumble();
   }
-  // the castle's doorway, open and dark (Bruno coming out, a pug going in)
+  // the castle's doorway, open and dark (Bruno coming out, a pug going in); titleDoorOpen: whether it was drawn open
+  // in the last frame (Gloop can be put in through it)
+  let titleDoorOpen = false;
   function drawDoorway() {
+    titleDoorOpen = true;
     ctx.fillStyle = '#11132a';
     for (let y = CASTLE_Y - 21; y < CASTLE_Y; y++) { const r = y - CASTLE_Y + 21, inset = r < 5 ? [6, 3, 2, 1, 0][r] : 0; ctx.fillRect(109 + inset, y, 22 - inset * 2, 1); }
   }
@@ -4520,7 +4523,7 @@
   const holdables = () => [brunoOut, ...freePugs, ...freeFish, spaceGloop, titleGloop];
   const heldBy = id => holdables().find(o => o && o.grab && o.grab.id === id);
   const dragHeld = (o, [x, y]) => { o.grab.x = x; o.grab.y = y; };
-  const dropHeld = o => o === brunoOut ? dropBruno() : o === spaceGloop ? letGloopGo() : dropFree(o);
+  const dropHeld = o => o === brunoOut ? dropBruno() : o === spaceGloop ? letGloopGo() : o === titleGloop ? dropTitleGloop() : dropFree(o);
   function drawFreePugs() {
     for (const f of freePugs) {
       f.t++;
@@ -4658,6 +4661,7 @@
   ov.addEventListener('touchend', fingersOff);
   ov.addEventListener('touchcancel', fingersOff);
   function drawTitleScene() {
+    titleDoorOpen = false;
     if (!titleBgReady) { buildTitleBg(); titleBgReady = true; }
     if (titleNight && !titleNightReady) { buildTitleNight(); titleNightReady = true; }
     ctx.drawImage(titleNight ? titleNightBg : titleBg, 0, 0);
@@ -5845,12 +5849,35 @@
   // Gloop on the main menu, sent there by the mother ship's blast: sad, he just stands on the grass, blinking now and
   // then. Like Bruno he can be picked up (mouse, finger, or a controller's square with A held) and dragged anywhere,
   // dangling and swinging a little; let go, he drops to the ground (with a thud, or a splash in the moat) and stands
-  // there again. (titleGloop: his feet, x and y; state 'fall', 'stand' or 'held'; the rest as for the pugs)
+  // there again. If the castle's gate is open (Bruno out, or a pug going in) and he is let go at it, he goes into the
+  // castle (the user asked) and is gone from the main menu. (titleGloop: his feet, x and y; state 'fall', 'stand',
+  // 'held' or 'in'; the rest as for the pugs)
+  // (let go at the castle's open gate, his feet at the door or on the drawbridge: he goes in; anywhere else he drops)
+  function dropTitleGloop() {
+    const g = titleGloop;
+    if (titleDoorOpen && g.x > 100 && g.x < 140 && g.y > 126 && g.y < 172) {
+      g.grab = null; g.state = 'in'; g.t = 0; g.x0 = g.x; g.y0 = g.y;
+      tone(330, 0.2, 'sine', 0.04, -150);
+      if (ov.style.cursor) ov.style.cursor = '';
+      return;
+    }
+    dropFree(g);
+  }
   function drawTitleGloop() {
     const g = titleGloop;
     if (!gloopPics) gloopPics = Object.fromEntries(Object.entries(GLOOP).map(([k, v]) => [k, bakeWith(v, GLOOP_COLS)]));
     g.t++;
     let ang = 0;
+    if (g.state === 'in') {
+      // (going in at the castle's gate: off into the doorway, smaller and smaller, and the door shuts behind him;
+      // he is in the castle now, so he doesn't drop out of the sky again)
+      const k = Math.min(1, g.t / 20), sc = 1 - 0.6 * k, x = g.x0 + (120 - g.x0) * k, y = g.y0 + (CASTLE_Y - g.y0) * k;
+      drawDoorway();
+      if (k < 1) ctx.drawImage(gloopPics.sad, Math.round(x - 11 * sc), Math.round(y - 36 * sc), Math.round(22 * sc), Math.round(36 * sc));
+      g.box = null;
+      if (g.t > 26) { titleGloop = null; gloopOnMenu = false; sfx.rumble(); }
+      return;
+    }
     if (g.state === 'held') {
       g.x = clamp(g.grab.x - g.grab.dx, -10, PW + 10); g.y = clamp(g.grab.y - g.grab.dy, 30, PH + 20);
       ang = Math.sin(g.t / 4) * 0.15;   // (dangling, swinging his legs)
