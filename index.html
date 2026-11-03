@@ -2114,7 +2114,10 @@
     fromTitle = false; phase = 'title';
     mother = { state: 'gone', t: 0 };   // (back on the main menu, the mother ship has gone: the user asked for that)
     spaceGloop = null;   // (and so has Gloop, if he was floating in space)
-    stopGlitch();   // (and the game is back to normal: no glitching, the right way up, no old television; the user asked)
+    // (and after the glitching the game is back to normal: no glitching, the right way up, no old television, and
+    // Bruno back in his own job, Gloop back in his shop; the user asked)
+    if (gloopGlitch) { gloopBruno = false; gloopBrunoNext = false; }
+    stopGlitch();
     // (unless the mother ship's blast sent him here: then he drops out of the sky onto the grass, and stays)
     if (gloopOnMenu && !titleGloop) { titleGloop = { gloop: true, x: 34, y: -40, state: 'fall', t: 0, vy: 0, land: 214, box: null, grab: null }; tone(1200, 0.7, 'sine', 0.03, -900); }
     for (const pl of SPACE_PLANETS) { pl.shipGone = false; pl.deepGone = []; }   // (and the blown-up spaceships are back)
