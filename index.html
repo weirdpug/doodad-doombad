@@ -1235,6 +1235,123 @@
       put: (who, n) => `${n.name} ${n.are ? 'are' : 'is'} following ${who}!`, took: (who, n) => `${who} sent ${n.name} home.`,
       full: who => `${who} can't bring any more pets! Send one home first.` },
   };
+  // ----- Gloop's missions (the user asked 2026-11-02) -----
+  // The list pinned on the wall of Gloop's shop (inside Jupiter) holds three missions at a time, picked at random from
+  // things all over the game, and they never run out: each one done is replaced by the next, a little harder as they
+  // go on. A done mission's prize is a Customize thing of its own, unlocked for every pug: one of the free suits, hats,
+  // necklaces or pets in new random colours (a "Pink Top Hat"), made up from the mission's number, so it is the same
+  // every time. After MISSION_PRIZES (70) of those, the prize is coins instead, for every pug playing (the user
+  // asked). Kept in the browser (MISSIONS_KEY): the next mission's number, the three on the list (what each is, how
+  // many it needs and how far along it is), how many are done, and the numbers of the ones that won a prize (to make
+  // the prizes again on loading).
+  const MISSIONS_KEY = 'doodad-doombad-missions', MISSION_PRIZES = 70;
+  const MISSION_KINDS = [
+    { kind: 'levels', base: 2, say: n => `CLEAR ${n} LEVELS` },
+    { kind: 'coins', base: 30, say: n => `COLLECT ${n} COINS` },
+    { kind: 'jump', base: 8, say: n => `JUMP OVER ${n} BARRELS` },
+    { kind: 'smash', base: 4, say: n => `SMASH ${n} BARRELS` },
+    { kind: 'bananas', base: 10, say: n => `CATCH ${n} BANANAS ON EARTH` },
+    { kind: 'boops', base: 3, say: n => `BOOP ${n} MARTIANS ON MARS` },
+    { kind: 'rows', base: 20, say: n => `HOP ${n} ROWS ON SATURN` },
+    { kind: 'racewin', base: 1, say: n => `WIN ${n} MOON RACE${n === 1 ? '' : 'S'}` },
+    { kind: 'arenawin', base: 1, say: n => `WIN ${n} COLOSSEUM FIGHT${n === 1 ? '' : 'S'}` },
+    { kind: 'burritos', base: 3, say: n => `HIT GLOOP WITH ${n} BURRITOS` },
+    { kind: 'clouds', base: 3, say: n => `POOF ${n} CLOUDS` },
+    { kind: 'fireworks', base: 5, say: n => `LAUNCH ${n} FIREWORKS` },
+    { kind: 'fish', base: 3, say: n => `MAKE ${n} FISH JUMP` },
+  ];
+  // (random numbers that are always the same for the same seed)
+  const seeded = seed => () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  // (mission number n, new on the list: something to do that none of the others on it is, and how many: half as many
+  // again every 10 missions, up to three times as many from the 40th on)
+  function newMission(n) {
+    const r = seeded(n * 7919 + 13), on = new Set(missions ? missions.active.map(m => m.kind) : []);
+    let i = Math.floor(r() * MISSION_KINDS.length);
+    while (on.has(MISSION_KINDS[i].kind)) i = (i + 1) % MISSION_KINDS.length;
+    return { n, kind: MISSION_KINDS[i].kind, need: Math.round(MISSION_KINDS[i].base * (1 + Math.min(4, Math.floor(n / 10)) * 0.5)), have: 0 };
+  }
+  const missionSay = m => MISSION_KINDS.find(k => k.kind === m.kind).say(m.need);
+  // the free things a prize is made from: its Customize section, its key, and a short name for it
+  const PRIZE_BASES = [['suits', 'underwear', 'Underwear'], ['suits', 'tuxedo', 'Tuxedo'], ['suits', 'knight', 'Knight Armor'],
+    ['hats', 'tophat', 'Top Hat'], ['hats', 'glasses1', 'Round Glasses'], ['hats', 'glasses2', 'Half-Moon Glasses'], ['hats', 'helmet', 'Knight Helmet'],
+    ['necklaces', 'alpha', 'Dollar Necklace'], ['necklaces', 'tie', 'Tie'],
+    ['pets', 'turd', 'Bird'], ['pets', 'joe', 'Donkey'], ['pets', 'burrito', 'Burrito'], ['pets', 'human', 'Human']];
+  const PRIZE_COLS = ['R', 'B', 'V', 'Y', 'P', 'Q', 'M', 'F', 'C', 'g', 'n', 'D', 'O', 'G', 'L', 'N', 'W', 'H'];
+  const COL_NAMES = { R: 'Red', B: 'Blue', V: 'Sky Blue', Y: 'Yellow', P: 'Pink', Q: 'Plum', M: 'Rose', F: 'Orange', C: 'Cyan', g: 'Green', n: 'Navy',
+    D: 'Maroon', O: 'Amber', G: 'Silver', L: 'Tan', N: 'Brown', W: 'White', H: 'Grey' };
+  const prizeBase = n => PRIZE_BASES[Math.floor(seeded(n * 104729 + 7)() * PRIZE_BASES.length)];
+  // Mission n's prize: its base's pictures (every pose, and its card) copied with each of their colours but black (and
+  // white, unless most of it is white) swapped for a random one, under its own key (mission<n>), named for the colour
+  // most of it now is
+  function makePrize(n) {
+    const r = seeded(n * 104729 + 7), [view, baseKey, baseName] = PRIZE_BASES[Math.floor(r() * PRIZE_BASES.length)];
+    const sec = LOOK_SECTIONS[view], base = sec.list.find(x => x.key === baseKey), key = 'mission' + n;
+    const had = sec.list.find(x => x.key === key);
+    if (had) return { view, item: had };
+    const card = SPRITES[baseKey + '_' + sec.pic], map = {}, counts = {};
+    for (const ch of card.join('')) if (!'.K'.includes(ch)) counts[ch] = (counts[ch] || 0) + 1;
+    const main = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
+    for (const ch of Object.keys(counts)) if (ch !== 'W' || main === 'W') map[ch] = PRIZE_COLS[Math.floor(r() * PRIZE_COLS.length)];
+    for (const name of Object.keys(SPRITES)) {
+      if (name.startsWith(baseKey + '_')) SPRITES[key + name.slice(baseKey.length)] = SPRITES[name].map(row => [...row].map(ch => map[ch] || ch).join(''));
+    }
+    const top = Object.keys(map).sort((a, b) => counts[b] - counts[a])[0], colour = COL_NAMES[map[top]] || 'Mystery';
+    let name = `${colour} ${baseName}`;
+    for (let k = 2; sec.list.some(x => x.name === name); k++) name = `${colour} ${baseName} ${k}`;
+    const item = { key, name, what: `the ${name}`, alt: `A ${name.toLowerCase()} from Gloop's missions`, prize: n };
+    if (view === 'hats') item.h = base.h;
+    if (view === 'pets') { item.kind = base.kind; for (const f of ['farts', 'hops', 'leash']) if (base[f]) item[f] = base[f]; }
+    sec.list.push(item);
+    return { view, item };
+  }
+  let missions = null;
+  missions = (() => {
+    try {
+      const m = JSON.parse(localStorage.getItem(MISSIONS_KEY));
+      if (m && Array.isArray(m.active) && m.active.length === 3 && Array.isArray(m.prizes)
+        && m.active.every(a => a && MISSION_KINDS.some(k => k.kind === a.kind) && Math.floor(+a.need) > 0)) {
+        return { next: Math.max(4, Math.floor(+m.next) || 4), done: Math.max(0, Math.floor(+m.done) || 0),
+          active: m.active.map(a => ({ n: Math.max(1, Math.floor(+a.n) || 1), kind: a.kind, need: Math.floor(+a.need), have: Math.max(0, Math.min(Math.floor(+a.need), Math.floor(+a.have) || 0)) })),
+          prizes: [...new Set(m.prizes.map(n => Math.floor(+n)).filter(n => n > 0))].slice(0, MISSION_PRIZES) };
+      }
+    } catch (e) {}
+    const fresh = { next: 4, done: 0, active: [], prizes: [] };
+    missions = fresh;
+    for (let n = 1; n <= 3; n++) fresh.active.push(newMission(n));
+    return fresh;
+  })();
+  for (const n of missions.prizes) makePrize(n);   // (the prizes already won, back in Customize)
+  function saveMissions() { try { localStorage.setItem(MISSIONS_KEY, JSON.stringify(missions)); } catch (e) {} }
+  // something a mission counts just happened (amount of it): every mission on the list for it moves on, and one that
+  // is done gives its prize and makes way for the next
+  function missionEvent(kind, amount = 1) {
+    let changed = false;
+    for (const [i, m] of missions.active.entries()) {
+      if (m.kind !== kind) continue;
+      m.have = Math.min(m.need, m.have + amount); changed = true;
+      if (m.have >= m.need) completeMission(i);
+    }
+    if (changed) saveMissions();
+  }
+  // (what the list says a mission's prize will be)
+  const prizeWord = n => missions.prizes.length < MISSION_PRIZES ? `A NEW ${{ suits: 'SUIT', hats: 'HAT', necklaces: 'NECKLACE', pets: 'PET' }[prizeBase(n)[0]]}` : `${missionCoins()} COINS`;
+  const missionCoins = () => 20 + 5 * Math.floor(missions.done / 10);
+  function completeMission(i) {
+    const m = missions.active[i];
+    if (missions.prizes.length < MISSION_PRIZES) {
+      missions.prizes.push(m.n);
+      const { view, item } = makePrize(m.n);
+      addLookCard(view, LOOK_SECTIONS[view], item);
+      toast(`Mission done! You unlocked the ${item.name}. Find it in Customize.`, '#b48ae0'); sfx.oneUp();
+    } else {
+      const n = missionCoins();
+      for (let i = 0; i < 4; i++) if (joined[i]) coins[i] += n;
+      saveCoins(); updateHud(true);
+      toast(`Mission done! Every pug got ${n} coins.`, '#ffcc3d'); sfx.coin();
+    }
+    missions.done++;
+    missions.active[i] = newMission(missions.next++);   // (the next mission takes its place: not this one again, nor the other two)
+  }
   function loadLooks() {
     const l = [0, 1, 2, 3].map(() => ({ suit: '', hat: '', necklace: '', pets: [] }));
     try {
@@ -1384,6 +1501,7 @@
   // Coins: a spinning coin pops out where it was earned, with a "+N" and a ding
   function giveCoins(n, x, y, id) {
     coins[id || 0] += n;
+    missionEvent('coins', n);
     saveCoins();
     pops.push({ coin: true, n, x, y, vy: -2.6, t: 46 });
     sfx.coin();
@@ -2229,7 +2347,9 @@
   // (the cards sit in a row that scrolls sideways like the Store's, so more things never squeeze it)
   const lookShelf = document.getElementById('lookShelf'), lookScroll = document.getElementById('lookScroll'),
     lookItems = document.getElementById('lookItems');
-  for (const [view, sec] of Object.entries(LOOK_SECTIONS)) for (const n of sec.list) {
+  for (const [view, sec] of Object.entries(LOOK_SECTIONS)) for (const n of sec.list) addLookCard(view, sec, n);
+  // (one thing's card; also for a mission prize won while playing)
+  function addLookCard(view, sec, n) {
     const card = document.createElement('div'), pic = document.createElement('div'), img = document.createElement('img'),
       name = document.createElement('span'), wear = document.createElement('button');
     card.className = 'item'; pic.className = 'pic'; img.alt = n.alt;
@@ -2329,7 +2449,7 @@
     arcade: () => [
       ...(arcadeZoom.target && !arcadeZoom.out && !onShip() && !arcadeZoom.target.shop ? [{ label: 'Play', act: by => playFromArcade(by) }] : []),
       // (zoomed in on the spaceship, Back zooms out to Saturn first)
-      { label: 'Back', act: () => deepLive() ? deepOut() : onShip() ? shipOut() : arcadeZoom.target && !arcadeZoom.out ? zoomOut() : backToTitle() },
+      { label: 'Back', act: () => deepLive() ? deepOut() : onShip() ? shipOut() : inShop() && shop.listOpen ? closeMissionList() : arcadeZoom.target && !arcadeZoom.out ? zoomOut() : backToTitle() },
     ],
     custom: () => [
       ...CUSTOM_PARTS.map(c => ({ label: c.name, act: by => showPause(c.view, 0, null, by) })),
@@ -2540,6 +2660,7 @@
   function menuBack() {
     if (pauseView === 'arcade' && deepLive()) return deepOut();
     if (pauseView === 'arcade' && onShip()) return shipOut();   // (Esc or B zooms out of the spaceship first,
+    if (pauseView === 'arcade' && inShop() && shop.listOpen) return closeMissionList();   // (or puts Gloop's mission list back,
     if (pauseView === 'arcade' && arcadeZoom.target && !arcadeZoom.out) return zoomOut();   // then out of the planet)
     const part = CUSTOM_PARTS.findIndex(c => c.view === pauseView);
     if (part >= 0) showPause('custom', part);   // (from Suits, Hats or Necklaces back to Customize)
@@ -2755,6 +2876,7 @@
   function win(p) {
     // a knocked-out partner simply comes back on the next level: no heart lost
     phase = 'win'; winT = 160; winner = p.id; bonusLeft = bonus; sfx.win();
+    missionEvent('levels');
     // (glitching: two more levels cleared and the screen turns upside down, the user asked, with a big burst)
     if (gloopGlitch && ++glitchCleared >= 2 && !upsideDown) { setUpsideDown(true); glitchNext = glitchT; noise(0.6, 0.12, 6000, 200); }
     // (and one level after that, an old television: hard to see, the user asked)
@@ -3173,7 +3295,7 @@
       pops.push({ x: fire.x, y: fire.y - 34, text: 'STUNNED!', t: 60 });
     } else if (hit) {
       ex = hit.x; ey = hit.y;
-      hit.dead = true; addScore(300, hit.x, hit.y - 10, p.id); giveCoins(3, hit.x, hit.y - 4, p.id); sfx.smash();
+      hit.dead = true; addScore(300, hit.x, hit.y - 10, p.id); giveCoins(3, hit.x, hit.y - 4, p.id); sfx.smash(); missionEvent('smash');
       burst(hit.x, hit.y, hit.disco ? 'G' : hit.taco ? 'T' : 'O', 8);
     } else burst(ex, ey, 'Y', 3);   // (a miss sparks off the wall or the girder's end)
     shots.push({ x0: mx, y0: my, x1: ex, y1: ey, t: 8 });
@@ -3290,7 +3412,7 @@
       const b = barrels.find(b => !b.dead && Math.hypot(b.x - h.x, b.y - h.y) < 16);
       if (b) {
         b.dead = true; h.gone = true;
-        addScore(300, b.x, b.y - 10, h.by); giveCoins(3, b.x, b.y - 4, h.by); sfx.smash();
+        addScore(300, b.x, b.y - 10, h.by); giveCoins(3, b.x, b.y - 4, h.by); sfx.smash(); missionEvent('smash');
         burst(b.x, b.y, b.disco ? 'G' : 'O', 8); burst(h.x, h.y, 'G', 6);   // (a disco ball breaks into silver bits)
         continue;
       }
@@ -3348,7 +3470,7 @@
       if (P.hammer > 0 && P.state !== 'climb') {   // (the hammer is put away on a ladder)
         const z = hammerZone(P);
         if (Math.hypot(b.x - z.x, b.y - z.y) < 18) {
-          b.dead = true; addScore(300, b.x, b.y - 10, id); giveCoins(3, b.x, b.y - 4, id); sfx.smash();
+          b.dead = true; addScore(300, b.x, b.y - 10, id); giveCoins(3, b.x, b.y - 4, id); sfx.smash(); missionEvent('smash');
           for (let i = 0; i < 8; i++) pops.push({ x: b.x, y: b.y, vx: (Math.random() - .5) * 4, vy: -Math.random() * 3, t: 30, chip: true, color: b.disco ? 'G' : 'O' });
           continue;
         }
@@ -3357,7 +3479,7 @@
       if (!P.safe && (b.x - cx) ** 2 + (b.y - cy) ** 2 < (R - 1.5) ** 2) return die(P);
       b.scored = b.scored || [false, false, false, false];
       if (!b.scored[id] && P.state === 'air' && Math.abs(b.x - P.x) < 10 && b.y > P.y && b.y - P.y < 56) {
-        b.scored[id] = true; addScore(100, P.x, P.y - 34, id); giveCoins(1, b.x, b.y - 4, id); sfx.score();
+        b.scored[id] = true; addScore(100, P.x, P.y - 34, id); giveCoins(1, b.x, b.y - 4, id); sfx.score(); missionEvent('jump');
       }
     }
   }
@@ -4178,6 +4300,7 @@
     const c = titleCloud(i);
     cloudGone[i] = c.lap; titleTapT = performance.now();
     cloudPoofs.push({ x: c.x + c.w / 2, y: c.y - 1, w: c.w, col: i === 2 ? '#e8a0a8' : '#c8a6d8', t: CLOUD_POOF });
+    missionEvent('clouds');
     try { initAudio(); } catch (e) {}
     sfx.poof();
   }
@@ -4195,6 +4318,7 @@
     const sx = clamp(tx + (Math.random() * 2 - 1) * 24, 4, PW - 4), sy = PH + 4;
     const T = Math.round(18 + Math.hypot(tx - sx, ty - sy) / 8);
     rockets.push({ sx, sy, tx, ty, t: 0, T, col: FW_COLS[fwNext++ % FW_COLS.length] });
+    missionEvent('fireworks');
     try { initAudio(); } catch (e) {}
     sfx.whistle(T / 60);
   }
@@ -4260,6 +4384,7 @@
     let dir = Math.random() < 0.5 ? -1 : 1, dx = dir * (8 + Math.random() * 6);
     if (!onMoat([x + dx, y])) { dir = -dir; dx = -dx; if (!onMoat([x + dx, y])) dx = 0; }
     fishes.push({ x0: x, y0: y, dx, dir, h: 14 + Math.random() * 8, t: 0, T: 36 });
+    missionEvent('fish');
     splash(x, y);
     try { initAudio(); } catch (e) {}
     sfx.bloop();
@@ -4815,8 +4940,9 @@
   // (zooming in or out redoes The Arcade's screen: its title, and Play shown or gone)
   function zoomTo(p) { arcadeZoom = { target: p, p: 0, out: false, ship: null, shop: p.shop ? { p: 0 } : null };
     if (p.shop) { spaceGloop = null; titleGloop = null; gloopOnMenu = false; gloopBruno = false; gloopBrunoNext = false; stopGlitch(); }   // (back in his shop; Bruno back in his job, and no more glitching)
-    if (p.shop) Object.assign(shop, { sad: false, tearT: 0, hitT: 0, whyT: 0, ammo: [], mess: [], bits: [], stains: [], lamp: 'up', lampY: 0, lampV: 0, ko: false, koT: 0, window: 'whole', suck: null, gone: false, wind: [] });   // (Gloop happy and clean again)
+    if (p.shop) Object.assign(shop, { sad: false, tearT: 0, hitT: 0, whyT: 0, ammo: [], mess: [], bits: [], stains: [], lamp: 'up', lampY: 0, lampV: 0, ko: false, koT: 0, window: 'whole', suck: null, gone: false, wind: [], listOpen: false });   // (Gloop happy and clean again)
     showPause('arcade', 0); sfx.tick(); }
+  function closeMissionList() { shop.listOpen = false; sfx.tick(); }
   function zoomOut() { if (!arcadeZoom.target || arcadeZoom.out) return; arcadeZoom.out = true; arcadeZoom.ship = arcadeZoom.deep = null; showPause('arcade', 0); sfx.tick(); }
   // (zoomed in on the spaceship, or on the way)
   const onShip = () => !!(arcadeZoom.ship && !arcadeZoom.ship.out);
@@ -5301,7 +5427,7 @@
   // (the mouse pointer turns into a hand over a planet, or a tiny ship)
   ov.addEventListener('pointermove', e => {
     if (!(fromTitle && pauseView === 'arcade')) { if (ov.style.cursor) ov.style.cursor = ''; return; }
-    const c = inShop() ? (e.target.closest('button') ? '' : 'crosshair') : spaceGloop && !arcadeZoom.target && !e.target.closest('button') && onSpaceGloop(e) ? (spaceGloop.grab ? 'grabbing' : 'grab') : arcadeZoom.target || (!e.target.closest('button') && (planetAt(e) || fleetNear(e) >= 0)) ? 'pointer' : '';
+    const c = inShop() ? (e.target.closest('button') ? '' : shop.listOpen || onMissionList(e) ? 'pointer' : 'crosshair') : spaceGloop && !arcadeZoom.target && !e.target.closest('button') && onSpaceGloop(e) ? (spaceGloop.grab ? 'grabbing' : 'grab') : arcadeZoom.target || (!e.target.closest('button') && (planetAt(e) || fleetNear(e) >= 0)) ? 'pointer' : '';
     if (ov.style.cursor !== c) ov.style.cursor = c;
   });
   function buildSpaceBg() {
@@ -5578,7 +5704,7 @@
   // [x, y, colour] from his top left; bits: bits flying off; stains: splats left on the shop, [x, y, colour])
   // (whyT: frames left of his WHY?)
   let gloopPics = null, shopBg = null, shop = { sad: false, tearT: 0, hitT: 0, whyT: 0, ammo: [], mess: [], bits: [], stains: [], lamp: 'up', lampY: 0, lampV: 0, lampX: 120, ko: false, koT: 0,
-    window: 'whole', suck: null, gone: false, wind: [] };
+    window: 'whole', suck: null, gone: false, wind: [], listOpen: false };
   // (window: 'whole' or 'broken'; suck: Gloop being sucked out, { t, from }; gone: he has been; wind: streaks of air)
   // (lamp: 'up' on its cord, 'fall' (lampY: how far it has dropped, lampV: how fast; lampX: where it snapped), 'down'
   // on Gloop's head (falling over with him), or 'gone', left behind the counter when he got up; ko: knocked out by it, koT: frames since: wobbling with the
@@ -5598,7 +5724,15 @@
     return x >= GLOOP_X && x < GLOOP_X + 44 && y >= GLOOP_Y && y < 192;
   }
   // (a click in the shop: a burrito thrown at Gloop if it is on him, or at that exact spot)
+  // (the mission list pinned on the wall, right of Gloop)
+  function onMissionList(e) {
+    const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * PW, y = (e.clientY - r.top) / r.height * PH;
+    return x >= 168 && x < 226 && y >= 115 && y < 160;
+  }
+  // (or, on the mission list, a look at it close up; with it up, any click puts it back)
   function shopClick(e) {
+    if (shop.listOpen) { shop.listOpen = false; sfx.tick(); return; }
+    if (onMissionList(e)) { shop.listOpen = true; sfx.tick(); return; }
     if (shop.ammo.length >= 8) return;
     const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * PW, y = (e.clientY - r.top) / r.height * PH;
     shop.ammo.push({ t: 0, at: onGloop(e) && !gloopDown() && !shop.gone && !shop.suck ? null : [x, y] }); sfx.toss();   // (not at him while he's down or gone)
@@ -5664,6 +5798,18 @@
       for (let i = 0; i < 7; i++) { const an = i * 0.9 + 0.3; for (let r = 7; r < 16; r++) ctx.fillRect(Math.round(PORT[0] + Math.cos(an + Math.sin(r * 1.7) * 0.12) * r), Math.round(PORT[1] + Math.sin(an + Math.sin(r * 1.7) * 0.12) * r), 1, 1); }
       for (let i = 0; i < 16; i++) { const an = i / 16 * Math.PI * 2, r = 5 + (i % 2) * 2; ctx.fillRect(Math.round(PORT[0] + Math.cos(an) * r), Math.round(PORT[1] + Math.sin(an) * r), 1, 1); }
     }
+    // (the mission list pinned on the wall: a line for each of the three missions on it, inked in as far as it has got)
+    ctx.fillStyle = 'rgba(20,10,4,0.35)'; ctx.fillRect(172, 119, 54, 40);
+    ctx.fillStyle = '#3e2414'; ctx.fillRect(169, 116, 55, 41);
+    ctx.fillStyle = '#fff6e0'; ctx.fillRect(170, 117, 53, 39);
+    ctx.fillStyle = '#e8282f'; ctx.fillRect(195, 114, 3, 3); ctx.fillStyle = '#ff8a8a'; ctx.fillRect(195, 114, 1, 1);
+    drawText('MISSIONS', 197, 121, 'black', 'center');
+    missions.active.forEach((m, i) => {
+      const y = 133 + i * 8, k = Math.round(36 * m.have / m.need);
+      ctx.fillStyle = '#3e2414'; ctx.fillRect(174, y, 5, 5); ctx.fillStyle = '#fff6e0'; ctx.fillRect(175, y + 1, 3, 3);
+      ctx.fillStyle = '#c8b898'; ctx.fillRect(183, y + 2, 36, 1);
+      ctx.fillStyle = '#3e2414'; ctx.fillRect(183, y + 2, k, 1);
+    });
     for (const [x, y, col] of shop.stains) { ctx.fillStyle = col; ctx.fillRect(x, y, 2, 2); }   // (burrito splats)
     // the lamp, swinging a little on its cord, and its warm glow; once a burrito snaps it down, just the cord's
     // stub swinging (the lamp itself drops, and lands on Gloop, further down)
@@ -5779,7 +5925,7 @@
       }
       {
         // (splat on Gloop: he flinches and turns sad, some of it sticks to his face, the rest flies off)
-        shop.sad = true; shop.hitT = 20;
+        shop.sad = true; shop.hitT = 20; missionEvent('burritos');
         if (!shop.ko) { shop.tearT = SHOP_TEAR; shop.whyT = 150; }   // (knocked out, he doesn't notice)
         for (let i = 0; i < 6 && shop.mess.length < 40; i++) shop.mess.push([8 + Math.floor(Math.random() * 28), 6 + Math.floor(Math.random() * 20), BURRITO_BITS[i % BURRITO_BITS.length]]);
         noise(0.25, 0.16, 1400, 200); tone(140, 0.15, 'square', 0.05, -60); tone(392, 0.35, 'sine', 0.04, -120, 0.35); tone(294, 0.5, 'sine', 0.035, -90, 0.65);   // (splat, then a sad sigh)
@@ -5823,6 +5969,28 @@
       for (let i = 0; i < 4; i++) { ctx.fillStyle = '#3e2414'; ctx.fillRect(117 + i, 132 + i, 8 - i * 2, 1); ctx.fillStyle = '#fff6e0'; ctx.fillRect(118 + i, 132 + i, Math.max(0, 6 - i * 2), 1); }
       drawText('WHY?', 120, 121, 'black', 'center');
     }
+    if (shop.listOpen && inShop()) drawMissionList();
+  }
+  // the mission list up close, over the shop: each mission, how far along it is, and what it will win
+  function drawMissionList() {
+    ctx.fillStyle = 'rgba(12,6,20,0.55)'; ctx.fillRect(0, 0, PW, PH);
+    ctx.fillStyle = '#3e2414'; ctx.fillRect(10, 62, 220, 184);
+    ctx.fillStyle = '#fff6e0'; ctx.fillRect(11, 63, 218, 182);
+    ctx.fillStyle = '#e8282f'; ctx.fillRect(118, 59, 4, 4); ctx.fillStyle = '#ff8a8a'; ctx.fillRect(118, 59, 1, 1);
+    drawText("GLOOP'S MISSIONS", 120, 69, 'black', 'center');
+    ctx.fillStyle = '#c8b898'; ctx.fillRect(20, 79, 200, 1);
+    missions.active.forEach((m, i) => {
+      const y = 86 + i * 46, prize = 'PRIZE: ' + prizeWord(m.n);
+      drawText(missionSay(m), 20, y, 'black');
+      ctx.fillStyle = '#3e2414'; ctx.fillRect(20, y + 10, 200, 7);
+      ctx.fillStyle = '#e8dcc0'; ctx.fillRect(21, y + 11, 198, 5);
+      ctx.fillStyle = '#5fd068'; ctx.fillRect(21, y + 11, Math.round(198 * m.have / m.need), 5);
+      drawText(`${m.have} OF ${m.need}`, 20, y + 21, 'black');
+      drawText(prize, 220 - (prize.length * 6 - 1), y + 21, 'red');
+      if (i < 2) { ctx.fillStyle = '#c8b898'; ctx.fillRect(20, y + 35, 200, 1); }
+    });
+    drawText(`MISSIONS DONE: ${missions.done}`, 120, 218, 'black', 'center');
+    drawText('CLICK TO PUT IT BACK', 120, 231, 'black', 'center');
   }
   // Gloop in space (the user asked 2026-11-02): once the broken window has sucked him out of his shop, leaving the
   // shop finds him floating in space, out of Jupiter's red spot, sad and slowly tumbling, drifting about and bouncing
@@ -6111,7 +6279,7 @@
       it.x += it.vx; it.vy += it.gr; it.y += it.vy; it.spin++;
       if (g.lost) continue;
       if (it.vy > 0 && prevY < bowl.top && it.y >= bowl.top && Math.abs(it.x - bowl.cx) <= bowl.half) {
-        it.caught = true; g.score++; sfx.coin();
+        it.caught = true; g.score++; sfx.coin(); missionEvent('bananas');
         g.plus.push({ x: bowl.cx, y: bowl.top - 4, t: 30 });
       } else if (it.y >= BANANA_GROUND) { it.dead = true; g.lost = 1; g.splat = { x: it.x }; sfx.die(); }
     }
@@ -6357,7 +6525,7 @@
         const w = alive.length === 1 ? alive[0] : null;
         g.result = { winner: w ? w.id : null, lost: !w && alive.length > 1 };
         g.endT = 150;
-        if (w && !w.cpu) sfx.hammer();
+        if (w && !w.cpu) { sfx.hammer(); missionEvent('arenawin'); }
       }
     }
     if (g.result && --g.endT <= 0) { phase = 'paused'; showPause('arenaOver', 0); }
@@ -6614,7 +6782,7 @@
         if (c === cam) tone(500, 0.3, 'sawtooth', 0.04, 900);
       }
       if (off && c.v > 0.6 && Math.random() < 0.4) g.dust.push({ d: c.d - 6, x: c.x + (Math.random() * 6 - 3), t: 18 });
-      if (c.d >= RACE_LEN) { c.place = ++g.placed; if (!c.cpu) sfx.hammer(); }
+      if (c.d >= RACE_LEN) { c.place = ++g.placed; if (!c.cpu) sfx.hammer(); if (!c.cpu && c.place === 1) missionEvent('racewin'); }
     }
     // (the cameras: the whole screen's follows the pug that pressed Play; each split-screen view follows its own
     // buggy, sideways too, halfway between it and the middle of the track)
@@ -7075,7 +7243,7 @@
         if (b.pop || Math.abs(p.x - b.x) >= 11 || Math.abs(p.y - b.y) >= 11) continue;
         if (b.dizzy) {
           const n = 100 + 20 * Math.round(b.y / DG_CELL);
-          b.pop = 24; p.score += n; digPop(b.x + 8, b.y, n); sfx.pop();
+          b.pop = 24; p.score += n; digPop(b.x + 8, b.y, n); sfx.pop(); missionEvent('boops');
           digBits(b.x + 8, b.y + 8, ['#5fd068', '#b4f08a', '#ffffff'], 10, 2.5);
         } else if (!p.inv) { digHurt(p); break; }
       }
@@ -7361,7 +7529,7 @@
         const h = p.hopping;
         if (++h.t >= HP_HOP) {
           p.row = h.to; p.x = h.x1; p.hopping = null;
-          if (p.row > p.far) { p.far = p.row; p.idle = 0; }
+          if (p.row > p.far) { p.far = p.row; p.idle = 0; missionEvent('rows'); }
           const lane = hopLane(p.row);
           if (lane.kind === 'safe' && lane.bone !== null && Math.round(p.x / HP_CELL) === lane.bone) {
             lane.bone = null; p.bones++; sfx.coin(); g.pops.push({ x: p.x + 8, wy: p.row * HP_CELL + 16, n: 3, t: 40 });
