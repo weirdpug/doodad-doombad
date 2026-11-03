@@ -2110,6 +2110,7 @@
     fromTitle = false; phase = 'title';
     mother = { state: 'gone', t: 0 };   // (back on the main menu, the mother ship has gone: the user asked for that)
     spaceGloop = null;   // (and so has Gloop, if he was floating in space)
+    stopGlitch();   // (and the game is back to normal: no glitching, the right way up, no old television; the user asked)
     // (unless the mother ship's blast sent him here: then he drops out of the sky onto the grass, and stays)
     if (gloopOnMenu && !titleGloop) { titleGloop = { gloop: true, x: 34, y: -40, state: 'fall', t: 0, vy: 0, land: 214, box: null, grab: null }; tone(1200, 0.7, 'sine', 0.03, -900); }
     for (const pl of SPACE_PLANETS) { pl.shipGone = false; pl.deepGone = []; }   // (and the blown-up spaceships are back)
@@ -5953,7 +5954,8 @@
   // upside down (setUpsideDown: the menus stay the right way up; the arrows still move the pugs the same way, which
   // now looks backwards). One level after that it turns into an old television (oldTV), everything hard to see: the
   // colours washed out to a dim grey-green, snow fizzing all over, dark scan lines, a dark band rolling down the
-  // screen, dark corners, and the picture a little blurred. It all stops once Gloop is back in his shop (into Jupiter).
+  // screen, dark corners, and the picture a little blurred. It all stops on going back to the main menu, or once Gloop
+  // is back in his shop (into Jupiter).
   const glitchScreen = document.querySelector('.screen');
   const GLITCH_COLS = ['#ff00ff', '#00ffff', '#00ff66', '#000000', '#ffffff', '#ffcc00'];
   function drawGlitch() {
