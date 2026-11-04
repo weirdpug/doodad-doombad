@@ -1833,9 +1833,19 @@
       const n = list.find(x => x.key === l[slot]);
       if (n && n.locked && n.locked()) l[slot] = '';
     }
+    // (the mission prizes too, the user asked 2026-11-03: each goes back out of Customize and off any pug that has it,
+    // and Gloop's list starts again from the beginning)
+    for (const sec of Object.values(LOOK_SECTIONS)) for (const n of sec.list.filter(n => n.prize)) { n.card.remove(); sec.list.splice(sec.list.indexOf(n), 1); }
+    for (const l of looks) {
+      l.pets = l.pets.filter(k => !prizeOf(k));
+      for (const slot of ['suit', 'hat', 'necklace']) if (prizeOf(l[slot])) l[slot] = '';
+    }
+    Object.assign(missions, { next: 4, done: 0, active: [], won: [] });
+    for (let n = 1; n <= 3; n++) missions.active.push(newMission(n));
+    saveMissions();
     saveLooks(); sfx.nope();
     toast('Everything you unlocked is locked again', '#ff3e6c');
-    if (phase === 'paused' && LOOK_SECTIONS[pauseView]) renderLooks();
+    if (phase === 'paused' && LOOK_SECTIONS[pauseView]) showPause(pauseView, 0);   // (its cards may have changed)
   }
   function zeroCoins() {
     coins = [0, 0, 0, 0]; saveCoins(); updateHud(true); sfx.tick();
