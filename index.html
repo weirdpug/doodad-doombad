@@ -1812,7 +1812,8 @@
   //   ZER0      every pug's coins go back to 0 (zeroCoins), on any screen
   //   C0/\/\E   ("come") calls the alien mother ship into The Arcade (codeCome); on the main menu, up into space first
   //   EXP       blows up all the mother ship's tiny ships at once, and so the mother ship (codeExp), in The Arcade
-  //   L0CK      locks again everything that had to be unlocked (Zorp the Alien, and the space things), keeping what you start with (relock)
+  //   L0CK      locks again everything that had to be unlocked (Zorp the Alien, the space things and the mission prizes), keeping what you start with (relock)
+  //   L0CK2     only resets Gloop's missions and locks their prizes again (codeMissions)
   // A code's first key still does its usual job if it is a game key (B barks, ZER0's Z jumps), but once a
   // code has begun, its next keys only type the code: the coin code's S doesn't also climb down or pick a
   // menu choice, the skip code's X makes no tacos. A key that doesn't fit, or nothing typed for 25 seconds,
@@ -1820,7 +1821,8 @@
   const CODES = [{ code: 'C0!NS', at: 0, run: () => openCoinBar() }, { code: 'B0O/\\/\\', at: 0, run: () => codeBoom() },
     { code: '|_!FE', at: 0, run: () => toggleSafe() }, { code: '/\\/EXT', at: 0, run: () => skipLevel() },
     { code: 'ZER0', at: 0, run: () => zeroCoins() }, { code: 'C0/\\/\\E', at: 0, run: () => codeCome() },
-    { code: 'EXP', at: 0, run: () => codeExp() }, { code: 'L0CK', at: 0, run: () => relock() }];
+    { code: 'EXP', at: 0, run: () => codeExp() }, { code: 'L0CK', at: 0, run: () => relock() },
+    { code: 'L0CK2', at: 0, run: () => codeMissions() }];
   // The zero code (the user asked for one to reset their coins): every pug's coins are set to 0 and saved.
   // Store things already bought are kept.
   // (the lock code, the user asked 2026-10-31: every unlock forgotten, and a pet that is locked again goes home, and a
@@ -1833,8 +1835,14 @@
       const n = list.find(x => x.key === l[slot]);
       if (n && n.locked && n.locked()) l[slot] = '';
     }
-    // (the mission prizes too, the user asked 2026-11-03: each goes back out of Customize and off any pug that has it,
-    // and Gloop's list starts again from the beginning)
+    resetMissions();   // (the mission prizes too, the user asked 2026-11-03)
+    saveLooks(); sfx.nope();
+    toast('Everything you unlocked is locked again', '#ff3e6c');
+    if (phase === 'paused' && LOOK_SECTIONS[pauseView]) showPause(pauseView, 0);   // (its cards may have changed)
+  }
+  // Every mission prize goes back out of Customize and off any pug that has it, and Gloop's list starts again from
+  // the beginning
+  function resetMissions() {
     for (const sec of Object.values(LOOK_SECTIONS)) for (const n of sec.list.filter(n => n.prize)) { n.card.remove(); sec.list.splice(sec.list.indexOf(n), 1); }
     for (const l of looks) {
       l.pets = l.pets.filter(k => !prizeOf(k));
@@ -1843,8 +1851,12 @@
     Object.assign(missions, { next: 4, done: 0, active: [], won: [] });
     for (let n = 1; n <= 3; n++) missions.active.push(newMission(n));
     saveMissions();
+  }
+  // (the mission code, the user asked 2026-11-03: just the missions and their prizes; other unlocks stay)
+  function codeMissions() {
+    resetMissions();
     saveLooks(); sfx.nope();
-    toast('Everything you unlocked is locked again', '#ff3e6c');
+    toast("Gloop's missions are reset and their prizes are locked again", '#ff3e6c');
     if (phase === 'paused' && LOOK_SECTIONS[pauseView]) showPause(pauseView, 0);   // (its cards may have changed)
   }
   function zeroCoins() {
@@ -1866,7 +1878,10 @@
     if (invincible) { toast('Nothing can knock you out!', '#ffcc3d'); sfx.oneUp(); }
     else { toast('You can be knocked out again', '#ff3e6c'); sfx.tick(); }
   }
-  let codeTime = 0;
+  // (codeWait: a code just finished that is also the start of a longer one (L0CK, L0CK2), waiting CODE_WAIT ms for the
+  // rest of the longer one before it runs)
+  const CODE_WAIT = 2000;
+  let codeTime = 0, codeWait = null;
   const codeKeys = new Set();   // keys a code or the coin bar took, so letting go of one doesn't "click" a focused button
   // (returns true when a code took this key press)
   function secretCode(e) {
@@ -1886,7 +1901,13 @@
       if (c.at === c.code.length) done = c;
     }
     if (took) { e.preventDefault(); codeKeys.add(e.code); }
-    if (done) { for (const c of CODES) c.at = 0; done.run(); }
+    // (the next key after a waiting code: it runs now, unless that key finished the longer code instead)
+    const waiting = codeWait;
+    if (waiting) { clearTimeout(waiting.timer); codeWait = null; if (!done || !done.code.startsWith(waiting.code)) waiting.run(); }
+    if (done && CODES.some(c => c !== done && c.code.startsWith(done.code))) {
+      for (const c of CODES) if (c === done || !c.code.startsWith(done.code)) c.at = 0;
+      codeWait = { code: done.code, run: done.run, timer: setTimeout(() => { codeWait = null; for (const c of CODES) c.at = 0; done.run(); }, CODE_WAIT) };
+    } else if (done) { for (const c of CODES) c.at = 0; done.run(); }
     return took;
   }
   // The coin bar: "How many coins?" above the keyboard pug's head (in the middle of the screen when no
