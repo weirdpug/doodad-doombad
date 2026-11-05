@@ -1471,7 +1471,7 @@
   // ----- Gloop's potions (the user asked 2026-11-04) -----
   // Six mystery potions stand on Gloop's shelves (the user asked for more than one), each POTION_PRICE coins from the pug
   // buying it. Buying one drinks it and puts a new random potion in its place. Some do something at once (now); the rest work on every pug in the next
-  // main game (not the Arcade's games), and stop at Game Over or Go to Main Menu. They add up, except that a potion
+  // main game (not the Arcade's games), and stop at Game Over, Restart or Go to Main Menu. They add up, except that a potion
   // replaces its rival. None of them may do anything a Store item does (the user asked): no extra hearts, no running
   // faster, no flames, nothing that changes how barrels look, breaks them or stuns Bruno, no help with falls, no thrown
   // hammers, no disco. Kept in the browser (POTIONS_KEY): the potions on the shelves, and those waiting or working.
@@ -1537,7 +1537,7 @@
     savePotions();
   }
   for (let i = potions.shelf.length; i < POTION_SPOTS.length; i++) stockPotion(i);
-  // (the main game ending, at Game Over or Go to Main Menu, ends the potions)
+  // (the main game ending, at Game Over, Restart or Go to Main Menu, ends the potions)
   function endPotions() {
     if (!potions.active.length) return;
     potions.active = []; savePotions();
@@ -2950,7 +2950,7 @@
   // Restart starts the game over from level 1 with 3 hearts and fresh scores; coins are kept
   function restartGame() {
     if (phase !== 'paused') return;
-    releaseAll(); newGame();
+    releaseAll(); endPotions(); newGame();
   }
   // Go to Main Menu: back to the castle screen. The game so far is dropped (coins and the bag are kept),
   // and Start there begins a new game from level 1.
