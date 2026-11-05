@@ -3332,12 +3332,31 @@
     lines.forEach((line, i) => drawText(line, PW / 2, 140 - lines.length * gap / 2 + i * gap, 'gold', 'center', size));
   }
   // After the black screen (the user asked 2026-11-05): a random spot on Jupiter, a completely flat plain under the
-  // planet's bands that goes on for ever. The pugs can walk, jump and bark, and Gloop chases them on foot all the time:
-  // a pug he catches dies, and with none left it's back to the main menu, as is the pause menu's Main Menu. (plain: the
+  // planet's bands that goes on for ever, with obstacles to get past as you run (plainObstacle). The pugs can walk, jump
+  // and bark, and Gloop chases them on foot all the time, walking over everything: a pug he catches dies, and with none
+  // left it's back to the main menu, as is the pause menu's Main Menu. (plain: the
   // state, phase 'mini' like the Arcade's games; PLAIN_Y: the ground on the screen; PLAIN_SPOTS: the spots, each the
   // sky's bands, the ground and what's in the sky; GLOOP_NEAR: how far off he stays at most, however fast they run)
   let plain = null;
-  const PLAIN_Y = 238, PLAIN_SKY_W = 480, GLOOP_NEAR = 104;
+  const PLAIN_Y = 238, PLAIN_SKY_W = 480, GLOOP_NEAR = 104, PLAIN_W = 6, PLAIN_H = 13;
+  // (the obstacle a pug at x with feet at y is inside, if any: PLAIN_W either side of it, PLAIN_H tall)
+  const plainHit = (x, y) => plain.obs.find(o => x + PLAIN_W > o.x1 && x - PLAIN_W < o.x2 && y > o.top && y - PLAIN_H < o.bot);
+  // (what feet at y would land on at x: the highest top at or below them, or the ground)
+  const plainFloor = (x, y) => plain.obs.reduce((t, o) => x + PLAIN_W > o.x1 && x - PLAIN_W < o.x2 && o.top >= y - 0.01 ? Math.min(t, o.top) : t, PLAIN_Y);
+  // The next obstacle, one of four, each solid and possible to get past with a jump (34 pixels high) as Gloop closes in:
+  // a rock to hop; a tall rock, a full jump; steps, a low block to jump on and a wall too high to reach from the ground;
+  // and the dead end (the user asked): a shelf you can run under, up against a wall too high to jump, and with the shelf
+  // in the way you can't jump it from under there, so it's back towards Gloop, out from under, up onto the shelf from
+  // its left end, and forward over the wall. Going up onto the shelf the first time means no going back at all.
+  function plainObstacle() {
+    const g = plain, x = g.nextObs, r = Math.random(), solid = (x1, x2, h, over = 0) => g.obs.push({ x1, x2, top: PLAIN_Y - h, bot: PLAIN_Y - over });
+    let w;
+    if (r < 0.4) { w = 16 + Math.floor(Math.random() * 12); solid(x, x + w, 12 + Math.floor(Math.random() * 8)); }
+    else if (r < 0.62) { w = 14 + Math.floor(Math.random() * 8); solid(x, x + w, 26 + Math.floor(Math.random() * 5)); }
+    else if (r < 0.8) { w = 40; solid(x, x + 20, 26); solid(x + 20, x + 40, 54); }
+    else { w = 46; solid(x, x + 28, 26, 20); solid(x + 28, x + 46, 54); }
+    g.nextObs = x + w + 150 + Math.random() * 110;
+  }
   const PLAIN_SPOTS = [
     { bands: ['#a8541e', '#c8742f', '#8a4220', '#d89a5a', '#a8541e', '#c8742f'], ground: ['#d8a878', '#a86f3e', '#7a4a26'], sky: 'swirls' },
     { bands: ['#f4e6cc', '#e8c9a0', '#f0dfc0', '#d8b080', '#f4e6cc', '#e8d4b0'], ground: ['#f0dcc0', '#c8a878', '#a07f52'], sky: 'none' },
@@ -3376,14 +3395,15 @@
     banana = arena = race = dig = hop = null;
     document.body.classList.remove('blackout');
     const spot = PLAIN_SPOTS[Math.floor(Math.random() * PLAIN_SPOTS.length)], x0 = Math.floor(Math.random() * 100000);
-    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, endT: 0 };
+    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0 };
     const first = kbSlot !== null && joined[kbSlot] ? kbSlot : 0;
     for (let i = 0; i < 4; i++) if (arenaDriven(i) || i === first) plainPug(i);
     try { initAudio(); } catch (e) {}
     releaseAll(); fromTitle = true; phase = 'mini'; hideOverlay();
   }
   function plainPug(id) {
-    plain.pugs.push({ id, x: Math.max(plain.cam + PW / 2 - 24 + id * 16, plain.gloopX + GLOOP_NEAR), y: PLAIN_Y, vy: 0, ground: true, face: 1, moving: false, anim: 0, barkT: 0, prev: { jump: true, bark: true } });
+    const x = Math.max(plain.cam + PW / 2 - 24 + id * 16, plain.gloopX + GLOOP_NEAR);
+    plain.pugs.push({ id, x, y: plainFloor(x, -999), vy: 0, ground: true, face: 1, moving: false, anim: 0, barkT: 0, prev: { jump: true, bark: true } });
   }
   // (a fresh press jumps or barks once; holding it does nothing more)
   function plainInput(p) {
@@ -3403,27 +3423,42 @@
     for (const p of g.pugs) {
       if (p.dead) continue;
       const inp = plainInput(p), dx = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
-      p.moving = !!dx;
-      if (dx) { p.face = dx; p.x += dx * 1.25; if (++p.anim % 12 === 0 && p.ground) sfx.step(); }
+      p.moving = false;
+      if (dx) {
+        // (a step, unless it's off the edge of the view or into an obstacle)
+        const nx = p.x + dx * 1.25;
+        p.face = dx;
+        if ((dx > 0 ? nx <= g.cam + PW - 8 : nx >= g.cam + 8) && !plainHit(nx, p.y)) { p.x = nx; p.moving = true; if (++p.anim % 12 === 0 && p.ground) sfx.step(); }
+      }
       if (inp.jump && p.ground) { p.ground = false; p.vy = -3.4; sfx.jump(); }
-      if (!p.ground) { p.vy += 0.16; p.y += p.vy; if (p.y >= PLAIN_Y) { p.y = PLAIN_Y; p.vy = 0; p.ground = true; } }
+      if (p.ground && plainFloor(p.x, p.y) > p.y) { p.ground = false; p.vy = 0; }   // (walked off the edge of something)
+      if (!p.ground) {
+        p.vy += 0.16;
+        let ny = p.y + p.vy;
+        if (p.vy < 0) { const o = plainHit(p.x, ny); if (o) { ny = o.bot + PLAIN_H; p.vy = 0; } }   // (a bump on the head)
+        else { const f = plainFloor(p.x, p.y); if (ny >= f) { ny = f; p.vy = 0; p.ground = true; } }
+        p.y = ny;
+      }
       if (inp.bark && p.barkT < 25) { p.barkT = 45; sfx.bark(LOOK[p.id].bark); }
       if (p.barkT > 0) p.barkT--;
     }
     g.kbAtk = false;
-    // (the view stays on the pugs still alive, who can't walk off its edges)
+    // (the view stays on the pugs still alive)
     const alive = g.pugs.filter(p => !p.dead);
     if (!alive.length) { if (!g.endT) g.endT = 150; return; }
     const mid = alive.reduce((n, p) => n + p.x, 0) / alive.length;
     g.cam += (mid - PW / 2 - g.cam) * 0.1;
-    for (const p of alive) p.x = clamp(p.x, g.cam + 8, g.cam + PW - 8);
+    while (g.nextObs < g.cam + PW + 120) plainObstacle();
+    g.obs = g.obs.filter(o => o.x2 > g.gloopX - 140);
     // Gloop is always on the pugs' left (the user asked) and goes after the leftmost: slower than a pug, but faster once
-    // it has got away from him, so he never drops out of sight. A pug he reaches dies, unless it is up in the air above
-    // his head.
+    // it has got away from him, so he never drops out of sight. He walks up and over the obstacles, and a pug he reaches
+    // dies, however high up it is.
     const gap = alive.reduce((n, p) => Math.min(n, p.x), Infinity) - g.gloopX;
     g.gloopX += gap > GLOOP_NEAR ? 1.35 : 0.9;
-    for (const p of alive) if (Math.abs(p.x - g.gloopX) < 12 && p.y > PLAIN_Y - 36) {
-      p.dead = true; p.y = PLAIN_Y; p.barkT = 0; sfx.die();
+    const under = g.obs.reduce((t, o) => g.gloopX + 8 > o.x1 && g.gloopX - 8 < o.x2 ? Math.min(t, o.top) : t, PLAIN_Y);
+    g.gloopY += (under - g.gloopY) * 0.2;
+    for (const p of alive) if (Math.abs(p.x - g.gloopX) < 12) {
+      p.dead = true; p.y = plainFloor(p.x, p.y); p.ground = true; p.barkT = 0; sfx.die();
       if (alive.every(q => q.dead)) g.endT = 150;
     }
   }
@@ -3445,6 +3480,13 @@
       const h = Math.abs(Math.sin(n * 12.9898) * 43758.5453) % 1, y = PLAIN_Y + 10 + Math.floor(h * (PH - PLAIN_Y - 14));
       ctx.fillRect(Math.round(n * 19 + h * 12 - g.cam), y, 3 + Math.floor(h * 6), 1);
     }
+    for (const o of g.obs) {
+      const x = Math.round(o.x1 - g.cam), w = o.x2 - o.x1, h = o.bot - o.top;
+      if (x > PW || x + w < 0) continue;
+      ctx.fillStyle = '#2a160a'; ctx.fillRect(x, o.top, w, h);
+      ctx.fillStyle = mid; ctx.fillRect(x + 1, o.top + 1, w - 2, h - 1);
+      ctx.fillStyle = top; ctx.fillRect(x + 1, o.top + 1, w - 2, 2);
+    }
     drawPlainGloop();
     for (const p of g.pugs) {
       const X = Math.round(p.x - g.cam), Y = Math.round(p.y), flip = p.face < 0, L = looks[p.id];
@@ -3464,7 +3506,7 @@
     if (!gloopPics) gloopPics = Object.fromEntries(Object.entries(GLOOP).map(([k, v]) => [k, bakeWith(v, GLOOP_COLS)]));
     const g = plain, pic = g.t % 260 < 14 ? gloopPics.sadBlink : gloopPics.sad, step = g.endT ? 0 : Math.sin(g.t / 7);
     ctx.save();
-    ctx.translate(Math.round(g.gloopX - g.cam), PLAIN_Y - Math.round(Math.abs(step) * 2));
+    ctx.translate(Math.round(g.gloopX - g.cam), Math.round(g.gloopY) - Math.round(Math.abs(step) * 2));
     ctx.rotate(step * 0.08);
     ctx.drawImage(pic, -11, -36, 22, 36);
     ctx.restore();
