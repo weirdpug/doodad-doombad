@@ -3288,12 +3288,13 @@
   }
   // Past level 9 while the game is glitching (the user asked 2026-11-05) there are no more levels: the glitching stops,
   // Bruno is back in his job, and the whole page goes black, with only yellow words on it. A click, tap, key or controller
-  // button changes them to the second words (the user asked), and BLACK_WAIT frames after that another one goes quietly
-  // back to the main menu.
-  const BLACK_LINES = ['YOU WERE NOT', 'MEANT TO MAKE', 'IT THIS FAR'], BLACK_LINES2 = ['YOU SUCKED ME', 'OUT A WINDOW'], BLACK_WAIT = 300;
-  let blackT = 0, blackPad = false, blackNext = false;
+  // button moves on to the next words (the user asked, the last a bit bigger), and BLACK_WAIT frames after the last
+  // another one goes quietly back to the main menu.
+  const BLACK_WORDS = [{ lines: ['YOU WERE NOT', 'MEANT TO MAKE', 'IT THIS FAR'], size: 2 }, { lines: ['YOU SUCKED ME', 'OUT A WINDOW'], size: 2 },
+    { lines: ['YOU BLEW ME UP', 'WITH A', 'SPACESHIP'], size: 2.5 }], BLACK_WAIT = 300;
+  let blackT = 0, blackPad = false, blackAt = 0;
   function blackOut() {
-    phase = 'blackout'; blackT = 0; blackPad = false; blackNext = false;
+    phase = 'blackout'; blackT = 0; blackPad = false; blackAt = 0;
     gloopBruno = false; gloopBrunoNext = false; stopGlitch();
     releaseAll(); closeCoinBar();
     cv.style.cursor = '';
@@ -3305,10 +3306,10 @@
     const down = [...navigator.getGamepads()].some(g => g && g.buttons.some(b => b.pressed));
     if (down) blackPad = true; else if (blackPad) { blackPad = false; blackPress(); }
   }
-  // (a press let go: nothing until the first words are up, then the second words, then out)
+  // (a press let go: nothing until the first words are up, then the next words, then out)
   function blackPress() {
     if (blackT < 60) return;
-    if (!blackNext) { blackNext = true; blackT = 60; tone(70, 0.9, 'sine', 0.08, -25); }
+    if (blackAt < BLACK_WORDS.length - 1) { blackAt++; blackT = 60; tone(70 - blackAt * 15, 0.9, 'sine', 0.08, -25); }
     else if (blackT >= BLACK_WAIT) leaveBlackout();
   }
   function leaveBlackout() { document.body.classList.remove('blackout'); toMainMenu(); }
@@ -3317,8 +3318,8 @@
   function drawBlackout() {
     ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, PW, PH);
     if (blackT < 60) return;   // (a moment of nothing at all first)
-    const lines = blackNext ? BLACK_LINES2 : BLACK_LINES;
-    lines.forEach((line, i) => drawText(line, PW / 2, 140 - lines.length * 9 + i * 18, 'gold', 'center', 2));
+    const { lines, size } = BLACK_WORDS[blackAt], gap = 9 * size;
+    lines.forEach((line, i) => drawText(line, PW / 2, 140 - lines.length * gap / 2 + i * gap, 'gold', 'center', size));
   }
   function gameOver() {
     phase = 'over';
