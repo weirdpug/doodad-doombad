@@ -1464,6 +1464,78 @@
     missions.done++;
     missions.active[i] = newMission(missions.next++);   // (the next mission takes its place: not this one again, nor the other two)
   }
+  // ----- Gloop's potions (the user asked 2026-11-04) -----
+  // One mystery potion stands on Gloop's shelf at a time, POTION_PRICE coins from the pug buying it. Buying it drinks it
+  // and puts a new random potion on the shelf. Some do something at once (now); the rest work on every pug in the next
+  // main game (not the Arcade's games), and stop at Game Over or Go to Main Menu. They add up, except that a potion
+  // replaces its rival. None of them may do anything a Store item does (the user asked): no extra hearts, no running
+  // faster, no flames, nothing that changes how barrels look, breaks them or stuns Bruno, no help with falls, no thrown
+  // hammers, no disco. Kept in the browser (POTIONS_KEY): the potion on the shelf, and those waiting or working.
+  const POTIONS_KEY = 'doodad-doombad-potions', POTION_PRICE = 15;
+  // (the three bottles: # the liquid, @ its shade)
+  const POTION_BOTTLES = [
+    ['....NNNN....', '....NNNN....', '....G..G....', '....G..G....', '...GG..GG...', '..G######G..', '.G########G.', '.G#W######G.', '.G#W######G.', '.G########G.', '.G@@@@@@@@G.', '..G@@@@@@G..', '...GGGGGG...'],
+    ['....NNNN....', '....NNNN....', '....G..G....', '...GG..GG...', '...G####G...', '...G#W##G...', '...G#W##G...', '...G####G...', '...G####G...', '...G####G...', '...G####G...', '...G@@@@G...', '...GGGGGG...'],
+    ['....NNNN....', '....NNNN....', '....G..G....', '....G..G....', '....G..G....', '...G####G...', '...G#W##G...', '..G##W###G..', '..G######G..', '.G########G.', '.G########G.', '.G@@@@@@@@G.', '..GGGGGGGG..'],
+  ];
+  // (liquid and shade: palette letters; bottle: which of the three; says: what the buyer is told; rival: the potion it
+  // replaces; now: it happens at once, with the words to show)
+  const POTIONS = [
+    { key: 'floaty', name: 'Floaty Potion', liquid: 'V', shade: 'B', bottle: 0, says: 'SLOW FLOATY JUMPS' },
+    { key: 'tiny', name: 'Tiny Potion', liquid: 'C', shade: 'B', bottle: 1, says: 'YOUR PUGS SHRINK', rival: 'giant' },
+    { key: 'giant', name: 'Giant Potion', liquid: 'F', shade: 'N', bottle: 2, says: 'YOUR PUGS GROW HUGE', rival: 'tiny' },
+    { key: 'colors', name: 'Color Potion', liquid: 'P', shade: 'Q', bottle: 0, says: 'PUGS KEEP CHANGING COLOR' },
+    { key: 'ghost', name: 'Ghost Potion', liquid: 'c', shade: 'a', bottle: 1, says: 'PUGS TURN SEE-THROUGH' },
+    { key: 'mirror', name: 'Mirror Potion', liquid: 'G', shade: 'H', bottle: 2, says: 'THE LEVEL FLIPS SIDEWAYS' },
+    { key: 'wobble', name: 'Wobble Potion', liquid: 'g', shade: '2', bottle: 0, says: 'THE LEVEL WOBBLES' },
+    { key: 'dark', name: 'Dark Potion', liquid: 'k', shade: 'I', bottle: 1, says: 'THE LIGHTS GO OUT' },
+    { key: 'ice', name: 'Ice Potion', liquid: 'p', shade: 'o', bottle: 2, says: 'SLIPPERY FLOORS AND SNOW' },
+    { key: 'backwards', name: 'Backwards Potion', liquid: 'Y', shade: 'F', bottle: 0, says: 'LEFT AND RIGHT SWAP' },
+    { key: 'moonwalk', name: 'Moonwalk Potion', liquid: '7', shade: '9', bottle: 1, says: 'PUGS WALK FACING BACKWARD' },
+    { key: 'hiccup', name: 'Hiccup Potion', liquid: '6', shade: '5', bottle: 2, says: 'PUGS GET THE HICCUPS' },
+    { key: 'squeak', name: 'Squeaky Potion', liquid: 'P', shade: 'M', bottle: 1, says: 'BARKS TURN INTO SQUEAKS', rival: 'moo' },
+    { key: 'moo', name: 'Moo Potion', liquid: 'E', shade: 'J', bottle: 0, says: 'BARKS TURN INTO MOOS', rival: 'squeak' },
+    { key: 'tinybruno', name: 'Shrink Potion', liquid: 'T', shade: 'J', bottle: 2, says: 'BRUNO SHRINKS' },
+    { key: 'angry', name: 'Angry Potion', liquid: 'R', shade: '5', bottle: 0, says: 'BRUNO THROWS TWICE AS OFTEN' },
+    { key: 'slowbarrels', name: 'Slow Potion', liquid: 'L', shade: 'O', bottle: 1, says: 'BARRELS ROLL SLOWLY' },
+    { key: 'goldcoins', name: 'Gold Potion', liquid: 'Y', shade: 'O', bottle: 2, says: 'COINS COUNT DOUBLE' },
+    { key: 'stars', name: 'Star Potion', liquid: 't', shade: 'Y', bottle: 0, says: 'POINTS COUNT DOUBLE' },
+    { key: 'quake', name: 'Quake Potion', liquid: 'N', shade: 'A', bottle: 1, says: 'THE GROUND SHAKES' },
+    { key: 'lucky', name: 'Lucky Potion', liquid: '3', shade: '2', bottle: 2,
+      now(id) { const n = Math.floor(Math.random() * 26); coins[id] += n; saveCoins(); updateHud(true); return n ? `YOU FOUND ${n} COINS!` : 'NOTHING HAPPENED!'; } },
+    { key: 'gloopcolor', name: 'Paint Potion', liquid: 'M', shade: 'Q', bottle: 0,
+      now() { paintGloop(); return 'GLOOP CHANGES COLOR'; } },
+    { key: 'bubbles', name: 'Bubble Potion', liquid: 'o', shade: 'B', bottle: 1,
+      now() { shop.bubbles = true; return 'BUBBLES FILL THE SHOP'; } },
+  ];
+  for (const p of POTIONS) SPRITES['potion_' + p.key] = POTION_BOTTLES[p.bottle].map(r => r.replace(/#/g, p.liquid).replace(/@/g, p.shade));
+  const potionOf = key => POTIONS.find(p => p.key === key);
+  const potions = (() => {
+    const out = { shelf: '', active: [] };
+    try {
+      const s = JSON.parse(localStorage.getItem(POTIONS_KEY));
+      if (s && typeof s === 'object') {
+        if (potionOf(s.shelf)) out.shelf = s.shelf;
+        if (Array.isArray(s.active)) out.active = [...new Set(s.active.filter(k => potionOf(k) && !potionOf(k).now))];
+      }
+    } catch (e) {}
+    return out;
+  })();
+  function savePotions() { try { localStorage.setItem(POTIONS_KEY, JSON.stringify(potions)); } catch (e) {} }
+  const potionOn = key => potions.active.includes(key);
+  // (a new potion for the shelf: not the one just bought, nor one already waiting or working, if there is any other)
+  function stockPotion() {
+    const left = POTIONS.filter(p => p.key !== potions.shelf && !potions.active.includes(p.key));
+    potions.shelf = (left.length ? left : POTIONS)[Math.floor(Math.random() * (left.length || POTIONS.length))].key;
+    savePotions();
+  }
+  if (!potions.shelf) stockPotion();
+  // (the main game ending, at Game Over or Go to Main Menu, ends the potions)
+  function endPotions() {
+    if (!potions.active.length) return;
+    potions.active = []; savePotions();
+    toast('Your potions wore off', '#b48ae0');
+  }
   function loadLooks() {
     const l = [0, 1, 2, 3].map(() => ({ suit: '', hat: '', necklace: '', pets: [] }));
     try {
@@ -1553,6 +1625,7 @@
     resetLevel(); hideOverlay(); updateHud(true);
     // at the start of a game every pug shows its name above its head
     for (const p of players) p.nameT = 150;
+    if (potions.active.length) toast(`Potions working: ${potions.active.map(k => potionOf(k).name.replace(' Potion', '')).join(', ')}`, '#b48ae0');
   }
   // A player drops in: straight onto the bottom floor during a game (paused too), at the next level
   // during the level-clear banner, or at the next start from the title / game-over screen.
@@ -1605,6 +1678,7 @@
   const throwGap = () => Math.max(60, 170 - 18 * (level - 1)) + Math.random() * 60;
 
   function addScore(n, x, y, id) {
+    if (potionOn('stars')) n *= 2;
     scores[id || 0] += n;
     if (x !== undefined) pops.push({ x, y, text: String(n), t: 50 });
     const best = Math.max(...scores);
@@ -1612,6 +1686,7 @@
   }
   // Coins: a spinning coin pops out where it was earned, with a "+N" and a ding
   function giveCoins(n, x, y, id) {
+    if (potionOn('goldcoins')) n *= 2;
     coins[id || 0] += n;
     missionEvent('coins', n);
     saveCoins();
@@ -1735,10 +1810,11 @@
   function doBark(p) {
     if (phase !== 'play' || !p || !isIn(p) || p.barkCool > 0) return;
     // each bark says the pug's next line: most pugs go BARK, WOOF, BARK...; President Pug has his own
-    const says = LOOK[p.id].says || ['BARK', 'WOOF'];
+    const voice = potionOn('squeak') ? 2.4 : potionOn('moo') ? 0.4 : 1;
+    const says = potionOn('squeak') ? ['SQUEAK'] : potionOn('moo') ? ['MOO'] : LOOK[p.id].says || ['BARK', 'WOOF'];
     p.barkText = says[sayNext[p.id]++ % says.length];
     p.barkT = p.barkMax = 45 + (p.barkText.length > 5 ? 4 * (p.barkText.length - 5) : 0);   // longer lines stay up a little longer
-    p.barkCool = 20; sfx.bark(LOOK[p.id].bark);
+    p.barkCool = 20; sfx.bark(LOOK[p.id].bark * voice);
     wakeUp(p);
   }
   // Waking a knocked-out teammate: a pug standing right next to one lying 'down' (on the same floor)
@@ -2592,7 +2668,7 @@
     arcade: () => [
       ...(arcadeZoom.target && !arcadeZoom.out && !onShip() && !arcadeZoom.target.shop ? [{ label: 'Play', act: by => playFromArcade(by) }] : []),
       // (zoomed in on the spaceship, Back zooms out to Saturn first)
-      { label: 'Back', act: () => deepLive() ? deepOut() : onShip() ? shipOut() : inShop() && shop.listOpen ? closeMissionList() : arcadeZoom.target && !arcadeZoom.out ? zoomOut() : backToTitle() },
+      { label: 'Back', act: () => deepLive() ? deepOut() : onShip() ? shipOut() : inShop() && (shop.listOpen || shop.potionView) ? closeShopPaper() : arcadeZoom.target && !arcadeZoom.out ? zoomOut() : backToTitle() },
     ],
     custom: () => [
       ...CUSTOM_PARTS.map(c => ({ label: c.name, act: by => showPause(c.view, 0, null, by) })),
@@ -2803,7 +2879,7 @@
   function menuBack() {
     if (pauseView === 'arcade' && deepLive()) return deepOut();
     if (pauseView === 'arcade' && onShip()) return shipOut();   // (Esc or B zooms out of the spaceship first,
-    if (pauseView === 'arcade' && inShop() && shop.listOpen) return closeMissionList();   // (or puts Gloop's mission list back,
+    if (pauseView === 'arcade' && inShop() && (shop.listOpen || shop.potionView)) return closeShopPaper();   // (or puts Gloop's mission list or potion back,
     if (pauseView === 'arcade' && arcadeZoom.target && !arcadeZoom.out) return zoomOut();   // then out of the planet)
     const part = CUSTOM_PARTS.findIndex(c => c.view === pauseView);
     if (part >= 0) showPause('custom', part);   // (from Suits, Hats or Necklaces back to Customize)
@@ -2875,6 +2951,7 @@
     if (phase !== 'paused') return;
     releaseAll(); closeCoinBar();
     scores = [0, 0, 0, 0]; level = 1; lives = startLives(); brunoTaco = 0; brunoRolls = 0;
+    endPotions();
     resetLevel(); showTitle(0);
   }
   function togglePause() { if (phase === 'play') pauseGame(); else if (phase === 'paused') resumeGame(); }
@@ -3034,6 +3111,7 @@
   }
   function gameOver() {
     phase = 'over';
+    endPotions();
     // list everyone who played this game, including anyone whose controller dropped out
     const ids = [0, 1, 2, 3].filter(i => played[i]);
     const text = ids.length > 1
@@ -3087,6 +3165,7 @@
     const inp = P.inp, jp = P.jp;
     const k = speedOf(P);   // 2 for a spicy pug: walks, jumps across, steers and climbs twice as fast
     let dx = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
+    if (potionOn('backwards')) dx = -dx;
     P.moving = false;
     // A direction still held from the end of a ladder doesn't count until it is let go:
     // holding Down/Up never carries the pug onto the next ladder, and a sideways push held while
@@ -3102,17 +3181,27 @@
         if (inp.up && P.ladLock !== 'up') { const l = ladderAt(P, P.g, 'lo'); if (l) { P.state = 'climb'; P.lad = l; P.x = l.x; P.y -= 2; return; } }
         // going down a ladder needs a plain "down": a diagonal while walking past a ladder top keeps walking
         if (inp.down && !dx && P.ladLock !== 'down') { const l = ladderAt(P, P.g, 'hi'); if (l) { P.state = 'climb'; P.lad = l; P.x = l.x; P.y += 2; return; } }
-        if (jp.jump || jp.up) { P.state = 'air'; P.jumped = true; P.vy = -4.2; P.vx = dx * 1.5 * k; if (dx) P.face = dx; P.top = P.y; P.fromG = P.g; sfx.jump(); return; }
+        if (jp.jump || jp.up) { P.state = 'air'; P.jumped = true; P.vy = potionOn('floaty') ? -3 : -4.2; P.vx = dx * 1.5 * k; if (dx) P.face = dx; P.top = P.y; P.fromG = P.g; sfx.jump(); return; }
       }
       // a footstep every 12 steps of the walk animation (checked as "crossed a multiple of 12", since a
       // spicy pug's counter goes up by 2 and may be odd from before it ate the pepper)
       if (dx) { P.face = dx; P.moving = true; const a0 = P.anim; P.anim += k; if (Math.floor(P.anim / 12) !== Math.floor(a0 / 12)) sfx.step(); }
-      P.x = clamp(P.x + dx * 1.5 * k, P.g === 0 ? 48 : 6, 474);
+      // (on ice a pug gathers speed and loses it slowly, but is never faster than walking)
+      let walk = dx * 1.5 * k;
+      if (potionOn('ice')) { walk = P.slide = (P.slide || 0) + (walk - (P.slide || 0)) * 0.06; if (Math.abs(walk) > 0.2) P.moving = true; }
+      P.x = clamp(P.x + walk, P.g === 0 ? 48 : 6, 474);
+      // (the hiccups: a little hop every few seconds, but not with a hammer in paw)
+      if (potionOn('hiccup') && !P.hammer && (P.hicT = (P.hicT ?? 240) - 1) <= 0) {
+        P.hicT = 200 + Math.random() * 240; P.state = 'air'; P.jumped = false; P.vy = -2.6; P.vx = walk; P.top = P.y; P.fromG = P.g;
+        pops.push({ x: P.x, y: P.y - 44, text: 'HIC!', t: 40 }); tone(900, 0.08, 'square', 0.03, 500);
+        return;
+      }
       const g = G[P.g];
       // (fromG: the floor it left, where a Bouncy Pillow bounces it back to)
       if (!onGirder(g, P.x)) { P.state = 'air'; P.jumped = false; P.vy = 0; P.vx = dx * k; P.top = P.y; P.fromG = P.g; }
       else P.y = footY(g, P.x);
     } else if (P.state === 'air') {
+      P.slide = P.vx;
       // Grab a ladder in mid-air: holding Up or Down while jumping or falling next to one (any overlap,
       // the same reach as on the ground), anywhere between its two floors. Not with a hammer in paw
       // (except while Bruno is out rolling), and not with a direction still held from leaving a ladder.
@@ -3129,7 +3218,9 @@
         const g = G[P.bounce.g], d = P.bounce.x - P.x;
         P.vx = P.y < footY(g, P.bounce.x) - 4 ? clamp(d, -2.5, 2.5) : 0;
       }
-      P.vy = Math.min(P.vy + 0.22, 6); P.x += P.vx; P.y += P.vy;
+      // (a Floaty Potion: half the gravity, but it changes nothing about how far a fall may be; a bounce stays a bounce)
+      const floaty = potionOn('floaty') && !P.bounce;
+      P.vy = Math.min(P.vy + (floaty ? 0.11 : 0.22), floaty ? 3 : 6); P.x += P.vx; P.y += P.vy;
       if (P.x < 6 || P.x > 474) { P.x = clamp(P.x, 6, 474); P.vx = -P.vx * 0.5; }
       // the tar drum is a wall on the bottom floor, in the air too
       if (P.x < 48 && P.y > surf(G[1], P.x) + 12) { P.x = 48; P.vx = 0; }
@@ -3162,6 +3253,7 @@
       }
       if (P.y > worldH + 30) return die(P);
     } else if (P.state === 'climb') {
+      P.slide = 0;
       P.bounce = null;
       const l = P.lad, top = surf(G[l.hi], l.x), bot = surf(G[l.lo], l.x);
       if (inp.up) { P.y -= 1.1 * k; P.moving = true; P.anim += k; }
@@ -3181,7 +3273,7 @@
         barrels.push({ x: 104, y: surf(G[APE], 104) - R, g: APE, state: 'roll', rot: 0, vx: 0, vy: 0, lastLad: null });
         sfx.throw();
       }
-    } else if (apeTimer <= 0) { apeAnim = 40; apeTimer = throwGap(); }
+    } else if (apeTimer <= 0) { apeAnim = 40; apeTimer = throwGap() * (potionOn('angry') ? 0.5 : 1); }
   }
 
   // Big Bruno's roll. On the team's last heart a click on Bruno makes him pound his chest ('curl'),
@@ -3264,7 +3356,7 @@
   }
 
   function updateBarrels() {
-    const spd = barrelSpeed();
+    const spd = barrelSpeed() * (potionOn('slowbarrels') ? 0.6 : 1);
     for (const b of barrels) {
       if (b.state === 'roll') {
         const g = G[b.g], dir = Math.sign(g.y2 - g.y1) || 1, px = b.x;
@@ -4011,7 +4103,8 @@
   // Players 2-4 are the same pug recoloured: black, silver and red (fawn coat, shading and cream swapped)
   function drawPlayer(P) {
     if (P.state === 'out') return;
-    const sw = LOOK[P.id].swap;
+    const sw = potionOn('colors') ? LOOK[(P.id + (frame >> 3)) % 4].swap : LOOK[P.id].swap;
+    const size = potionOn('tiny') ? 0.5 : potionOn('giant') ? 2 : 1;   // (only how big it looks: it is hit the same)
     // draw a pose, then anything the pug has on over it, with the same anchor and flip
     // with the Taco Pug equipped the pug wears a taco suit over its body (never its head), drawn the same way,
     // and with Snazz equipped it wears pixel sunglasses
@@ -4020,12 +4113,16 @@
     const suit = bag[P.id].on.taco, shades = bag[P.id].on.shnaz, neck = looks[P.id].necklace, under = looks[P.id].suit,
       hat = looks[P.id].hat;
     const pug = (pose, x, y, flip) => {
+      ctx.save();
+      if (size !== 1) { ctx.translate(x, y); ctx.scale(size, size); ctx.translate(-x, -y); }
+      if (potionOn('ghost')) ctx.globalAlpha = 0.4;
       blitFeet(pose, x, y, flip, sw);
       if (under) blitFeet(under + '_' + pose.replace('player_', ''), x, y, flip);
       if (suit) blitFeet('suit_' + pose.replace('player_', ''), x, y, flip);
       if (shades) blitFeet('shades_' + pose.replace('player_', ''), x, y, flip);
       if (hat) blitFeet(hat + '_' + pose.replace('player_', ''), x, y, flip);
       if (neck) blitFeet(neck + '_' + pose.replace('player_', ''), x, y, flip);
+      ctx.restore();
     };
     const Y = Math.round(P.y / 2), left = P.face < 0;
     // the pug's sprites differ in size (side view, climbing from behind, belly-up), so each is
@@ -4050,7 +4147,7 @@
     else if (P.moving) pose = Math.floor(P.anim / 6) % 2 ? 'player_walk2' : 'player_walk1';
     // standing on a slope, rest the feet on the highest girder pixel under them so they never sink in
     const FY = P.state === 'walk' ? Math.min(gTop(G[P.g], X - 4), gTop(G[P.g], X + 3)) : Y;
-    pug(pose, X, FY, P.state !== 'climb' && left);
+    pug(pose, X, FY, P.state !== 'climb' && (P.moving && potionOn('moonwalk') ? !left : left));
     // (holding the Snifer Ripple up for a moment after a shot)
     if (P.aimT > 0 && P.state !== 'climb') blit('rifle_hold', left ? X - 13 : X + 1, FY - 9, left);
     if (P.hammer > 0 && (phase === 'play' || phase === 'paused') && P.state !== 'climb') {
@@ -5083,10 +5180,10 @@
   // (zooming in or out redoes The Arcade's screen: its title, and Play shown or gone)
   function zoomTo(p) { arcadeZoom = { target: p, p: 0, out: false, ship: null, shop: p.shop ? { p: 0 } : null };
     if (p.shop) { spaceGloop = null; titleGloop = null; gloopOnMenu = false; gloopBruno = false; gloopBrunoNext = false; stopGlitch(); }   // (back in his shop; Bruno back in his job, and no more glitching)
-    if (p.shop) Object.assign(shop, { sad: false, tearT: 0, hitT: 0, whyT: 0, ammo: [], mess: [], bits: [], stains: [], lamp: 'up', lampY: 0, lampV: 0, ko: false, koT: 0, window: 'whole', suck: null, gone: false, wind: [], listOpen: false });   // (Gloop happy and clean again)
+    if (p.shop) Object.assign(shop, { sad: false, tearT: 0, hitT: 0, whyT: 0, ammo: [], mess: [], bits: [], stains: [], lamp: 'up', lampY: 0, lampV: 0, ko: false, koT: 0, window: 'whole', suck: null, gone: false, wind: [], listOpen: false, potionView: null, drank: '', drankSays: '', potionT: 0, bubbles: false }); washGloop();   // (Gloop happy and clean again)
     showPause('arcade', 0); sfx.tick(); }
-  function closeMissionList() { shop.listOpen = false; sfx.tick(); }
-  function zoomOut() { if (!arcadeZoom.target || arcadeZoom.out) return; arcadeZoom.out = true; arcadeZoom.ship = arcadeZoom.deep = null; showPause('arcade', 0); sfx.tick(); }
+  function closeShopPaper() { shop.listOpen = false; shop.potionView = null; sfx.tick(); }
+  function zoomOut() { if (!arcadeZoom.target || arcadeZoom.out) return; if (arcadeZoom.shop) { washGloop(); shop.bubbles = false; } arcadeZoom.out = true; arcadeZoom.ship = arcadeZoom.deep = null; showPause('arcade', 0); sfx.tick(); }
   // (zoomed in on the spaceship, or on the way)
   const onShip = () => !!(arcadeZoom.ship && !arcadeZoom.ship.out);
   function shipIn() { arcadeZoom.ship = { p: 0, out: false }; showPause('arcade', 0); sfx.ufo(); }
@@ -5570,7 +5667,7 @@
   // (the mouse pointer turns into a hand over a planet, or a tiny ship)
   ov.addEventListener('pointermove', e => {
     if (!(fromTitle && pauseView === 'arcade')) { if (ov.style.cursor) ov.style.cursor = ''; return; }
-    const c = inShop() ? (e.target.closest('button') ? '' : shop.listOpen || onMissionList(e) ? 'pointer' : 'crosshair') : spaceGloop && !arcadeZoom.target && !e.target.closest('button') && onSpaceGloop(e) ? (spaceGloop.grab ? 'grabbing' : 'grab') : arcadeZoom.target || (!e.target.closest('button') && (planetAt(e) || fleetNear(e) >= 0)) ? 'pointer' : '';
+    const c = inShop() ? (e.target.closest('button') ? '' : shop.listOpen || shop.potionView || onMissionList(e) || onPotion(e) ? 'pointer' : 'crosshair') : spaceGloop && !arcadeZoom.target && !e.target.closest('button') && onSpaceGloop(e) ? (spaceGloop.grab ? 'grabbing' : 'grab') : arcadeZoom.target || (!e.target.closest('button') && (planetAt(e) || fleetNear(e) >= 0)) ? 'pointer' : '';
     if (ov.style.cursor !== c) ov.style.cursor = c;
   });
   function buildSpaceBg() {
@@ -5835,6 +5932,12 @@
   // on the planet is all the way in; a planet's shop: the spot to zoom into)
   const SHOP_FRAMES = 45, SHOP_ZOOM = 14, SHOP_NAME = "Gloop's Shop";
   const GLOOP_COLS = { p: '#b48ae0', r: '#d8c0f4', q: '#7a54a8', o: '#3a1f5a', v: '#3a8a4a' };
+  // (a Paint Potion turns him one of these until you leave the shop)
+  const GLOOP_PAINTS = [{ p: '#5fd068', r: '#b4f5c8', q: '#2f8f66', o: '#1b5745', v: '#7a54a8' }, { p: '#ff7ab8', r: '#ffc0dd', q: '#b83d78', o: '#5a0f2a', v: '#3a8a4a' },
+    { p: '#ffcc3d', r: '#fff0a8', q: '#c8742f', o: '#6b3410', v: '#3a8a4a' }, { p: '#5fb4ff', r: '#c0e4ff', q: '#2f5bff', o: '#1d2f8c', v: '#3a8a4a' }];
+  let gloopPaint = null;
+  function paintGloop() { gloopPaint = GLOOP_PAINTS[(GLOOP_PAINTS.indexOf(gloopPaint) + 1 + Math.floor(Math.random() * (GLOOP_PAINTS.length - 1))) % GLOOP_PAINTS.length]; gloopPics = null; }
+  function washGloop() { if (gloopPaint) { gloopPaint = null; gloopPics = null; } }
   const GLOOP = {"idle": [".....YY.........YY....", "......o.........o.....", ".......o.......o......", ".........ooooo........", ".......oorrrppoo......", ".....oorrrrpppppoo....", "....orrrrrWWWpppppo...", "....orWWWpWKWpWWWpo...", "....orWKWpWWWpWKWpo...", "...orrWWWpppppWWWpqo..", "....oppppppppppppqo...", "....opppKpppppKqqqo...", "....oppppKKKKKqqqqo...", ".....oopppWppqqqoo....", ".......opppqqqqo......", "......ovRWWWWRvvo.....", ".....ovvRRDDRRvvvo....", "..ooovvvRWWWWRvvvvoo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvYWWWWWYvvvpo..", ".opppvvvvWWWWWvvvpppo.", ".ooooNNNNNYYYNNNNNooo.", ".....onnnnnnnnnnno....", ".....onnnnnnnnnnno....", ".....onnnnooonnnno....", ".....onnno...onnno....", ".....onnno...onnno....", ".....onnno...onnno....", "...KIKKKKK...KIKKKKK..", "...KKKKKKK...KKKKKKK..", "....KKKKK.....KKKKK..."], "blink": [".....YY.........YY....", "......o.........o.....", ".......o.......o......", ".........ooooo........", ".......oorrrppoo......", ".....oorrrrpppppoo....", "....orrrrrppppppppo...", "....orppppooopppppo...", "....orooopppppooopo...", "...orrppppppppppppqo..", "....oppppppppppppqo...", "....opppKpppppKqqqo...", "....oppppKKKKKqqqqo...", ".....oopppWppqqqoo....", ".......opppqqqqo......", "......ovRWWWWRvvo.....", ".....ovvRRDDRRvvvo....", "..ooovvvRWWWWRvvvvoo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvYWWWWWYvvvpo..", ".opppvvvvWWWWWvvvpppo.", ".ooooNNNNNYYYNNNNNooo.", ".....onnnnnnnnnnno....", ".....onnnnnnnnnnno....", ".....onnnnooonnnno....", ".....onnno...onnno....", ".....onnno...onnno....", ".....onnno...onnno....", "...KIKKKKK...KIKKKKK..", "...KKKKKKK...KKKKKKK..", "....KKKKK.....KKKKK..."], "sad": ["......................", ".....oo.........oo....", "....o..o.......o..o...", "...Y.....ooooo.....Y..", "...Y...oorrrppoo...Y..", ".....oorrrrpppppoo....", "....orrrrrooopppppo...", "....orooopWWWpooopo...", "....orWWWpWKWpWWWpo...", "...orrWKWpppppWKWpqo..", "....oppppppppppppqo...", "....oppppppppppqqqo...", "....oppppKKKKKqqqqo...", ".....oopKppppqKqoo....", ".......opppqqqqo......", "......ovvWWWWWvvo.....", ".....ovvRWWWWRvvvo....", "..ooovvvRRDDRRvvvvoo..", "..opvvvvYRWWRWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvYWWWWWYvvvpo..", ".opppvvvvWWWWWvvvpppo.", ".ooooNNNNNYYYNNNNNooo.", ".....onnnnnnnnnnno....", ".....onnnnnnnnnnno....", ".....onnnnooonnnno....", ".....onnno...onnno....", ".....onnno...onnno....", ".....onnno...onnno....", "...KIKKKKK...KIKKKKK..", "...KKKKKKK...KKKKKKK..", "....KKKKK.....KKKKK..."], "sadBlink": ["......................", ".....oo.........oo....", "....o..o.......o..o...", "...Y.....ooooo.....Y..", "...Y...oorrrppoo...Y..", ".....oorrrrpppppoo....", "....orrrrrppppppppo...", "....orppppppppppppo...", "....orppppooopppppo...", "...orrooopppppooopqo..", "....oppppppppppppqo...", "....oppppppppppqqqo...", "....oppppKKKKKqqqqo...", ".....oopKppppqKqoo....", ".......opppqqqqo......", "......ovvWWWWWvvo.....", ".....ovvRWWWWRvvvo....", "..ooovvvRRDDRRvvvvoo..", "..opvvvvYRWWRWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvYWWWWWYvvvpo..", ".opppvvvvWWWWWvvvpppo.", ".ooooNNNNNYYYNNNNNooo.", ".....onnnnnnnnnnno....", ".....onnnnnnnnnnno....", ".....onnnnooonnnno....", ".....onnno...onnno....", ".....onnno...onnno....", ".....onnno...onnno....", "...KIKKKKK...KIKKKKK..", "...KKKKKKK...KKKKKKK..", "....KKKKK.....KKKKK..."], "ko": ["......................", ".....oo.........oo....", "....o..o.......o..o...", "...Y.....ooooo.....Y..", "...Y...oorrrppoo...Y..", ".....oorrrrpppppoo....", "....orrrrropopppppo...", "....oropoppoppopopo...", "....orpoppopoppoppo...", "...orropopppppopopqo..", "....oppppppppppppqo...", "....oppppKKKKKpqqqo...", "....oppppKDDDKqqqqo...", ".....ooppppPPqqqoo....", ".......opppPqqqo......", "......ovvWWWWWvvo.....", ".....ovvRWWWWRvvvo....", "..ooovvvRRDDRRvvvvoo..", "..opvvvvYRWWRWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvYWWWWWYvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvvWWWWWvvvvpo..", "..opvvvvYWWWWWYvvvpo..", ".opppvvvvWWWWWvvvpppo.", ".ooooNNNNNYYYNNNNNooo.", ".....onnnnnnnnnnno....", ".....onnnnnnnnnnno....", ".....onnnnooonnnno....", ".....onnno...onnno....", ".....onnno...onnno....", ".....onnno...onnno....", "...KIKKKKK...KIKKKKK..", "...KKKKKKK...KKKKKKK..", "....KKKKK.....KKKKK..."]};
   const bakeWith = (rows, cols) => {
     const c = document.createElement('canvas'); c.width = rows[0].length; c.height = rows.length;
@@ -5847,7 +5950,7 @@
   // [x, y, colour] from his top left; bits: bits flying off; stains: splats left on the shop, [x, y, colour])
   // (whyT: frames left of his WHY?)
   let gloopPics = null, shopBg = null, shop = { sad: false, tearT: 0, hitT: 0, whyT: 0, ammo: [], mess: [], bits: [], stains: [], lamp: 'up', lampY: 0, lampV: 0, lampX: 120, ko: false, koT: 0,
-    window: 'whole', suck: null, gone: false, wind: [], listOpen: false };
+    window: 'whole', suck: null, gone: false, wind: [], listOpen: false, potionView: null, drank: '', drankSays: '', potionT: 0, bubbles: false };
   // (window: 'whole' or 'broken'; suck: Gloop being sucked out, { t, from }; gone: he has been; wind: streaks of air)
   // (lamp: 'up' on its cord, 'fall' (lampY: how far it has dropped, lampV: how fast; lampX: where it snapped), 'down'
   // on Gloop's head (falling over with him), or 'gone', left behind the counter when he got up; ko: knocked out by it, koT: frames since: wobbling with the
@@ -5860,6 +5963,28 @@
   // (a burrito to throw: a rolled tortilla with its filling showing at one end)
   SPRITES.thrown_burrito = ['..LLLLLLLL..', '.LOLLLLOLLL.', 'LLLLLLLLLLRg', 'LLOLLLLLLLNW', '.LLLLOLLLLL.', '..LLLLLLLL..'];
   const inShop = () => !!(arcadeZoom.shop && arcadeZoom.shop.p === 1 && arcadeZoom.target && !arcadeZoom.out);
+  // (the potion on the shelf, or the card on the counter that says what it costs)
+  function onPotion(e) {
+    const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * PW, y = (e.clientY - r.top) / r.height * PH;
+    return (x >= 186 && x < 208 && y >= 86 && y < 106) || (x >= 169 && x < 213 && y >= 165 && y < 190);
+  }
+  // (the pug buying: the one whose controller square clicked, or the keyboard's)
+  const potionBuyer = () => { const by = padClickBy !== null ? padClickBy : kbSlot || 0; return joined[by] ? by : 0; };
+  function buyPotion() {
+    const id = potionBuyer(), p = potionOf(potions.shelf);
+    if (coins[id] < POTION_PRICE) { sfx.nope(); return; }
+    coins[id] -= POTION_PRICE; saveCoins(); updateHud(true);
+    shop.drank = p.key; shop.drankSays = p.says || '';
+    if (p.now) shop.drankSays = p.now(id);
+    else {
+      potions.active = potions.active.filter(k => k !== p.rival);
+      if (!potions.active.includes(p.key)) potions.active.push(p.key);
+    }
+    stockPotion();   // (and a new potion takes its place, the user asked)
+    shop.potionView = 'drank'; shop.potionT = 40;
+    tone(300, 0.1, 'sine', 0.05, 200); tone(340, 0.1, 'sine', 0.05, 200, 0.14); tone(380, 0.1, 'sine', 0.05, 200, 0.28);   // (glug, glug, glug)
+    [659, 880, 1175].forEach((f, i) => tone(f, 0.12, 'triangle', 0.04, 0, 0.5 + i * 0.09));
+  }
   // (Gloop's box on the screen, drawn twice his size behind the counter)
   const GLOOP_X = 98, GLOOP_Y = 144;
   function onGloop(e) {
@@ -5872,10 +5997,18 @@
     const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * PW, y = (e.clientY - r.top) / r.height * PH;
     return x >= 168 && x < 226 && y >= 115 && y < 160;
   }
-  // (or, on the mission list, a look at it close up; with it up, any click puts it back)
+  // (or, on the mission list, a look at it close up; with it up, any click puts it back. On the potion, the potion
+  // up close, where a click on Buy buys it and any other click puts it back)
   function shopClick(e) {
     if (shop.listOpen) { shop.listOpen = false; sfx.tick(); return; }
+    if (shop.potionView) {
+      const r = cv.getBoundingClientRect(), bx = (e.clientX - r.left) / r.width * PW, by = (e.clientY - r.top) / r.height * PH;
+      if (shop.potionView === 'buy' && bx >= 78 && bx < 162 && by >= 172 && by < 192) buyPotion();
+      else { shop.potionView = null; sfx.tick(); }
+      return;
+    }
     if (onMissionList(e)) { shop.listOpen = true; sfx.tick(); return; }
+    if (onPotion(e)) { shop.potionView = 'buy'; sfx.tick(); return; }
     if (shop.ammo.length >= 8) return;
     const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * PW, y = (e.clientY - r.top) / r.height * PH;
     shop.ammo.push({ t: 0, at: onGloop(e) && !gloopDown() && !shop.gone && !shop.suck ? null : [x, y] }); sfx.toss();   // (not at him while he's down or gone)
@@ -5924,7 +6057,7 @@
   }
   function drawJupiterShop() {
     if (!shopBg) buildShopBg();
-    if (!gloopPics) gloopPics = Object.fromEntries(Object.entries(GLOOP).map(([k, v]) => [k, bakeWith(v, GLOOP_COLS)]));
+    if (!gloopPics) gloopPics = Object.fromEntries(Object.entries(GLOOP).map(([k, v]) => [k, bakeWith(v, gloopPaint || GLOOP_COLS)]));
     const t = spaceT, a = ctx.globalAlpha;   // (a: how far the shop has faded in, so all of it fades together)
     ctx.drawImage(shopBg, 0, 0);
     // the storm outside the porthole: red and orange bands swirling past
@@ -5953,6 +6086,18 @@
       ctx.fillStyle = '#c8b898'; ctx.fillRect(183, y + 2, 36, 1);
       ctx.fillStyle = '#3e2414'; ctx.fillRect(183, y + 2, k, 1);
     });
+    // (the potion for sale on the lower shelf, with a glint going across it and its price on a tag; sparkling just after
+    // it has been refreshed)
+    const bottle = sprite('potion_' + potions.shelf);
+    if (bottle) ctx.drawImage(bottle, 191, 91);
+    if (t % 180 < 12) { ctx.fillStyle = '#ffffff'; ctx.fillRect(194 + (t % 180 >> 1), 97 + (t % 180 >> 2), 1, 1); }
+    ctx.fillStyle = '#3e2414'; ctx.fillRect(205, 102, 15, 10); ctx.fillStyle = '#fff6e0'; ctx.fillRect(206, 103, 13, 8);
+    drawText(POTION_PRICE, 207, 103, 'black');
+    if (shop.potionT > 0) {
+      shop.potionT--;
+      ctx.fillStyle = shop.potionT % 4 < 2 ? '#fff6c8' : '#ffcc3d';
+      for (let i = 0; i < 6; i++) ctx.fillRect(197 + Math.round(Math.cos(i + t / 6) * (40 - shop.potionT) / 3), 97 + Math.round(Math.sin(i + t / 6) * (40 - shop.potionT) / 3), 2, 2);
+    }
     for (const [x, y, col] of shop.stains) { ctx.fillStyle = col; ctx.fillRect(x, y, 2, 2); }   // (burrito splats)
     // the lamp, swinging a little on its cord, and its warm glow; once a burrito snaps it down, just the cord's
     // stub swinging (the lamp itself drops, and lands on Gloop, further down)
@@ -6023,11 +6168,11 @@
     }
     // (his hands resting on the counter top, but not while he is falling or down behind it)
     if (here && fall < 0.15) {
-      ctx.fillStyle = GLOOP_COLS.o; ctx.fillRect(GLOOP_X + 2, 186, 8, 5); ctx.fillRect(GLOOP_X + 34, 186, 8, 5);
-      ctx.fillStyle = GLOOP_COLS.p; ctx.fillRect(GLOOP_X + 3, 187, 6, 3); ctx.fillRect(GLOOP_X + 35, 187, 6, 3);
+      ctx.fillStyle = (gloopPaint || GLOOP_COLS).o; ctx.fillRect(GLOOP_X + 2, 186, 8, 5); ctx.fillRect(GLOOP_X + 34, 186, 8, 5);
+      ctx.fillStyle = (gloopPaint || GLOOP_COLS).p; ctx.fillRect(GLOOP_X + 3, 187, 6, 3); ctx.fillRect(GLOOP_X + 35, 187, 6, 3);
     }
-    // (the card says COMING SOON, and the till shows nothing rung up)
-    drawText('COMING', 191, 169, 'black', 'center'); drawText('SOON!', 191, 179, 'red', 'center');
+    // (the card says what's for sale, and the till shows nothing rung up)
+    drawText('POTION', 191, 169, 'black', 'center'); drawText(POTION_PRICE + ' COIN', 191, 179, 'red', 'center');
     drawText('000', 47, 152, 'green', 'center');
     // the thrown burritos: up from the bottom of the screen in an arc, spinning and getting smaller as they go, to
     // the spot each was thrown at (or Gloop's face), where it splats
@@ -6112,7 +6257,44 @@
       for (let i = 0; i < 4; i++) { ctx.fillStyle = '#3e2414'; ctx.fillRect(117 + i, 132 + i, 8 - i * 2, 1); ctx.fillStyle = '#fff6e0'; ctx.fillRect(118 + i, 132 + i, Math.max(0, 6 - i * 2), 1); }
       drawText('WHY?', 120, 121, 'black', 'center');
     }
+    // (a Bubble Potion's bubbles, rising past everything until you leave)
+    if (shop.bubbles) {
+      ctx.fillStyle = 'rgba(200,240,255,0.55)';
+      for (let i = 0; i < 26; i++) {
+        const x = Math.floor(i * 29 % PW + Math.sin(t / 22 + i) * 5), y = Math.floor(PH - (t * (0.4 + (i % 3) * 0.15) + i * 37) % PH), s = 3 + i % 4;
+        ctx.fillRect(x, y, s, 1); ctx.fillRect(x, y + s, s, 1); ctx.fillRect(x - 1, y + 1, 1, s - 1); ctx.fillRect(x + s, y + 1, 1, s - 1);
+      }
+    }
     if (shop.listOpen && inShop()) drawMissionList();
+    if (shop.potionView && inShop()) drawPotionPanel();
+  }
+  // the potion up close: a mystery until it's bought, then what it did
+  function drawPotionPanel() {
+    ctx.fillStyle = 'rgba(12,6,20,0.55)'; ctx.fillRect(0, 0, PW, PH);
+    ctx.fillStyle = '#3e2414'; ctx.fillRect(30, 62, 180, 170);
+    ctx.fillStyle = '#fff6e0'; ctx.fillRect(31, 63, 178, 168);
+    drawText("GLOOP'S POTION", 120, 69, 'black', 'center');
+    ctx.fillStyle = '#c8b898'; ctx.fillRect(40, 79, 160, 1);
+    if (shop.potionView === 'buy') {
+      const id = potionBuyer(), short = POTION_PRICE - coins[id], s = sprite('potion_' + potions.shelf);
+      if (s) ctx.drawImage(s, 102, 84, 36, 39);
+      drawText('MYSTERY POTION', 120, 129, 'black', 'center');
+      drawText('WHAT WILL IT DO?', 120, 139, 'black', 'center');
+      drawText(`${LOOK[id].name} has ${coins[id]} coin${coins[id] === 1 ? '' : 's'}`, 120, 156, 'black', 'center');
+      ctx.fillStyle = '#3e2414'; ctx.fillRect(78, 172, 84, 20);
+      ctx.fillStyle = short > 0 ? '#a8a090' : '#5fd068'; ctx.fillRect(79, 173, 82, 18);
+      drawText(`BUY: ${POTION_PRICE} COINS`, 120, 179, 'black', 'center');
+      if (short > 0) drawText(`NEED ${short} MORE`, 120, 198, 'red', 'center');
+      drawText('CLICK ELSEWHERE TO LEAVE', 120, 214, 'black', 'center');
+    } else {
+      const p = potionOf(shop.drank), s = sprite('potion_' + shop.drank);
+      if (s) ctx.drawImage(s, 102, 84, 36, 39);
+      drawText(p.name, 120, 129, 'red', 'center');
+      drawText(shop.drankSays, 120, 143, 'black', 'center');
+      if (!p.now) drawText('IN YOUR NEXT GAME', 120, 156, 'black', 'center');
+      drawText('A NEW POTION IS ON THE SHELF', 120, 186, 'black', 'center');
+      drawText('CLICK TO GO ON', 120, 214, 'black', 'center');
+    }
   }
   // the mission list up close, over the shop: each mission, how far along it is, and what it will win
   function drawMissionList() {
@@ -7799,6 +7981,43 @@
     if (g.startT > 0) banner(g.startT > 40 ? 'SATURN SCRAMBLE' : 'HOP!', 110, 'gold', 2);
     if (g.endT) banner('GAME OVER', 120, 'pink', 2);
   }
+  // (Bruno where he stands, half size with a Shrink Potion: only how he looks, his corner is as dangerous as ever)
+  function drawHomeBruno() {
+    if (!potionOn('tinybruno')) return drawApe();
+    const X = px(64), Y = Math.round(surf(G[APE], 64) / 2);
+    ctx.save(); ctx.translate(X, Y); ctx.scale(0.5, 0.5); ctx.translate(-X, -Y); drawApe(); ctx.restore();
+  }
+  // The potions that change the whole picture of the level, drawn over it each frame
+  let potionDark = null;
+  function drawPotionScreen() {
+    const cam = Math.round(camY / 2);
+    if (potionOn('dark')) {
+      // (black, with a pool of light cut out round each pug)
+      if (!potionDark) { potionDark = document.createElement('canvas'); potionDark.width = PW; potionDark.height = PH; }
+      const g = potionDark.getContext('2d');
+      g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, PW, PH);
+      g.fillStyle = 'rgba(4,4,16,0.94)'; g.fillRect(0, 0, PW, PH);
+      g.globalCompositeOperation = 'destination-out';
+      for (const P of players) if (P.state !== 'out') {
+        const x = px(P.x), y = Math.round(P.y / 2) - cam - 8, light = g.createRadialGradient(x, y, 18, x, y, 54);
+        light.addColorStop(0, 'rgba(0,0,0,1)'); light.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = light; g.beginPath(); g.arc(x, y, 54, 0, Math.PI * 2); g.fill();
+      }
+      ctx.drawImage(potionDark, 0, 0);
+    }
+    if (potionOn('ice')) {
+      ctx.fillStyle = '#ffffff';
+      for (let i = 0; i < 40; i++) {
+        const x = (i * 67 + Math.sin(frame / 40 + i) * 6 + 240) % PW, y = (i * 43 + frame * (0.3 + (i % 3) * 0.15)) % PH;
+        ctx.fillRect(Math.floor(x), Math.floor(y), 1 + i % 2, 1 + i % 2);
+      }
+    }
+    if (potionOn('wobble')) for (let y = 0; y < PH; y += 3) {
+      const s = Math.round(Math.sin(y / 14 + frame / 10) * 3);
+      if (s) ctx.drawImage(cv, 0, y, PW, 3, s, y, PW, 3);
+    }
+    if (potionOn('mirror')) { ctx.save(); ctx.translate(PW, 0); ctx.scale(-1, 1); ctx.drawImage(cv, 0, 0); ctx.restore(); }
+  }
   function draw() {
     // gliding between the main menu and The Arcade, both scenes
     if (skyScroll) { drawSkyScroll(); updateHud(); return; }
@@ -7826,7 +8045,7 @@
     const cam = Math.round(camY / 2);
     ctx.save();
     // (the screen shakes for a moment when Bruno's ball thumps onto a floor or he lands back home)
-    ctx.translate(0, -cam + (shakeT > 0 ? (frame % 2 ? 1 : -1) : 0));
+    ctx.translate(0, -cam + (shakeT > 0 || potionOn('quake') ? (frame % 2 ? 1 : -1) : 0));
     ctx.drawImage(stage, 0, 0);
     if (discoFloors.size) drawDisco();
     drawTorches();
@@ -7838,8 +8057,8 @@
       else blit('hammer_up', px(h.x) - 3, Math.round(h.y / 2) - 4 + (Math.floor(frame / 20) % 2));
     }
     // (Bruno trembles while he says "an explosion explodes")
-    if (boom && boom.t < BOOM_TALK) { ctx.save(); ctx.translate(boom.t % 4 < 2 ? 1 : -1, 0); drawApe(); ctx.restore(); }
-    else drawApe();
+    if (boom && boom.t < BOOM_TALK) { ctx.save(); ctx.translate(boom.t % 4 < 2 ? 1 : -1, 0); drawHomeBruno(); ctx.restore(); }
+    else drawHomeBruno();
     drawPearl();
     for (const b of barrels) if (!b.dead) { if (b.taco) drawTaco(b); else if (b.disco) drawDiscoBall(b); else drawRollingBarrel(b.x, b.y, b.rot); }
     // thrown hammers tumble end over end (upright, then on its side, every 3 frames); one thrown with a
@@ -7975,6 +8194,7 @@
       acc += Math.min(100, t - lastT); lastT = t;
       while (acc >= 1000 / 60) { step(); acc -= 1000 / 60; }
       draw();
+      if (potions.active.length && (phase === 'play' || phase === 'win' || (phase === 'paused' && !fromTitle))) drawPotionScreen();
       if (gloopGlitch) drawGlitch();
     } catch (e) {
       acc = 0;
