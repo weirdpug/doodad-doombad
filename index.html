@@ -1820,7 +1820,7 @@
     showControllerHelp(); updateHud(true);
     // (in the Store opened from the main menu no game is running: it just shows the pugs still here)
     // (in the Colosseum its pug fights on for the computer, and the fight pauses to say so)
-    if ((arena || race || dig || hop) && fromTitle && phase === 'mini') { pauseMini(`Player ${id + 1}'s controller disconnected. Press A on a controller to bring them back.`); return; }
+    if ((arena || race || dig || hop || plain) && fromTitle && phase === 'mini') { pauseMini(`Player ${id + 1}'s controller disconnected. Press A on a controller to bring them back.`); return; }
     if (fromTitle) { if (phase === 'paused') showPause(pauseView, menuSel); return; }
     if (phase === 'play' || phase === 'paused' || phase === 'win') {
       // if everyone left was sitting out, the team is out: that costs a heart and the level restarts
@@ -2217,11 +2217,11 @@
     // X or Enter also swings the sword)
     if (phase === 'mini') {
       const km = keyMap[e.code];
-      const swing = (arena || dig) && (e.code === 'KeyX' || e.key === 'Enter');   // (on Mars, a bark)
+      const swing = (arena || dig || plain) && (e.code === 'KeyX' || e.key === 'Enter' || (plain && e.code === 'KeyB'));   // (on Mars and Jupiter, a bark)
       // (in the Colosseum a keyboard that hasn't joined yet joins as the next player, as in the main game)
-      if ((arena || race || dig || hop) && (km || swing) && !e.repeat) claimKeyboard(true);
+      if ((arena || race || dig || hop || plain) && (km || swing) && !e.repeat) claimKeyboard(true);
       if (km) { e.preventDefault(); keys[km] = true; }
-      if (swing && !e.repeat) { e.preventDefault(); (arena || dig).kbAtk = true; }
+      if (swing && !e.repeat) { e.preventDefault(); (arena || dig || plain).kbAtk = true; }
       if ((e.key === 'Escape' || e.key === 'p' || e.key === 'P') && !e.repeat) pauseMini();
       return;
     }
@@ -2293,7 +2293,7 @@
   addEventListener('blur', releaseAll);
 
   // the touch buttons count as the keyboard: the same pug, and they join the same way its keys do
-  document.getElementById('barkBtn').addEventListener('pointerdown', e => { e.preventDefault(); initAudio(); if (phase === 'mini' && (arena || race || dig || hop)) { if ((arena || dig) && claimKeyboard(true)) (arena || dig).kbAtk = true; return; } if (claimKeyboard(true) === true) doBark(pById(kbSlot)); });
+  document.getElementById('barkBtn').addEventListener('pointerdown', e => { e.preventDefault(); initAudio(); if (phase === 'mini' && (arena || race || dig || hop || plain)) { if ((arena || dig || plain) && claimKeyboard(true)) (arena || dig || plain).kbAtk = true; return; } if (claimKeyboard(true) === true) doBark(pById(kbSlot)); });
   document.querySelectorAll('.pad button[data-k]').forEach(btn => {
     const k = btn.dataset.k;
     const on = e => {
@@ -2371,6 +2371,7 @@
       else if ((phase === 'play' || phase === 'paused') && !fromTitle) p1Lost();
       // (the keyboard can only take Player 1 back if it isn't already someone else)
       else if (phase === 'mini' && dig && !dig.endT) pauseDig(`Player 1's controller disconnected. ${kbSlot === null || kbSlot === 0 ? 'Press a key, or A on a controller,' : 'Press A on a controller'} to take Player 1 back.`);
+      else if (phase === 'mini' && plain) pausePlain(`Player 1's controller disconnected. ${kbSlot === null || kbSlot === 0 ? 'Press a key, or A on a controller,' : 'Press A on a controller'} to take Player 1 back.`);
       else if (phase === 'mini' && hop && !hop.endT) pauseHop(`Player 1's controller disconnected. ${kbSlot === null || kbSlot === 0 ? 'Press a key, or A on a controller,' : 'Press A on a controller'} to take Player 1 back.`);
       else if (phase === 'mini' && race && !race.endT) pauseRace(`Player 1's controller disconnected. ${kbSlot === null || kbSlot === 0 ? 'Press a key, or A on a controller,' : 'Press A on a controller'} to take Player 1 back.`);
       else if (phase === 'mini' && arena && !arena.result) pauseArena(`Player 1's controller disconnected. ${kbSlot === null || kbSlot === 0 ? 'Press a key, or A on a controller,' : 'Press A on a controller'} to take Player 1 back.`);
@@ -2841,6 +2842,8 @@
     digOver: () => [{ label: 'Play again', act: by => startDig(by) }, { label: 'Back', act: () => backFromDig() }],
     hopPause: () => [{ label: 'Resume', act: () => resumeGame() }, { label: 'Back', act: () => backFromHop() }],
     hopOver: () => [{ label: 'Play again', act: by => startHop(by) }, { label: 'Back', act: () => backFromHop() }],
+    // (Jupiter's flat plain: only one way home)
+    plainPause: () => [{ label: 'Resume', act: () => resumeGame() }, { label: 'Main Menu', act: () => leavePlain() }],
     arcade: () => [
       ...(arcadeZoom.target && !arcadeZoom.out && !onShip() && !arcadeZoom.target.shop ? [{ label: 'Play', act: by => playFromArcade(by) }] : []),
       // (zoomed in on the spaceship, Back zooms out to Saturn first)
@@ -2867,7 +2870,7 @@
     // (the Store and Necklaces show the bag or look of the pug that opened them)
     if ((store || neck) && by !== undefined && joined[by]) storeBy = by;
     if (!joined[storeBy]) storeBy = kbBy();
-    const bpause = /^(banana|arena|race|dig|hop)Pause$/.test(view), bover = /^(banana|arena|race|dig|hop)Over$/.test(view);
+    const bpause = /^(banana|arena|race|dig|hop|plain)Pause$/.test(view), bover = /^(banana|arena|race|dig|hop)Over$/.test(view);
     ovTitle.textContent = bpause ? 'Paused' : view === 'arenaOver' ? arenaWords().title : view === 'raceOver' ? raceWords().title : view === 'digOver' ? digWords().title : view === 'hopOver' ? hopWords().title : bover ? 'Splat!' : arcade ? (onShip() ? 'Alien Spaceship' : inShop() ? SHOP_NAME : arcadeZoom.target && !arcadeZoom.out ? arcadeZoom.target.name : 'The Arcade') : store ? 'Store' : part ? part.name : custom ? 'Customize' : 'Paused';
     // (Necklaces keeps a line for what was just put on, and with 2-4 pugs, whose look it is)
     ovText.hidden = arcade || (custom && !neck);
@@ -2880,6 +2883,7 @@
       : view === 'raceOver' ? raceWords().text
       : view === 'digPause' ? 'Mars Dig. Dig for bones and crystals, bark to make the Martians dizzy, then boop them. Look out for falling rocks!'
       : view === 'digOver' ? digWords().text
+      : view === 'plainPause' ? 'Somewhere on Jupiter. Gloop is watching from his spaceship.'
       : view === 'hopPause' ? 'Saturn Scramble. Hop across Saturn\'s rings: dodge the rovers and comets, ride the ice over open space, and keep moving, or an alien will beam you up!'
       : view === 'hopOver' ? hopWords().text
       : view === 'arenaOver' ? arenaWords().text
@@ -3113,6 +3117,7 @@
     // (back on Saturn, a direction or A still held from the menu doesn't hop)
     if (fromTitle && pauseView === 'hopPause') { releaseAll(); if (hop) hop.pugs.forEach(p => { p.prev = { up: true, down: true, left: true, right: true }; }); phase = 'mini'; hideOverlay(); return; }
     if (fromTitle && pauseView === 'hopOver') return backFromHop();
+    if (fromTitle && pauseView === 'plainPause') { releaseAll(); if (plain) plain.pugs.forEach(p => { p.prev = { jump: true, bark: true }; }); phase = 'mini'; hideOverlay(); return; }
     if (fromTitle) return backToTitle();   // (the Store or Customize opened from the main menu goes back there)
     releaseAll(); phase = 'play'; hideOverlay();
   }
@@ -3289,12 +3294,12 @@
   }
   // Past level 9 while the game is glitching (the user asked 2026-11-05) there are no more levels: the glitching stops,
   // Bruno is back in his job, and the whole page goes black, with only yellow words on it. A click, tap, key or controller
-  // button moves on to the next words (the user asked, and chose their sizes), and BLACK_WAIT frames after the last
-  // another one goes quietly back to the main menu.
+  // button moves on to the next words (the user asked, and chose their sizes), and one more goes to a random spot on
+  // Jupiter (startPlain).
   const BLACK_WORDS = [{ lines: ['YOU WERE NOT', 'MEANT TO MAKE', 'IT THIS FAR'], size: 2 }, { lines: ['YOU SUCKED ME', 'OUT A WINDOW'], size: 2 },
     { lines: ['YOU BLEW ME UP', 'WITH A', 'SPACESHIP'], size: 2.5 }, { lines: ['YOU CRAMMED', 'ME IN A', 'CASTLE!!!'], size: 3 },
     { lines: ['AND NOW', 'THIS!!!!!!'], size: 3.5 }, { lines: ['NO'], size: 2 },
-    { lines: ['I WILL GET', 'MY REVENGE'], size: 2 }], BLACK_WAIT = 300;
+    { lines: ['I WILL GET', 'MY REVENGE'], size: 2 }];
   let blackT = 0, blackPad = false, blackAt = 0;
   function blackOut() {
     phase = 'blackout'; blackT = 0; blackPad = false; blackAt = 0; p1LostAtWin = false;
@@ -3310,13 +3315,12 @@
     const down = [...navigator.getGamepads()].some(g => g && g.buttons.some(b => b.pressed));
     if (down) blackPad = true; else if (blackPad) { blackPad = false; blackPress(); }
   }
-  // (a press let go: nothing until the first words are up, then the next words, then out)
+  // (a press let go: nothing until the first words are up, then the next words, then Jupiter)
   function blackPress() {
     if (blackT < 60) return;
     if (blackAt < BLACK_WORDS.length - 1) { blackAt++; blackT = 60; tone(130 - blackAt * 15, 0.9, 'sine', 0.08, -25); }
-    else if (blackT >= BLACK_WAIT) leaveBlackout();
+    else startPlain();
   }
-  function leaveBlackout() { document.body.classList.remove('blackout'); toMainMenu(); }
   addEventListener('keyup', () => { if (phase === 'blackout') blackPress(); }, true);
   addEventListener('click', e => { if (phase === 'blackout') { e.stopPropagation(); e.preventDefault(); blackPress(); } }, true);
   function drawBlackout() {
@@ -3324,6 +3328,121 @@
     if (blackT < 60) return;   // (a moment of nothing at all first)
     const { lines, size } = BLACK_WORDS[blackAt], gap = 9 * size;
     lines.forEach((line, i) => drawText(line, PW / 2, 140 - lines.length * gap / 2 + i * gap, 'gold', 'center', size));
+  }
+  // After the black screen (the user asked 2026-11-05): a random spot on Jupiter, a completely flat plain under the
+  // planet's bands that goes on for ever. The pugs can walk, jump and bark, and Gloop hovers above them in a spaceship,
+  // drifting after them. The pause menu's Main Menu is the way home. (plain: the state, phase 'mini' like the Arcade's
+  // games; PLAIN_Y: the ground on the screen; PLAIN_SPOTS: the spots, each the sky's bands, the ground and what's in the sky)
+  let plain = null;
+  const PLAIN_Y = 238, PLAIN_SKY_W = 480;
+  const PLAIN_SPOTS = [
+    { bands: ['#a8541e', '#c8742f', '#8a4220', '#d89a5a', '#a8541e', '#c8742f'], ground: ['#d8a878', '#a86f3e', '#7a4a26'], sky: 'swirls' },
+    { bands: ['#f4e6cc', '#e8c9a0', '#f0dfc0', '#d8b080', '#f4e6cc', '#e8d4b0'], ground: ['#f0dcc0', '#c8a878', '#a07f52'], sky: 'none' },
+    { bands: ['#e8c9a0', '#d8a878', '#f0dfc0', '#c8915a', '#e8c9a0', '#f0dfc0'], ground: ['#c8848a', '#a85a50', '#7a3a34'], sky: 'redspot' },
+    { bands: ['#8a4220', '#a8541e', '#6e3418', '#c8742f', '#8a4220', '#6e3418'], ground: ['#c8915a', '#8a5630', '#5e3a20'], sky: 'ovals' },
+    { bands: ['#8a8e9e', '#a8a2a0', '#6e7488', '#b8b0a8', '#8a8e9e', '#6e7488'], ground: ['#c0c4d0', '#8a8e9e', '#5e6274'], sky: 'none' },
+    { bands: ['#c8583a', '#e8785a', '#a8341e', '#f0a070', '#c8583a', '#e8c9a0'], ground: ['#f0a070', '#c8583a', '#8a2c1a'], sky: 'swirls' },
+  ];
+  // (the sky, built once for each visit: wavy bands that join up at the edges, so it can scroll round for ever)
+  function buildPlainSky(spot) {
+    const c = document.createElement('canvas'); c.width = PLAIN_SKY_W; c.height = PLAIN_Y;
+    const g = c.getContext('2d'), n = spot.bands.length, bh = PLAIN_Y / n, a = Math.random() * 6, b = Math.random() * 6;
+    for (let x = 0; x < PLAIN_SKY_W; x += 2) for (let y = 0; y < PLAIN_Y; y++) {
+      const t = x / PLAIN_SKY_W * Math.PI * 2, i = Math.floor((y + Math.sin(t * 3 + a + y / 30) * 5 + Math.sin(t * 7 + b) * 2) / bh);
+      g.fillStyle = spot.bands[((i % n) + n) % n]; g.fillRect(x, y, 2, 1);
+    }
+    const oval = (x, y, rx, ry, col) => { g.fillStyle = col; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); g.fill(); };
+    if (spot.sky === 'redspot') { const x = 120 + Math.random() * 240, y = 90 + Math.random() * 60; oval(x, y, 70, 38, '#f0dfc0'); oval(x, y, 62, 32, '#c8482e'); oval(x, y, 46, 22, '#a8341e'); oval(x, y, 24, 10, '#c8583a'); }
+    if (spot.sky === 'ovals') for (let i = 0; i < 6; i++) { const x = 40 + i * 76 + Math.random() * 24, y = 40 + Math.random() * 150; oval(x, y, 14, 7, '#f4e6cc'); oval(x, y, 9, 4, '#ffffff'); }
+    if (spot.sky === 'swirls') for (let i = 0; i < 40; i++) {
+      const x = 8 + Math.random() * (PLAIN_SKY_W - 16), y = 10 + Math.random() * (PLAIN_Y - 20), r = 4 + Math.random() * 7;
+      g.strokeStyle = 'rgba(255,240,210,0.35)'; g.beginPath(); g.arc(x, y, r, Math.random() * 6, Math.random() * 6 + 8); g.stroke();
+    }
+    return c;
+  }
+  function startPlain() {
+    document.body.classList.remove('blackout');
+    const spot = PLAIN_SPOTS[Math.floor(Math.random() * PLAIN_SPOTS.length)], x0 = Math.floor(Math.random() * 100000);
+    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, shipX: x0 };
+    const first = kbSlot !== null && joined[kbSlot] ? kbSlot : 0;
+    for (let i = 0; i < 4; i++) if (arenaDriven(i) || i === first) plainPug(i);
+    try { initAudio(); } catch (e) {}
+    releaseAll(); fromTitle = true; phase = 'mini'; hideOverlay();
+  }
+  function plainPug(id) {
+    plain.pugs.push({ id, x: plain.cam + PW / 2 - 24 + id * 16, y: PLAIN_Y, vy: 0, ground: true, face: 1, moving: false, anim: 0, barkT: 0, prev: { jump: true, bark: true } });
+  }
+  // (a fresh press jumps or barks once; holding it does nothing more)
+  function plainInput(p) {
+    const g = plain, pad = padHeld[p.id] || {}, kb = kbSlot !== null ? p.id === kbSlot : p.id === 0 && ownerOf(0) === undefined;
+    const held = k => !!pad[k] || (kb && keys[k]);
+    const jump = !!pad.jump || (kb && (keys.jump || keys.up)), bark = !!pad.bark || !!pad.toss;
+    const inp = { left: held('left'), right: held('right'), jump: jump && !p.prev.jump, bark: (bark && !p.prev.bark) || (kb && g.kbAtk) };
+    p.prev = { jump, bark };
+    return inp;
+  }
+  function stepPlain() {
+    const g = plain;
+    g.t++;
+    for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.pugs.some(p => p.id === i)) plainPug(i);
+    for (const p of g.pugs) {
+      const inp = plainInput(p), dx = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
+      p.moving = !!dx;
+      if (dx) { p.face = dx; p.x += dx * 1.25; if (++p.anim % 12 === 0 && p.ground) sfx.step(); }
+      if (inp.jump && p.ground) { p.ground = false; p.vy = -3.4; sfx.jump(); }
+      if (!p.ground) { p.vy += 0.16; p.y += p.vy; if (p.y >= PLAIN_Y) { p.y = PLAIN_Y; p.vy = 0; p.ground = true; } }
+      if (inp.bark && p.barkT < 25) { p.barkT = 45; sfx.bark(LOOK[p.id].bark); }
+      if (p.barkT > 0) p.barkT--;
+    }
+    g.kbAtk = false;
+    // (the view stays on the pugs, who can't walk off its edges; Gloop drifts along after them)
+    const mid = g.pugs.reduce((n, p) => n + p.x, 0) / g.pugs.length;
+    g.cam += (mid - PW / 2 - g.cam) * 0.1;
+    for (const p of g.pugs) p.x = clamp(p.x, g.cam + 8, g.cam + PW - 8);
+    g.shipX += (mid - g.shipX) * 0.02;
+  }
+  function pausePlain(note) {
+    if (phase !== 'mini' || !plain) return;
+    releaseAll(); phase = 'paused'; showPause('plainPause', 0, note);
+  }
+  function leavePlain() { plain = null; toMainMenu(); }
+  function drawPlain() {
+    const g = plain, off = (((g.cam * 0.25 + g.t * 0.1) % PLAIN_SKY_W) + PLAIN_SKY_W) % PLAIN_SKY_W;
+    ctx.drawImage(g.sky, -off, 0); ctx.drawImage(g.sky, PLAIN_SKY_W - off, 0);
+    // the ground: perfectly flat, with little marks that pass by to show the pugs are moving
+    const [top, mid, low] = g.spot.ground;
+    ctx.fillStyle = low; ctx.fillRect(0, PLAIN_Y, PW, PH - PLAIN_Y);
+    ctx.fillStyle = mid; ctx.fillRect(0, PLAIN_Y, PW, 6);
+    ctx.fillStyle = top; ctx.fillRect(0, PLAIN_Y, PW, 2);
+    ctx.fillStyle = mid;
+    for (let n = Math.floor(g.cam / 19) - 1; n * 19 < g.cam + PW + 19; n++) {
+      const h = Math.abs(Math.sin(n * 12.9898) * 43758.5453) % 1, y = PLAIN_Y + 10 + Math.floor(h * (PH - PLAIN_Y - 14));
+      ctx.fillRect(Math.round(n * 19 + h * 12 - g.cam), y, 3 + Math.floor(h * 6), 1);
+    }
+    drawGloopShip(Math.round(g.shipX - g.cam), 62 + Math.round(Math.sin(g.t / 40) * 4));
+    for (const p of g.pugs) {
+      const X = Math.round(p.x - g.cam), Y = Math.round(p.y), flip = p.face < 0, L = looks[p.id];
+      const pose = !p.ground ? 'jump' : p.moving ? (Math.floor(p.anim / 6) % 2 ? 'walk2' : 'walk1') : 'stand';
+      blitFeet('player_' + pose, X, Y, flip, LOOK[p.id].swap);
+      if (L.suit) blitFeet(L.suit + '_' + pose, X, Y, flip);
+      if (L.hat) blitFeet(L.hat + '_' + pose, X, Y, flip);
+      if (L.necklace) blitFeet(L.necklace + '_' + pose, X, Y, flip);
+      if (p.barkT > 0) drawText('WOOF!', X, Y - 24 - hatUp(p.id), 'black', 'center');
+      if (g.pugs.length > 1) drawText('P' + (p.id + 1), X, Y - 34 - hatUp(p.id), LOOK[p.id].tag, 'center');
+    }
+  }
+  // Gloop, sad and looking down at you, under a glass dome on a saucer (x: its middle, y: the top of the hull)
+  function drawGloopShip(x, y) {
+    if (!gloopPics) gloopPics = Object.fromEntries(Object.entries(GLOOP).map(([k, v]) => [k, bakeWith(v, GLOOP_COLS)]));
+    const t = plain.t, pic = t % 260 < 14 ? gloopPics.sadBlink : gloopPics.sad;
+    ctx.fillStyle = 'rgba(159,216,255,0.28)'; ctx.beginPath(); ctx.ellipse(x, y, 19, 21, 0, Math.PI, 0); ctx.fill();
+    ctx.drawImage(pic, 0, 0, 22, 16, x - 11, y - 16, 22, 16);
+    ctx.strokeStyle = '#d8f0ff'; ctx.beginPath(); ctx.ellipse(x, y, 19, 21, 0, Math.PI, 0); ctx.stroke();
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(x - 12, y - 15, 2, 4);   // (a glint on the glass)
+    ctx.fillStyle = '#55556a'; ctx.fillRect(x - 34, y + 1, 68, 2); ctx.fillRect(x - 28, y + 9, 56, 2); ctx.fillRect(x - 12, y + 11, 24, 3);
+    ctx.fillStyle = '#b8c0d8'; ctx.fillRect(x - 24, y - 1, 48, 2); ctx.fillRect(x - 36, y + 3, 72, 6);
+    ctx.fillStyle = '#eef0f6'; ctx.fillRect(x - 32, y + 3, 64, 1);
+    for (let i = 0; i < 7; i++) { ctx.fillStyle = (i + (t >> 4)) % 3 === 0 ? '#ffcc3d' : (i + (t >> 4)) % 3 === 1 ? '#e8282f' : '#5fd068'; ctx.fillRect(x - 31 + i * 10, y + 5, 3, 2); }
   }
   function gameOver() {
     phase = 'over';
@@ -4081,7 +4200,7 @@
     } else if (phase === 'blackout') { stepBlackout();
     } else if (phase === 'title') {
       updateApe(); updateBarrels(); barrels = barrels.filter(b => !b.dead);
-    } else if (phase === 'mini') { if (arena) stepArena(); else if (race) stepRace(); else if (dig) stepDig(); else if (hop) stepHop(); else stepBanana(); }
+    } else if (phase === 'mini') { if (arena) stepArena(); else if (race) stepRace(); else if (dig) stepDig(); else if (hop) stepHop(); else if (plain) stepPlain(); else stepBanana(); }
     else if (phase === 'boom' && --shipBoomT <= 0) endShipBoom();   // (the spaceship's explosion picture, 5 seconds)
     // pets fly along with their pugs while a level plays and during the level-clear banner
     if (phase === 'play' || phase === 'win') for (const p of players) movePets(p);
@@ -5520,7 +5639,7 @@
   // (motherCalled: drawSkyScroll starts it at the top). Not during a game, the Store or Customize.
   let motherCalled = false;
   function codeCome() {
-    if (mother.state !== 'gone') return;
+    if (mother.state !== 'gone' || plain) return;
     const titleScreen = phase === 'paused' && fromTitle && pauseView !== 'arcade' && !/^(banana|arena|race|dig|hop)/.test(pauseView);
     if (phase === 'title' || titleScreen) { motherCalled = true; scrollSky(1, kbBy()); return; }   // (the Store, Customize too)
     if (phase === 'mini' || (phase === 'paused' && fromTitle && /^(banana|arena|race|dig|hop)/.test(pauseView))) backToArcade();   // (a mini-game: out to space)
@@ -6950,7 +7069,7 @@
   // whether a player drives pug id: its controller, or the keyboard (the keyboard drives Player 1's pug until it
   // joins as someone else, unless a controller has Player 1); a pug nobody drives fights for the computer
   const arenaDriven = id => joined[id] && (ownerOf(id) !== undefined || kbSlot === id || (id === 0 && kbSlot === null));
-  const pauseMini = note => arena ? pauseArena(note) : race ? pauseRace(note) : dig ? pauseDig(note) : hop ? pauseHop(note) : pauseBanana();
+  const pauseMini = note => arena ? pauseArena(note) : race ? pauseRace(note) : dig ? pauseDig(note) : hop ? pauseHop(note) : plain ? pausePlain(note) : pauseBanana();
   // back to The Arcade, zoomed in on the mother ship
   function backFromArena() {
     const gun = arena && arena.gun;
@@ -8257,6 +8376,7 @@
     if (dig && (phase === 'mini' || (fromTitle && (pauseView === 'digPause' || pauseView === 'digOver')))) {
       drawDig(); updateHud(); return;
     }
+    if (plain && (phase === 'mini' || (fromTitle && pauseView === 'plainPause'))) { drawPlain(); updateHud(); return; }
     if (hop && (phase === 'mini' || (fromTitle && (pauseView === 'hopPause' || pauseView === 'hopOver')))) {
       drawHop(); updateHud(); return;
     }
