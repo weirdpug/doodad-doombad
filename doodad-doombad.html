@@ -1840,7 +1840,7 @@
     q.x = outOfHole(g, q.x);   // (never inside a hole in that floor)
     if (q.g === APE) q.x = Math.max(q.x, 100);
     q.y = footY(g, q.x);
-    q.state = 'walk'; q.vx = q.vy = 0; q.lad = null; q.hammer = 0; q.deathT = 0; q.safe = 120; q.nameT = 0;
+    q.state = 'walk'; q.vx = q.vy = q.slide = 0; q.lad = null; q.hammer = 0; q.deathT = 0; q.safe = 120; q.nameT = 0;
     toast(`${LOOK[q.id].name} is back!`, LOOK[q.id].hex); sfx.oneUp();
     updateHud();
   }
@@ -2964,7 +2964,9 @@
   function onBruno(e) {
     if (phase !== 'play' || bruno) return false;
     const r = cv.getBoundingClientRect();
-    const wx = (e.clientX - r.left) * PW / r.width * 2, wy = ((e.clientY - r.top) * PH / r.height + Math.round(camY / 2)) * 2;
+    let wx = (e.clientX - r.left) * PW / r.width * 2;
+    const wy = ((e.clientY - r.top) * PH / r.height + Math.round(camY / 2)) * 2;
+    if (potionOn('mirror')) wx = PW * 2 - wx;   // (with the level flipped, he is over on the right)
     const feet = surf(G[APE], BRUNO_HOME);
     return wx > BRUNO_HOME - 44 && wx < BRUNO_HOME + 44 && wy > feet - 72 && wy < feet + 8;
   }
@@ -3164,6 +3166,9 @@
   function updatePlayer(P) {
     const inp = P.inp, jp = P.jp;
     const k = speedOf(P);   // 2 for a spicy pug: walks, jumps across, steers and climbs twice as fast
+    // (a Floaty Potion's jumps are ordinary jumps in slow motion: they land in the same place, only later, because
+    // jumping further is what Spicy does)
+    const air = potionOn('floaty') ? 0.5 : 1;
     let dx = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
     if (potionOn('backwards')) dx = -dx;
     P.moving = false;
@@ -3181,7 +3186,7 @@
         if (inp.up && P.ladLock !== 'up') { const l = ladderAt(P, P.g, 'lo'); if (l) { P.state = 'climb'; P.lad = l; P.x = l.x; P.y -= 2; return; } }
         // going down a ladder needs a plain "down": a diagonal while walking past a ladder top keeps walking
         if (inp.down && !dx && P.ladLock !== 'down') { const l = ladderAt(P, P.g, 'hi'); if (l) { P.state = 'climb'; P.lad = l; P.x = l.x; P.y += 2; return; } }
-        if (jp.jump || jp.up) { P.state = 'air'; P.jumped = true; P.vy = potionOn('floaty') ? -3 : -4.2; P.vx = dx * 1.5 * k; if (dx) P.face = dx; P.top = P.y; P.fromG = P.g; sfx.jump(); return; }
+        if (jp.jump || jp.up) { P.state = 'air'; P.jumped = true; P.vy = -4.2 * air; P.vx = dx * 1.5 * k * air; if (dx) P.face = dx; P.top = P.y; P.fromG = P.g; sfx.jump(); return; }
       }
       // a footstep every 12 steps of the walk animation (checked as "crossed a multiple of 12", since a
       // spicy pug's counter goes up by 2 and may be odd from before it ate the pepper)
@@ -3190,15 +3195,17 @@
       let walk = dx * 1.5 * k;
       if (potionOn('ice')) { walk = P.slide = (P.slide || 0) + (walk - (P.slide || 0)) * 0.06; if (Math.abs(walk) > 0.2) P.moving = true; }
       P.x = clamp(P.x + walk, P.g === 0 ? 48 : 6, 474);
-      // (the hiccups: a little hop every few seconds, but not with a hammer in paw)
-      if (potionOn('hiccup') && !P.hammer && (P.hicT = (P.hicT ?? 240) - 1) <= 0) {
-        P.hicT = 200 + Math.random() * 240; P.state = 'air'; P.jumped = false; P.vy = -2.6; P.vx = walk; P.top = P.y; P.fromG = P.g;
+      // (the hiccups: a little hop every few seconds that can be steered like a jump, but not with a hammer in paw, and
+      // it holds off while anything dangerous is close, because a pug can't jump over it from the middle of a hop)
+      if (potionOn('hiccup') && !P.hammer && (P.hicT = (P.hicT ?? 240) - 1) <= 0 && !bruno
+        && !barrels.some(b => !b.dead && b.g === P.g && Math.abs(b.x - P.x) < 150) && !(fire && fire.g === P.g && Math.abs(fire.x - P.x) < 150)) {
+        P.hicT = 200 + Math.random() * 240; P.state = 'air'; P.jumped = true; P.vy = -2.6 * air; P.vx = walk * air; P.top = P.y; P.fromG = P.g;
         pops.push({ x: P.x, y: P.y - 44, text: 'HIC!', t: 40 }); tone(900, 0.08, 'square', 0.03, 500);
         return;
       }
       const g = G[P.g];
       // (fromG: the floor it left, where a Bouncy Pillow bounces it back to)
-      if (!onGirder(g, P.x)) { P.state = 'air'; P.jumped = false; P.vy = 0; P.vx = dx * k; P.top = P.y; P.fromG = P.g; }
+      if (!onGirder(g, P.x)) { P.state = 'air'; P.jumped = false; P.vy = 0; P.vx = dx * k * air; P.top = P.y; P.fromG = P.g; }
       else P.y = footY(g, P.x);
     } else if (P.state === 'air') {
       P.slide = P.vx;
@@ -3211,16 +3218,16 @@
       }
       const py = P.y, ox = P.x;
       // Steer a jump diagonally with left/right, even if pressed after takeoff
-      if (P.jumped && dx) { P.vx = dx * 1.5 * k; P.face = dx; }
+      if (P.jumped && dx) { P.vx = dx * 1.5 * k * air; P.face = dx; }
       // A Bouncy Pillow's bounce goes straight up until the pug is above the floor it fell from, then
       // over to its spot on that floor (so it never bumps into the girder's end on the way)
       if (P.bounce) {
         const g = G[P.bounce.g], d = P.bounce.x - P.x;
         P.vx = P.y < footY(g, P.bounce.x) - 4 ? clamp(d, -2.5, 2.5) : 0;
       }
-      // (a Floaty Potion: half the gravity, but it changes nothing about how far a fall may be; a bounce stays a bounce)
+      // (a Floaty Potion: slow motion, but it changes nothing about how far a fall may be; a bounce stays a bounce)
       const floaty = potionOn('floaty') && !P.bounce;
-      P.vy = Math.min(P.vy + (floaty ? 0.11 : 0.22), floaty ? 3 : 6); P.x += P.vx; P.y += P.vy;
+      P.vy = Math.min(P.vy + (floaty ? 0.055 : 0.22), floaty ? 3 : 6); P.x += P.vx; P.y += P.vy;
       if (P.x < 6 || P.x > 474) { P.x = clamp(P.x, 6, 474); P.vx = -P.vx * 0.5; }
       // the tar drum is a wall on the bottom floor, in the air too
       if (P.x < 48 && P.y > surf(G[1], P.x) + 12) { P.x = 48; P.vx = 0; }
@@ -4210,7 +4217,7 @@
       // try spots 0, +14, -14, +28, -28 ... px from the pug and take the first one clear of the
       // arrows already placed; the search is bounded, and if every spot is taken the arrow
       // simply overlaps (never loop forever)
-      const base = clamp(px(p.x), 9, PW - 10);
+      const base = clamp(potionOn('mirror') ? PW - px(p.x) : px(p.x), 9, PW - 10);
       let X = base;
       for (let k = 0; k <= 32; k++) {
         const c = clamp(base + (k % 2 ? 1 : -1) * 14 * Math.ceil(k / 2), 9, PW - 10);
@@ -8149,6 +8156,7 @@
     drawBruno(true);
     if (boom) drawBoom();
     ctx.restore();
+    if (potions.active.length) drawPotionScreen();   // (under the banners and arrows, so those can still be read)
     drawOffscreenMarkers(cam);
     if (phase === 'win') banner(isBoss() ? `${brunoName().toUpperCase()} DEFEATED!` : `LEVEL ${level} CLEAR`, 116, 'gold', 2);
     const p1 = pById(0);
@@ -8194,7 +8202,6 @@
       acc += Math.min(100, t - lastT); lastT = t;
       while (acc >= 1000 / 60) { step(); acc -= 1000 / 60; }
       draw();
-      if (potions.active.length && (phase === 'play' || phase === 'win' || (phase === 'paused' && !fromTitle))) drawPotionScreen();
       if (gloopGlitch) drawGlitch();
     } catch (e) {
       acc = 0;
