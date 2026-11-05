@@ -2209,9 +2209,10 @@
     // which used to leave the pug walking on its own (sometimes right off a girder)
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (coinBarOpen) return coinBarKey(e);
+    if (phase === 'blackout') { if (keyMap[e.code]) e.preventDefault(); return; }   // (no codes either: nothing may show on the black)
     if (secretCode(e)) return;
     // gliding to or from The Arcade, or a spaceship exploding: keys do nothing
-    if (phase === 'scroll' || phase === 'boom' || phase === 'arrive' || phase === 'mboom' || phase === 'blackout') { if (keyMap[e.code]) e.preventDefault(); return; }
+    if (phase === 'scroll' || phase === 'boom' || phase === 'arrive' || phase === 'mboom') { if (keyMap[e.code]) e.preventDefault(); return; }
     // Banana Catch: the arrows (or A/D) move and Esc or P pauses; nothing else does anything (in the Colosseum,
     // X or Enter also swings the sword)
     if (phase === 'mini') {
@@ -3292,10 +3293,12 @@
   // another one goes quietly back to the main menu.
   const BLACK_WORDS = [{ lines: ['YOU WERE NOT', 'MEANT TO MAKE', 'IT THIS FAR'], size: 2 }, { lines: ['YOU SUCKED ME', 'OUT A WINDOW'], size: 2 },
     { lines: ['YOU BLEW ME UP', 'WITH A', 'SPACESHIP'], size: 2.5 }, { lines: ['YOU CRAMMED', 'ME IN A', 'CASTLE!!!'], size: 3 },
-    { lines: ['AND NOW', 'THIS!!!!!!'], size: 3.5 }, { lines: ['NO'], size: 2 }], BLACK_WAIT = 300;
+    { lines: ['AND NOW', 'THIS!!!!!!'], size: 3.5 }, { lines: ['NO'], size: 2 },
+    { lines: ['I WILL GET', 'MY REVENGE'], size: 2 }], BLACK_WAIT = 300;
   let blackT = 0, blackPad = false, blackAt = 0;
   function blackOut() {
-    phase = 'blackout'; blackT = 0; blackPad = false; blackAt = 0;
+    phase = 'blackout'; blackT = 0; blackPad = false; blackAt = 0; p1LostAtWin = false;
+    boom = null; boomPic.hidden = true; boomPicT = 0;   // (no explosion goes off, or stays up, over the black)
     gloopBruno = false; gloopBrunoNext = false; stopGlitch();
     releaseAll(); closeCoinBar();
     cv.style.cursor = '';
@@ -3310,7 +3313,7 @@
   // (a press let go: nothing until the first words are up, then the next words, then out)
   function blackPress() {
     if (blackT < 60) return;
-    if (blackAt < BLACK_WORDS.length - 1) { blackAt++; blackT = 60; tone(115 - blackAt * 15, 0.9, 'sine', 0.08, -25); }
+    if (blackAt < BLACK_WORDS.length - 1) { blackAt++; blackT = 60; tone(130 - blackAt * 15, 0.9, 'sine', 0.08, -25); }
     else if (blackT >= BLACK_WAIT) leaveBlackout();
   }
   function leaveBlackout() { document.body.classList.remove('blackout'); toMainMenu(); }
