@@ -3287,7 +3287,8 @@
   // button moves on to the next words (the user asked, the later ones a bit bigger each), and BLACK_WAIT frames after the last
   // another one goes quietly back to the main menu.
   const BLACK_WORDS = [{ lines: ['YOU WERE NOT', 'MEANT TO MAKE', 'IT THIS FAR'], size: 2 }, { lines: ['YOU SUCKED ME', 'OUT A WINDOW'], size: 2 },
-    { lines: ['YOU BLEW ME UP', 'WITH A', 'SPACESHIP'], size: 2.5 }, { lines: ['YOU CRAMMED', 'ME IN A', 'CASTLE!!!'], size: 3 }], BLACK_WAIT = 300;
+    { lines: ['YOU BLEW ME UP', 'WITH A', 'SPACESHIP'], size: 2.5 }, { lines: ['YOU CRAMMED', 'ME IN A', 'CASTLE!!!'], size: 3 },
+    { lines: ['AND NOW', 'THIS!!!!!!'], size: 3.5 }], BLACK_WAIT = 300;
   let blackT = 0, blackPad = false, blackAt = 0;
   function blackOut() {
     phase = 'blackout'; blackT = 0; blackPad = false; blackAt = 0;
@@ -3305,7 +3306,7 @@
   // (a press let go: nothing until the first words are up, then the next words, then out)
   function blackPress() {
     if (blackT < 60) return;
-    if (blackAt < BLACK_WORDS.length - 1) { blackAt++; blackT = 60; tone(85 - blackAt * 15, 0.9, 'sine', 0.08, -25); }
+    if (blackAt < BLACK_WORDS.length - 1) { blackAt++; blackT = 60; tone(100 - blackAt * 15, 0.9, 'sine', 0.08, -25); }
     else if (blackT >= BLACK_WAIT) leaveBlackout();
   }
   function leaveBlackout() { document.body.classList.remove('blackout'); toMainMenu(); }
