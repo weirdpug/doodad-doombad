@@ -2042,6 +2042,7 @@
   //   L0CK      locks again everything that had to be unlocked (Zorp the Alien, the space things and the mission prizes), keeping what you start with (relock)
   //   L0CK2     only resets Gloop's missions and locks their prizes again (codeMissions)
   //   YAY!      unlocks every customization there is, mission prizes too (unlockAll)
+  //   B0SS      goes straight to Gloop's chase on Jupiter (codeBoss), from any screen
   // A code's first key still does its usual job if it is a game key (B barks, ZER0's Z jumps), but once a
   // code has begun, its next keys only type the code: the coin code's S doesn't also climb down or pick a
   // menu choice, the skip code's X makes no tacos. A key that doesn't fit, or nothing typed for 25 seconds,
@@ -2050,7 +2051,8 @@
     { code: '|_!FE', at: 0, run: () => toggleSafe() }, { code: '/\\/EXT', at: 0, run: () => skipLevel() },
     { code: 'ZER0', at: 0, run: () => zeroCoins() }, { code: 'C0/\\/\\E', at: 0, run: () => codeCome() },
     { code: 'EXP', at: 0, run: () => codeExp() }, { code: 'L0CK', at: 0, run: () => relock() },
-    { code: 'L0CK2', at: 0, run: () => codeMissions() }, { code: 'YAY!', at: 0, run: () => unlockAll() }];
+    { code: 'L0CK2', at: 0, run: () => codeMissions() }, { code: 'YAY!', at: 0, run: () => unlockAll() },
+    { code: 'B0SS', at: 0, run: () => codeBoss() }];
   // The zero code (the user asked for one to reset their coins): every pug's coins are set to 0 and saved.
   // Store things already bought are kept.
   // (the lock code, the user asked 2026-10-31: every unlock forgotten, and a pet that is locked again goes home, and a
@@ -3357,7 +3359,17 @@
     }
     return c;
   }
+  // (the chase code, the user asked 2026-11-05: straight there from any screen, except in the middle of a long
+  // animation; whatever was going on is left behind, as the way home is the main menu)
+  function codeBoss() {
+    if (plain || phase === 'scroll' || phase === 'boom' || phase === 'arrive' || phase === 'mboom') return;
+    if (gloopGlitch) { gloopBruno = false; gloopBrunoNext = false; }
+    stopGlitch();
+    boom = null; boomPic.hidden = true; boomPicT = 0;
+    startPlain();
+  }
   function startPlain() {
+    banana = arena = race = dig = hop = null;
     document.body.classList.remove('blackout');
     const spot = PLAIN_SPOTS[Math.floor(Math.random() * PLAIN_SPOTS.length)], x0 = Math.floor(Math.random() * 100000);
     plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 + (Math.random() < 0.5 ? -GLOOP_NEAR : GLOOP_NEAR), gloopFace: 1, endT: 0 };
@@ -3383,6 +3395,7 @@
     g.t++;
     if (g.endT && --g.endT === 0) return leavePlain();
     if (!g.endT) for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.pugs.some(p => p.id === i)) plainPug(i);
+    g.pugs = g.pugs.filter(p => arenaDriven(p.id));   // (one nobody drives any more goes, so it can't hold the view back)
     for (const p of g.pugs) {
       if (p.dead) continue;
       const inp = plainInput(p), dx = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
@@ -3396,7 +3409,7 @@
     g.kbAtk = false;
     // (the view stays on the pugs still alive, who can't walk off its edges)
     const alive = g.pugs.filter(p => !p.dead);
-    if (!alive.length) return;
+    if (!alive.length) { if (!g.endT) g.endT = 150; return; }
     const mid = alive.reduce((n, p) => n + p.x, 0) / alive.length;
     g.cam += (mid - PW / 2 - g.cam) * 0.1;
     for (const p of alive) p.x = clamp(p.x, g.cam + 8, g.cam + PW - 8);
@@ -3432,10 +3445,12 @@
     for (const p of g.pugs) {
       const X = Math.round(p.x - g.cam), Y = Math.round(p.y), flip = p.face < 0, L = looks[p.id];
       const pose = p.dead ? 'dead' : !p.ground ? 'jump' : p.moving ? (Math.floor(p.anim / 6) % 2 ? 'walk2' : 'walk1') : 'stand';
-      blitFeet('player_' + pose, X, Y, flip, LOOK[p.id].swap);
-      if (L.suit) blitFeet(L.suit + '_' + pose, X, Y, flip);
-      if (L.hat) blitFeet(L.hat + '_' + pose, X, Y, flip);
-      if (L.necklace) blitFeet(L.necklace + '_' + pose, X, Y, flip);
+      // (not blitFeet, which holds things on the screen: a dead pug scrolls off with the ground)
+      const feet = (name, sw) => { const b = sprite(name, flip, sw); if (b) ctx.drawImage(b, X - (b.width >> 1), Y - b.height); };
+      feet('player_' + pose, LOOK[p.id].swap);
+      if (L.suit) feet(L.suit + '_' + pose);
+      if (L.hat) feet(L.hat + '_' + pose);
+      if (L.necklace) feet(L.necklace + '_' + pose);
       if (p.barkT > 0) drawText('WOOF!', X, Y - 24 - hatUp(p.id), 'black', 'center');
       if (g.pugs.length > 1) drawText('P' + (p.id + 1), X, Y - 34 - hatUp(p.id), LOOK[p.id].tag, 'center');
     }
