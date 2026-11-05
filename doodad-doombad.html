@@ -1889,6 +1889,7 @@
   //   EXP       blows up all the mother ship's tiny ships at once, and so the mother ship (codeExp), in The Arcade
   //   L0CK      locks again everything that had to be unlocked (Zorp the Alien, the space things and the mission prizes), keeping what you start with (relock)
   //   L0CK2     only resets Gloop's missions and locks their prizes again (codeMissions)
+  //   YAY!      unlocks every customization there is, mission prizes too (unlockAll)
   // A code's first key still does its usual job if it is a game key (B barks, ZER0's Z jumps), but once a
   // code has begun, its next keys only type the code: the coin code's S doesn't also climb down or pick a
   // menu choice, the skip code's X makes no tacos. A key that doesn't fit, or nothing typed for 25 seconds,
@@ -1897,7 +1898,7 @@
     { code: '|_!FE', at: 0, run: () => toggleSafe() }, { code: '/\\/EXT', at: 0, run: () => skipLevel() },
     { code: 'ZER0', at: 0, run: () => zeroCoins() }, { code: 'C0/\\/\\E', at: 0, run: () => codeCome() },
     { code: 'EXP', at: 0, run: () => codeExp() }, { code: 'L0CK', at: 0, run: () => relock() },
-    { code: 'L0CK2', at: 0, run: () => codeMissions() }];
+    { code: 'L0CK2', at: 0, run: () => codeMissions() }, { code: 'YAY!', at: 0, run: () => unlockAll() }];
   // The zero code (the user asked for one to reset their coins): every pug's coins are set to 0 and saved.
   // Store things already bought are kept.
   // (the lock code, the user asked 2026-10-31: every unlock forgotten, and a pet that is locked again goes home, and a
@@ -1913,6 +1914,20 @@
     resetMissions();   // (the mission prizes too, the user asked 2026-11-03)
     saveLooks(); sfx.nope();
     toast('Everything you unlocked is locked again', '#ff3e6c');
+    if (phase === 'paused' && LOOK_SECTIONS[pauseView]) showPause(pauseView, 0);   // (its cards may have changed)
+  }
+  // (the unlock code, the user asked 2026-11-04: everything that has to be unlocked, for every pug: what is won by
+  // playing or bought with coins, and every mission prize; the missions on the list then pay in coins)
+  function unlockAll() {
+    for (const k of ['alien', 'space', 'chickens']) unlock(k);
+    for (const p of PRIZES) if (!missions.won.includes(p.item.key)) {
+      missions.won.push(p.item.key);
+      LOOK_SECTIONS[p.view].list.push(p.item);
+      addLookCard(p.view, LOOK_SECTIONS[p.view], p.item);
+    }
+    for (const m of missions.active) m.prize = null;
+    saveMissions(); sfx.oneUp();
+    toast('Every customization is unlocked!', '#ffcc3d');
     if (phase === 'paused' && LOOK_SECTIONS[pauseView]) showPause(pauseView, 0);   // (its cards may have changed)
   }
   // Every mission prize goes back out of Customize and off any pug that has it, and Gloop's list starts again from
