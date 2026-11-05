@@ -3283,7 +3283,7 @@
     }
   }
   // Past level 9 while the game is glitching (the user asked 2026-11-05) there are no more levels: the glitching stops,
-  // Bruno is back in his job, and the whole page goes black, with one speech bubble from nobody on it. After
+  // Bruno is back in his job, and the whole page goes black, with only yellow words on it. After
   // BLACK_WAIT frames any key, click, tap or controller button, let go, goes quietly back to the main menu.
   const BLACK_LINES = ['YOU WERE NOT', 'MEANT TO MAKE', 'IT THIS FAR'], BLACK_WAIT = 300;
   let blackT = 0, blackPad = false;
@@ -3307,11 +3307,7 @@
   function drawBlackout() {
     ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, PW, PH);
     if (blackT < 60) return;   // (a moment of nothing at all first)
-    const w = 176, h = 70, x = (PW - w) >> 1, y = 96;
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(x + 3, y, w - 6, h); ctx.fillRect(x, y + 3, w, h - 6); ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
-    for (let i = 0; i < 12; i++) ctx.fillRect(x + 44 + i, y + h + i, 12 - i, 1);   // (its tail, pointing at nobody)
-    BLACK_LINES.forEach((line, i) => drawText(line, PW / 2, y + 9 + i * 18, 'black', 'center', 2));
+    BLACK_LINES.forEach((line, i) => drawText(line, PW / 2, 114 + i * 18, 'gold', 'center', 2));
   }
   function gameOver() {
     phase = 'over';
