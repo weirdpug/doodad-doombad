@@ -3283,12 +3283,13 @@
     }
   }
   // Past level 9 while the game is glitching (the user asked 2026-11-05) there are no more levels: the glitching stops,
-  // Bruno is back in his job, and the whole page goes black, with only yellow words on it. After
-  // BLACK_WAIT frames any key, click, tap or controller button, let go, goes quietly back to the main menu.
-  const BLACK_LINES = ['YOU WERE NOT', 'MEANT TO MAKE', 'IT THIS FAR'], BLACK_WAIT = 300;
-  let blackT = 0, blackPad = false;
+  // Bruno is back in his job, and the whole page goes black, with only yellow words on it. A click, tap, key or controller
+  // button changes them to the second words (the user asked), and BLACK_WAIT frames after that another one goes quietly
+  // back to the main menu.
+  const BLACK_LINES = ['YOU WERE NOT', 'MEANT TO MAKE', 'IT THIS FAR'], BLACK_LINES2 = ['YOU SUCKED ME', 'OUT A WINDOW'], BLACK_WAIT = 300;
+  let blackT = 0, blackPad = false, blackNext = false;
   function blackOut() {
-    phase = 'blackout'; blackT = 0; blackPad = false;
+    phase = 'blackout'; blackT = 0; blackPad = false; blackNext = false;
     gloopBruno = false; gloopBrunoNext = false; stopGlitch();
     releaseAll(); closeCoinBar();
     cv.style.cursor = '';
@@ -3296,18 +3297,24 @@
     tone(55, 1.6, 'sine', 0.09, -20);
   }
   function stepBlackout() {
-    if (++blackT < BLACK_WAIT) return;
+    blackT++;
     const down = [...navigator.getGamepads()].some(g => g && g.buttons.some(b => b.pressed));
-    if (down) blackPad = true; else if (blackPad) leaveBlackout();
+    if (down) blackPad = true; else if (blackPad) { blackPad = false; blackPress(); }
+  }
+  // (a press let go: nothing until the first words are up, then the second words, then out)
+  function blackPress() {
+    if (blackT < 60) return;
+    if (!blackNext) { blackNext = true; blackT = 60; tone(70, 0.9, 'sine', 0.08, -25); }
+    else if (blackT >= BLACK_WAIT) leaveBlackout();
   }
   function leaveBlackout() { document.body.classList.remove('blackout'); toMainMenu(); }
-  const blackDone = () => phase === 'blackout' && blackT >= BLACK_WAIT;
-  addEventListener('keyup', () => { if (blackDone()) leaveBlackout(); }, true);
-  addEventListener('click', e => { if (blackDone()) { e.stopPropagation(); e.preventDefault(); leaveBlackout(); } }, true);
+  addEventListener('keyup', () => { if (phase === 'blackout') blackPress(); }, true);
+  addEventListener('click', e => { if (phase === 'blackout') { e.stopPropagation(); e.preventDefault(); blackPress(); } }, true);
   function drawBlackout() {
     ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, PW, PH);
     if (blackT < 60) return;   // (a moment of nothing at all first)
-    BLACK_LINES.forEach((line, i) => drawText(line, PW / 2, 114 + i * 18, 'gold', 'center', 2));
+    const lines = blackNext ? BLACK_LINES2 : BLACK_LINES;
+    lines.forEach((line, i) => drawText(line, PW / 2, 140 - lines.length * 9 + i * 18, 'gold', 'center', 2));
   }
   function gameOver() {
     phase = 'over';
