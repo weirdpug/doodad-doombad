@@ -3333,8 +3333,9 @@
   }
   // After the black screen (the user asked 2026-11-05): a random spot on Jupiter, a completely flat plain under the
   // planet's bands that goes on for ever, with obstacles to get past as you run (plainObstacle). The pugs can walk, jump
-  // and bark, and Gloop chases them on foot all the time, walking over everything: a pug he catches dies, and with none
-  // left it's back to the main menu, as is the pause menu's Main Menu. (plain: the
+  // and bark, and Gloop chases them on foot all the time, walking over everything: a pug he catches dies, and so does one
+  // hit by the barrels that sometimes fall from the sky; with none left it's back to the main menu, as is the pause
+  // menu's Main Menu. (plain: the
   // state, phase 'mini' like the Arcade's games; PLAIN_Y: the ground on the screen; PLAIN_SPOTS: the spots, each the
   // sky's bands, the ground and what's in the sky; GLOOP_NEAR: how far off he stays at most, however fast they run)
   let plain = null;
@@ -3395,7 +3396,7 @@
     banana = arena = race = dig = hop = null;
     document.body.classList.remove('blackout');
     const spot = PLAIN_SPOTS[Math.floor(Math.random() * PLAIN_SPOTS.length)], x0 = Math.floor(Math.random() * 100000);
-    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0 };
+    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150 };
     const first = kbSlot !== null && joined[kbSlot] ? kbSlot : 0;
     for (let i = 0; i < 4; i++) if (arenaDriven(i) || i === first) plainPug(i);
     try { initAudio(); } catch (e) {}
@@ -3457,10 +3458,23 @@
     g.gloopX += gap > GLOOP_NEAR ? 1.35 : 0.9;
     const under = g.obs.reduce((t, o) => g.gloopX + 8 > o.x1 && g.gloopX - 8 < o.x2 ? Math.min(t, o.top) : t, PLAIN_Y);
     g.gloopY += (under - g.gloopY) * 0.2;
-    for (const p of alive) if (Math.abs(p.x - g.gloopX) < 12) {
-      p.dead = true; p.y = plainFloor(p.x, p.y); p.ground = true; p.barkT = 0; sfx.die();
-      if (alive.every(q => q.dead)) g.endT = 150;
+    const kill = p => { if (p.dead) return; p.dead = true; p.y = plainFloor(p.x, p.y); p.ground = true; p.barkT = 0; sfx.die(); };
+    for (const p of alive) if (Math.abs(p.x - g.gloopX) < 12) kill(p);
+    // Barrels now and then fall out of the sky, each with a shadow showing where it will land. One that hits a pug
+    // kills it; one that hits the ground or an obstacle smashes.
+    if (--g.dropT <= 0) { g.dropT = 80 + Math.random() * 170; g.drops.push({ x: g.cam + 30 + Math.random() * (PW - 40), y: -16, vy: 0.4, spin: 0 }); }
+    for (const b of g.drops) {
+      b.vy = Math.min(b.vy + 0.07, 3.4); b.y += b.vy; b.spin++;
+      for (const p of alive) if (Math.abs(b.x - p.x) < 11 && b.y + 5 > p.y - PLAIN_H && b.y - 5 < p.y) kill(p);
+      if (b.y + 5 >= plainFloor(b.x, b.y - b.vy + 5)) {
+        b.gone = true; sfx.smash();
+        for (let i = 0; i < 8; i++) g.bits.push({ x: b.x, y: b.y + 4, vx: (Math.random() - 0.5) * 3, vy: -1 - Math.random() * 2, t: 24 });
+      }
     }
+    g.drops = g.drops.filter(b => !b.gone);
+    for (const b of g.bits) { b.vy += 0.2; b.x += b.vx; b.y += b.vy; b.t--; }
+    g.bits = g.bits.filter(b => b.t > 0);
+    if (alive.every(q => q.dead)) g.endT = 150;
   }
   function pausePlain(note) {
     if (phase !== 'mini' || !plain) return;
@@ -3487,7 +3501,15 @@
       ctx.fillStyle = mid; ctx.fillRect(x + 1, o.top + 1, w - 2, h - 1);
       ctx.fillStyle = top; ctx.fillRect(x + 1, o.top + 1, w - 2, 2);
     }
+    // (the shadows of the falling barrels, growing darker as they come down)
+    for (const b of g.drops) {
+      ctx.fillStyle = `rgba(20,10,4,${(0.2 + 0.5 * Math.max(0, b.y) / PLAIN_Y).toFixed(2)})`;
+      ctx.fillRect(Math.round(b.x - g.cam) - 6, plainFloor(b.x, b.y + 5) - 2, 12, 2);
+    }
     drawPlainGloop();
+    for (const b of g.drops) blit('barrel_roll' + (Math.floor(b.spin / 6) % 4), Math.round(b.x - g.cam) - 5, Math.round(b.y) - 5);
+    ctx.fillStyle = '#8a5630';
+    for (const b of g.bits) ctx.fillRect(Math.round(b.x - g.cam), Math.round(b.y), 2, 2);
     for (const p of g.pugs) {
       const X = Math.round(p.x - g.cam), Y = Math.round(p.y), flip = p.face < 0, L = looks[p.id];
       const pose = p.dead ? 'dead' : !p.ground ? 'jump' : p.moving ? (Math.floor(p.anim / 6) % 2 ? 'walk2' : 'walk1') : 'stand';
