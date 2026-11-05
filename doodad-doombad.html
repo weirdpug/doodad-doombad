@@ -2879,7 +2879,7 @@
       : view === 'raceOver' ? raceWords().text
       : view === 'digPause' ? 'Mars Dig. Dig for bones and crystals, bark to make the Martians dizzy, then boop them. Look out for falling rocks!'
       : view === 'digOver' ? digWords().text
-      : view === 'plainPause' ? 'Somewhere on Jupiter. Gloop is watching from his spaceship.'
+      : view === 'plainPause' ? 'Somewhere on Jupiter. Gloop is coming.'
       : view === 'hopPause' ? 'Saturn Scramble. Hop across Saturn\'s rings: dodge the rovers and comets, ride the ice over open space, and keep moving, or an alien will beam you up!'
       : view === 'hopOver' ? hopWords().text
       : view === 'arenaOver' ? arenaWords().text
@@ -3326,11 +3326,12 @@
     lines.forEach((line, i) => drawText(line, PW / 2, 140 - lines.length * gap / 2 + i * gap, 'gold', 'center', size));
   }
   // After the black screen (the user asked 2026-11-05): a random spot on Jupiter, a completely flat plain under the
-  // planet's bands that goes on for ever. The pugs can walk, jump and bark, and Gloop hovers above them in a spaceship,
-  // drifting after them. The pause menu's Main Menu is the way home. (plain: the state, phase 'mini' like the Arcade's
-  // games; PLAIN_Y: the ground on the screen; PLAIN_SPOTS: the spots, each the sky's bands, the ground and what's in the sky)
+  // planet's bands that goes on for ever. The pugs can walk, jump and bark, and Gloop chases them on foot all the time:
+  // a pug he catches dies, and with none left it's back to the main menu, as is the pause menu's Main Menu. (plain: the
+  // state, phase 'mini' like the Arcade's games; PLAIN_Y: the ground on the screen; PLAIN_SPOTS: the spots, each the
+  // sky's bands, the ground and what's in the sky; GLOOP_NEAR: how far off he stays at most, however fast they run)
   let plain = null;
-  const PLAIN_Y = 238, PLAIN_SKY_W = 480;
+  const PLAIN_Y = 238, PLAIN_SKY_W = 480, GLOOP_NEAR = 104;
   const PLAIN_SPOTS = [
     { bands: ['#a8541e', '#c8742f', '#8a4220', '#d89a5a', '#a8541e', '#c8742f'], ground: ['#d8a878', '#a86f3e', '#7a4a26'], sky: 'swirls' },
     { bands: ['#f4e6cc', '#e8c9a0', '#f0dfc0', '#d8b080', '#f4e6cc', '#e8d4b0'], ground: ['#f0dcc0', '#c8a878', '#a07f52'], sky: 'none' },
@@ -3359,7 +3360,7 @@
   function startPlain() {
     document.body.classList.remove('blackout');
     const spot = PLAIN_SPOTS[Math.floor(Math.random() * PLAIN_SPOTS.length)], x0 = Math.floor(Math.random() * 100000);
-    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, shipX: x0 };
+    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 + (Math.random() < 0.5 ? -GLOOP_NEAR : GLOOP_NEAR), gloopFace: 1, endT: 0 };
     const first = kbSlot !== null && joined[kbSlot] ? kbSlot : 0;
     for (let i = 0; i < 4; i++) if (arenaDriven(i) || i === first) plainPug(i);
     try { initAudio(); } catch (e) {}
@@ -3380,8 +3381,10 @@
   function stepPlain() {
     const g = plain;
     g.t++;
-    for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.pugs.some(p => p.id === i)) plainPug(i);
+    if (g.endT && --g.endT === 0) return leavePlain();
+    if (!g.endT) for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.pugs.some(p => p.id === i)) plainPug(i);
     for (const p of g.pugs) {
+      if (p.dead) continue;
       const inp = plainInput(p), dx = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
       p.moving = !!dx;
       if (dx) { p.face = dx; p.x += dx * 1.25; if (++p.anim % 12 === 0 && p.ground) sfx.step(); }
@@ -3391,11 +3394,21 @@
       if (p.barkT > 0) p.barkT--;
     }
     g.kbAtk = false;
-    // (the view stays on the pugs, who can't walk off its edges; Gloop drifts along after them)
-    const mid = g.pugs.reduce((n, p) => n + p.x, 0) / g.pugs.length;
+    // (the view stays on the pugs still alive, who can't walk off its edges)
+    const alive = g.pugs.filter(p => !p.dead);
+    if (!alive.length) return;
+    const mid = alive.reduce((n, p) => n + p.x, 0) / alive.length;
     g.cam += (mid - PW / 2 - g.cam) * 0.1;
-    for (const p of g.pugs) p.x = clamp(p.x, g.cam + 8, g.cam + PW - 8);
-    g.shipX += (mid - g.shipX) * 0.02;
+    for (const p of alive) p.x = clamp(p.x, g.cam + 8, g.cam + PW - 8);
+    // Gloop goes after the nearest pug: slower than a pug, but faster once it has got away from him, so he never
+    // drops out of sight. A pug he reaches dies, unless it is up in the air above his head.
+    const prey = alive.reduce((a, b) => Math.abs(b.x - g.gloopX) < Math.abs(a.x - g.gloopX) ? b : a), gap = prey.x - g.gloopX;
+    g.gloopFace = gap < 0 ? -1 : 1;
+    g.gloopX += g.gloopFace * (Math.abs(gap) > GLOOP_NEAR ? 1.35 : 0.9);
+    for (const p of alive) if (Math.abs(p.x - g.gloopX) < 12 && p.y > PLAIN_Y - 36) {
+      p.dead = true; p.y = PLAIN_Y; p.barkT = 0; sfx.die();
+      if (alive.every(q => q.dead)) g.endT = 150;
+    }
   }
   function pausePlain(note) {
     if (phase !== 'mini' || !plain) return;
@@ -3415,10 +3428,10 @@
       const h = Math.abs(Math.sin(n * 12.9898) * 43758.5453) % 1, y = PLAIN_Y + 10 + Math.floor(h * (PH - PLAIN_Y - 14));
       ctx.fillRect(Math.round(n * 19 + h * 12 - g.cam), y, 3 + Math.floor(h * 6), 1);
     }
-    drawGloopShip(Math.round(g.shipX - g.cam), 62 + Math.round(Math.sin(g.t / 40) * 4));
+    drawPlainGloop();
     for (const p of g.pugs) {
       const X = Math.round(p.x - g.cam), Y = Math.round(p.y), flip = p.face < 0, L = looks[p.id];
-      const pose = !p.ground ? 'jump' : p.moving ? (Math.floor(p.anim / 6) % 2 ? 'walk2' : 'walk1') : 'stand';
+      const pose = p.dead ? 'dead' : !p.ground ? 'jump' : p.moving ? (Math.floor(p.anim / 6) % 2 ? 'walk2' : 'walk1') : 'stand';
       blitFeet('player_' + pose, X, Y, flip, LOOK[p.id].swap);
       if (L.suit) blitFeet(L.suit + '_' + pose, X, Y, flip);
       if (L.hat) blitFeet(L.hat + '_' + pose, X, Y, flip);
@@ -3427,18 +3440,15 @@
       if (g.pugs.length > 1) drawText('P' + (p.id + 1), X, Y - 34 - hatUp(p.id), LOOK[p.id].tag, 'center');
     }
   }
-  // Gloop, sad and looking down at you, under a glass dome on a saucer (x: its middle, y: the top of the hull)
-  function drawGloopShip(x, y) {
+  // (Gloop, sad, all of him, waddling after them)
+  function drawPlainGloop() {
     if (!gloopPics) gloopPics = Object.fromEntries(Object.entries(GLOOP).map(([k, v]) => [k, bakeWith(v, GLOOP_COLS)]));
-    const t = plain.t, pic = t % 260 < 14 ? gloopPics.sadBlink : gloopPics.sad;
-    ctx.fillStyle = 'rgba(159,216,255,0.28)'; ctx.beginPath(); ctx.ellipse(x, y, 19, 21, 0, Math.PI, 0); ctx.fill();
-    ctx.drawImage(pic, 0, 0, 22, 16, x - 11, y - 16, 22, 16);
-    ctx.strokeStyle = '#d8f0ff'; ctx.beginPath(); ctx.ellipse(x, y, 19, 21, 0, Math.PI, 0); ctx.stroke();
-    ctx.fillStyle = '#ffffff'; ctx.fillRect(x - 12, y - 15, 2, 4);   // (a glint on the glass)
-    ctx.fillStyle = '#55556a'; ctx.fillRect(x - 34, y + 1, 68, 2); ctx.fillRect(x - 28, y + 9, 56, 2); ctx.fillRect(x - 12, y + 11, 24, 3);
-    ctx.fillStyle = '#b8c0d8'; ctx.fillRect(x - 24, y - 1, 48, 2); ctx.fillRect(x - 36, y + 3, 72, 6);
-    ctx.fillStyle = '#eef0f6'; ctx.fillRect(x - 32, y + 3, 64, 1);
-    for (let i = 0; i < 7; i++) { ctx.fillStyle = (i + (t >> 4)) % 3 === 0 ? '#ffcc3d' : (i + (t >> 4)) % 3 === 1 ? '#e8282f' : '#5fd068'; ctx.fillRect(x - 31 + i * 10, y + 5, 3, 2); }
+    const g = plain, pic = g.t % 260 < 14 ? gloopPics.sadBlink : gloopPics.sad, step = g.endT ? 0 : Math.sin(g.t / 7);
+    ctx.save();
+    ctx.translate(Math.round(g.gloopX - g.cam), PLAIN_Y - Math.round(Math.abs(step) * 2));
+    ctx.scale(g.gloopFace, 1); ctx.rotate(step * 0.08);
+    ctx.drawImage(pic, -11, -36, 22, 36);
+    ctx.restore();
   }
   function gameOver() {
     phase = 'over';
