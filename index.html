@@ -1507,9 +1507,9 @@
     { key: 'stars', name: 'Star Potion', liquid: 't', shade: 'Y', bottle: 0, says: 'POINTS COUNT DOUBLE' },
     { key: 'quake', name: 'Quake Potion', liquid: 'N', shade: 'A', bottle: 1, says: 'THE GROUND SHAKES' },
     { key: 'lucky', name: 'Lucky Potion', liquid: '3', shade: '2', bottle: 2,
-      now(id) { const n = Math.floor(Math.random() * 26); coins[id] += n; saveCoins(); updateHud(true); return n ? `YOU FOUND ${n} COINS!` : 'NOTHING HAPPENED!'; } },
+      now(id) { const n = Math.floor(Math.random() * 26); coins[id] += n; saveCoins(); updateHud(true); return n ? `YOU FOUND ${n} COIN${n === 1 ? '' : 'S'}!` : 'NOTHING HAPPENED!'; } },
     { key: 'gloopcolor', name: 'Paint Potion', liquid: 'M', shade: 'Q', bottle: 0,
-      now() { paintGloop(); return 'GLOOP CHANGES COLOR'; } },
+      now() { if (shop.gone) return 'NOTHING HAPPENED!'; paintGloop(); return 'GLOOP CHANGES COLOR'; } },
     { key: 'bubbles', name: 'Bubble Potion', liquid: 'o', shade: 'B', bottle: 1,
       now() { shop.bubbles = true; return 'BUBBLES FILL THE SHOP'; } },
   ];
@@ -5194,9 +5194,9 @@
   // (zooming in or out redoes The Arcade's screen: its title, and Play shown or gone)
   function zoomTo(p) { arcadeZoom = { target: p, p: 0, out: false, ship: null, shop: p.shop ? { p: 0 } : null };
     if (p.shop) { spaceGloop = null; titleGloop = null; gloopOnMenu = false; gloopBruno = false; gloopBrunoNext = false; stopGlitch(); }   // (back in his shop; Bruno back in his job, and no more glitching)
-    if (p.shop) Object.assign(shop, { sad: false, tearT: 0, hitT: 0, whyT: 0, ammo: [], mess: [], bits: [], stains: [], lamp: 'up', lampY: 0, lampV: 0, ko: false, koT: 0, window: 'whole', suck: null, gone: false, wind: [], listOpen: false, potionView: null, potionSpot: 0, drank: '', drankSays: '', potionT: 0, bubbles: false }); washGloop();   // (Gloop happy and clean again)
+    if (p.shop) Object.assign(shop, { sad: false, tearT: 0, hitT: 0, whyT: 0, ammo: [], mess: [], bits: [], stains: [], lamp: 'up', lampY: 0, lampV: 0, ko: false, koT: 0, window: 'whole', suck: null, gone: false, wind: [], listOpen: false, potionView: null, potionSpot: 0, potionBy: 0, drank: '', drankSays: '', potionT: 0, bubbles: false }); washGloop();   // (Gloop happy and clean again)
     showPause('arcade', 0); sfx.tick(); }
-  function closeShopPaper() { shop.listOpen = false; shop.potionView = null; sfx.tick(); }
+  function closeShopPaper() { if (shop.potionView === 'drank') shop.potionT = 40; shop.listOpen = false; shop.potionView = null; sfx.tick(); }
   function zoomOut() { if (!arcadeZoom.target || arcadeZoom.out) return; if (arcadeZoom.shop) { washGloop(); shop.bubbles = false; } arcadeZoom.out = true; arcadeZoom.ship = arcadeZoom.deep = null; showPause('arcade', 0); sfx.tick(); }
   // (zoomed in on the spaceship, or on the way)
   const onShip = () => !!(arcadeZoom.ship && !arcadeZoom.ship.out);
@@ -5964,7 +5964,7 @@
   // [x, y, colour] from his top left; bits: bits flying off; stains: splats left on the shop, [x, y, colour])
   // (whyT: frames left of his WHY?)
   let gloopPics = null, shopBg = null, shop = { sad: false, tearT: 0, hitT: 0, whyT: 0, ammo: [], mess: [], bits: [], stains: [], lamp: 'up', lampY: 0, lampV: 0, lampX: 120, ko: false, koT: 0,
-    window: 'whole', suck: null, gone: false, wind: [], listOpen: false, potionView: null, potionSpot: 0, drank: '', drankSays: '', potionT: 0, bubbles: false };
+    window: 'whole', suck: null, gone: false, wind: [], listOpen: false, potionView: null, potionSpot: 0, potionBy: 0, drank: '', drankSays: '', potionT: 0, bubbles: false };
   // (window: 'whole' or 'broken'; suck: Gloop being sucked out, { t, from }; gone: he has been; wind: streaks of air)
   // (lamp: 'up' on its cord, 'fall' (lampY: how far it has dropped, lampV: how fast; lampX: where it snapped), 'down'
   // on Gloop's head (falling over with him), or 'gone', left behind the counter when he got up; ko: knocked out by it, koT: frames since: wobbling with the
@@ -5995,7 +5995,7 @@
       if (!potions.active.includes(p.key)) potions.active.push(p.key);
     }
     stockPotion(shop.potionSpot);   // (and a new potion takes its place, the user asked)
-    shop.potionView = 'drank'; shop.potionT = 40;
+    shop.potionView = 'drank';
     tone(300, 0.1, 'sine', 0.05, 200); tone(340, 0.1, 'sine', 0.05, 200, 0.14); tone(380, 0.1, 'sine', 0.05, 200, 0.28);   // (glug, glug, glug)
     [659, 880, 1175].forEach((f, i) => tone(f, 0.12, 'triangle', 0.04, 0, 0.5 + i * 0.09));
   }
@@ -6017,13 +6017,15 @@
     if (shop.listOpen) { shop.listOpen = false; sfx.tick(); return; }
     if (shop.potionView) {
       const r = cv.getBoundingClientRect(), bx = (e.clientX - r.left) / r.width * PW, by = (e.clientY - r.top) / r.height * PH;
-      if (shop.potionView === 'buy' && bx >= 78 && bx < 162 && by >= 172 && by < 192) buyPotion();
-      else { shop.potionView = null; sfx.tick(); }
+      if (shop.potionView === 'buy' && bx >= 78 && bx < 162 && by >= 172 && by < 192) {
+        // (another pug pressing Buy sees its own coins first, before any are taken)
+        if (potionBuyer() !== shop.potionBy) { shop.potionBy = potionBuyer(); sfx.tick(); } else buyPotion();
+      } else { if (shop.potionView === 'drank') shop.potionT = 40; shop.potionView = null; sfx.tick(); }
       return;
     }
     if (onMissionList(e)) { shop.listOpen = true; sfx.tick(); return; }
     const spot = potionAt(e);
-    if (spot >= 0) { shop.potionSpot = spot; shop.potionView = 'buy'; sfx.tick(); return; }
+    if (spot >= 0) { shop.potionSpot = spot; shop.potionBy = potionBuyer(); shop.potionView = 'buy'; sfx.tick(); return; }
     if (shop.ammo.length >= 8) return;
     const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * PW, y = (e.clientY - r.top) / r.height * PH;
     shop.ammo.push({ t: 0, at: onGloop(e) && !gloopDown() && !shop.gone && !shop.suck ? null : [x, y] }); sfx.toss();   // (not at him while he's down or gone)
@@ -6294,7 +6296,7 @@
     drawText("GLOOP'S POTION", 120, 69, 'black', 'center');
     ctx.fillStyle = '#c8b898'; ctx.fillRect(40, 79, 160, 1);
     if (shop.potionView === 'buy') {
-      const id = potionBuyer(), short = POTION_PRICE - coins[id], s = sprite('potion_' + potions.shelf[shop.potionSpot]);
+      const id = joined[shop.potionBy] ? shop.potionBy : 0, short = POTION_PRICE - coins[id], s = sprite('potion_' + potions.shelf[shop.potionSpot]);
       if (s) ctx.drawImage(s, 102, 84, 36, 39);
       drawText('MYSTERY POTION', 120, 129, 'black', 'center');
       drawText('WHAT WILL IT DO?', 120, 139, 'black', 'center');
