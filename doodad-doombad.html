@@ -3372,14 +3372,14 @@
     banana = arena = race = dig = hop = null;
     document.body.classList.remove('blackout');
     const spot = PLAIN_SPOTS[Math.floor(Math.random() * PLAIN_SPOTS.length)], x0 = Math.floor(Math.random() * 100000);
-    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 + (Math.random() < 0.5 ? -GLOOP_NEAR : GLOOP_NEAR), gloopFace: 1, endT: 0 };
+    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, endT: 0 };
     const first = kbSlot !== null && joined[kbSlot] ? kbSlot : 0;
     for (let i = 0; i < 4; i++) if (arenaDriven(i) || i === first) plainPug(i);
     try { initAudio(); } catch (e) {}
     releaseAll(); fromTitle = true; phase = 'mini'; hideOverlay();
   }
   function plainPug(id) {
-    plain.pugs.push({ id, x: plain.cam + PW / 2 - 24 + id * 16, y: PLAIN_Y, vy: 0, ground: true, face: 1, moving: false, anim: 0, barkT: 0, prev: { jump: true, bark: true } });
+    plain.pugs.push({ id, x: Math.max(plain.cam + PW / 2 - 24 + id * 16, plain.gloopX + GLOOP_NEAR), y: PLAIN_Y, vy: 0, ground: true, face: 1, moving: false, anim: 0, barkT: 0, prev: { jump: true, bark: true } });
   }
   // (a fresh press jumps or barks once; holding it does nothing more)
   function plainInput(p) {
@@ -3413,11 +3413,11 @@
     const mid = alive.reduce((n, p) => n + p.x, 0) / alive.length;
     g.cam += (mid - PW / 2 - g.cam) * 0.1;
     for (const p of alive) p.x = clamp(p.x, g.cam + 8, g.cam + PW - 8);
-    // Gloop goes after the nearest pug: slower than a pug, but faster once it has got away from him, so he never
-    // drops out of sight. A pug he reaches dies, unless it is up in the air above his head.
-    const prey = alive.reduce((a, b) => Math.abs(b.x - g.gloopX) < Math.abs(a.x - g.gloopX) ? b : a), gap = prey.x - g.gloopX;
-    g.gloopFace = gap < 0 ? -1 : 1;
-    g.gloopX += g.gloopFace * (Math.abs(gap) > GLOOP_NEAR ? 1.35 : 0.9);
+    // Gloop is always on the pugs' left (the user asked) and goes after the leftmost: slower than a pug, but faster once
+    // it has got away from him, so he never drops out of sight. A pug he reaches dies, unless it is up in the air above
+    // his head.
+    const gap = alive.reduce((n, p) => Math.min(n, p.x), Infinity) - g.gloopX;
+    g.gloopX += gap > GLOOP_NEAR ? 1.35 : 0.9;
     for (const p of alive) if (Math.abs(p.x - g.gloopX) < 12 && p.y > PLAIN_Y - 36) {
       p.dead = true; p.y = PLAIN_Y; p.barkT = 0; sfx.die();
       if (alive.every(q => q.dead)) g.endT = 150;
@@ -3461,7 +3461,7 @@
     const g = plain, pic = g.t % 260 < 14 ? gloopPics.sadBlink : gloopPics.sad, step = g.endT ? 0 : Math.sin(g.t / 7);
     ctx.save();
     ctx.translate(Math.round(g.gloopX - g.cam), PLAIN_Y - Math.round(Math.abs(step) * 2));
-    ctx.scale(g.gloopFace, 1); ctx.rotate(step * 0.08);
+    ctx.rotate(step * 0.08);
     ctx.drawImage(pic, -11, -36, 22, 36);
     ctx.restore();
   }
