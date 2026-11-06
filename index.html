@@ -3650,16 +3650,9 @@
     if (!isleArt) buildIsle();
     ctx.drawImage(isleArt, 0, 0);
     for (const p of plain.pugs) drawPlainPug(p, Math.round(p.x), Math.round(p.y), 'gold');
-    // (Gloop's words, in yellow in a dark bubble, its tail pointing up out of the screen to wherever he is)
+    // (Gloop's words: just yellow text, no bubble, the user asked)
     const said = plain.isleT < ISLE_WORDS_END && ISLE_WORDS.filter(w => plain.isleT >= w[0]).pop();
-    if (said) {
-      const w = said[1].length * 6 + 13, x = (PW - w) >> 1, y = 34, h = 18;
-      ctx.fillStyle = '#ffcc3d'; ctx.beginPath(); ctx.moveTo(PW / 2 - 8, y); ctx.lineTo(PW / 2 + 12, y - 16); ctx.lineTo(PW / 2 + 8, y); ctx.closePath(); ctx.fill();
-      ctx.fillRect(x, y, w, h);
-      ctx.fillStyle = '#14122a'; ctx.fillRect(x + 2, y + 2, w - 4, h - 4);
-      ctx.beginPath(); ctx.moveTo(PW / 2 - 5, y + 2); ctx.lineTo(PW / 2 + 10, y - 11); ctx.lineTo(PW / 2 + 6, y + 2); ctx.closePath(); ctx.fill();
-      drawText(said[1], PW / 2, y + 6, 'gold', 'center');
-    }
+    if (said) drawText(said[1], PW / 2, 40, 'gold', 'center');
   }
   // Cut a pug, in its costume, into little coloured cells that can each be moved on their own. a: how far along the noodle
   // the cell ends up, with the head (the right of the sprite, u over 0.55) squeezed into the last bit of it. u, v: where
