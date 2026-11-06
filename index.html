@@ -3424,7 +3424,7 @@
   // (the space screen: one saucer for each of these pugs, side by side)
   function plainSpace(pugs) {
     plain.endT = 0; plain.bits = [];
-    plain.space = pugs.map((p, i) => ({ id: p.id, x: 50, y: PH / 2 + (i - (pugs.length - 1) / 2) * 40, face: 1, hp: SAUCER_HP, hit: 0, prev: { jump: true, bark: true } }));
+    plain.space = pugs.map((p, i) => ({ id: p.id, x: 50, y: PH / 2 + (i - (pugs.length - 1) / 2) * 40, face: 1, aimY: 0, hp: SAUCER_HP, hit: 0, prev: { jump: true, bark: true } }));
   }
   function startPlain() {
     banana = arena = race = dig = hop = null;
@@ -3452,8 +3452,8 @@
   }
   // (a little burst of bits)
   function blastAt(x, y, col) { for (let i = 0; i < 8; i++) plain.bits.push({ x, y, vx: (Math.random() - 0.5) * 3, vy: (Math.random() - 0.5) * 3, t: 22, col }); }
-  // (out in space: each player's saucer goes wherever it is steered, inside the screen, and shoots the way it faces with
-  // a press of the jump or bark button)
+  // (out in space: each player's saucer goes wherever it is steered, inside the screen, and shoots the way it last moved
+  // (left, right, up or down, the user asked) with a press of the jump or bark button)
   function stepPlainSpace() {
     const g = plain;
     if (g.endT && --g.endT === 0) return leavePlain();
@@ -3464,12 +3464,13 @@
     const flying = g.space.filter(a => a.hp > 0);
     for (const a of flying) {
       const inp = plainInput(a), dx = (inp.right ? 1 : 0) - (inp.left ? 1 : 0), dy = (inp.down ? 1 : 0) - (inp.up ? 1 : 0);
-      if (dx) a.face = dx;
+      if (dx) { a.face = dx; a.aimY = 0; }
+      if (dy) a.aimY = dy;
       a.x = clamp(a.x + dx * 1.6, 11, PW - 11); a.y = clamp(a.y + dy * 1.6, 6, PH - 6);
-      if (inp.shot || inp.bark) { g.shots.push({ x: a.x + a.face * 12, y: a.y + 1, dir: a.face }); tone(900, 0.12, 'square', 0.03, -600); }
+      if (inp.shot || inp.bark) { g.shots.push(a.aimY ? { x: a.x, y: a.y + a.aimY * 7, vx: 0, vy: a.aimY * SHOT_SPEED } : { x: a.x + a.face * 12, y: a.y + 1, vx: a.face * SHOT_SPEED, vy: 0 }); tone(900, 0.12, 'square', 0.03, -600); }
     }
     for (const a of flying) if (a.hit > 0) a.hit--;
-    for (const b of g.shots) b.x += b.dir * SHOT_SPEED;
+    for (const b of g.shots) { b.x += b.vx; b.y += b.vy; }
     for (const z of g.zaps) { z.x += z.vx; z.y += z.vy; }
     const boss = g.boss;
     if (boss && boss.dead) {
@@ -3506,7 +3507,7 @@
       else { sfx.die(); for (let i = 0; i < 4; i++) blastAt(a.x - 12 + i * 8, a.y, '#ffcc3d'); }
     }
     if (!g.endT && !g.space.some(a => a.hp > 0)) g.endT = 110;
-    g.shots = g.shots.filter(b => !b.gone && b.x > -10 && b.x < PW + 10);
+    g.shots = g.shots.filter(b => !b.gone && b.x > -10 && b.x < PW + 10 && b.y > -10 && b.y < PH + 10);
     g.zaps = g.zaps.filter(z => !z.gone && z.x > -10 && z.x < PW + 10 && z.y > -10 && z.y < PH + 10);
     for (const b of g.bits) { b.x += b.vx; b.y += b.vy; b.vy += 0.03; b.t--; }
     g.bits = g.bits.filter(b => b.t > 0);
@@ -3639,7 +3640,11 @@
       }
       ctx.drawImage(plainStars, 0, 0);
       if (plain.boss) drawBossShip(plain.boss);
-      for (const b of plain.shots) { ctx.fillStyle = '#5fd068'; ctx.fillRect(Math.round(b.x) - 5, Math.round(b.y) - 1, 10, 3); ctx.fillStyle = '#eef0f6'; ctx.fillRect(Math.round(b.x) - 3, Math.round(b.y), 6, 1); }
+      for (const b of plain.shots) {
+        const sx = Math.round(b.x), sy = Math.round(b.y), up = !!b.vy;
+        ctx.fillStyle = '#5fd068'; if (up) ctx.fillRect(sx - 1, sy - 5, 3, 10); else ctx.fillRect(sx - 5, sy - 1, 10, 3);
+        ctx.fillStyle = '#eef0f6'; if (up) ctx.fillRect(sx, sy - 3, 1, 6); else ctx.fillRect(sx - 3, sy, 6, 1);
+      }
       for (const z of plain.zaps) { ctx.fillStyle = '#e8282f'; ctx.fillRect(Math.round(z.x) - 3, Math.round(z.y) - 3, 6, 6); ctx.fillStyle = '#ffcc3d'; ctx.fillRect(Math.round(z.x) - 1, Math.round(z.y) - 1, 2, 2); }
       plain.space.forEach((a, row) => {
         if (a.hp > 0 && !(a.hit > 0 && a.hit % 6 < 3)) {
