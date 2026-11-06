@@ -171,6 +171,12 @@
   #overlay.title-mode .titlebtns .alt.chosen { background: var(--girder); color: #fff; box-shadow: 4px 4px 0 #5a0f2a; }
   #overlay.title-mode #start:not(.chosen) { background: var(--bg); color: var(--ink); box-shadow: inset 0 0 0 2px var(--girder), 4px 4px 0 #5a0f2a; }
   #overlay.title-mode .titlebtns .alt:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #5a0f2a; }
+  /* Boss Fight is only there once it's unlocked; then the four buttons sit two by two, so they cover no more of the
+     castle than the three did */
+  #overlay.title-mode .titlebtns #titleBoss { display: none; }
+  #overlay.title-mode .titlebtns.four { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); width: 92cqw; max-width: 100%; }
+  #overlay.title-mode .titlebtns.four button { min-width: 0; padding: clamp(7px, 2.4cqw, 12px) 2px; font-size: clamp(9px, 3.3cqw, 16px); letter-spacing: 0; white-space: nowrap; }
+  #overlay.title-mode .titlebtns.four #titleBoss { display: block; }
   /* Pause menu (Resume, Store, Restart): the chosen button is filled in, the others are outlined */
   #overlay.menu-mode { cursor: default; }
   /* the main menu (the start screen): the outdoor castle scene shows through. The title sits in the sky at the
@@ -331,6 +337,7 @@
         <button id="start" class="chosen" type="button">Start</button>
         <button id="titleStore" class="alt" type="button">Store</button>
         <button id="titleCustom" class="alt" type="button">Customize</button>
+        <button id="titleBoss" class="alt" type="button">Boss Fight</button>
       </div>
       </div>
     </div>
@@ -1208,7 +1215,8 @@
   // leash: it holds a leash to its pug's neck, and walks first in line, right behind the pug)
   // Things unlocked by doing something in the game, saved in the browser for every pug (alien: Zorp the Alien, for
   // blowing up the mother ship; the user asked 2026-10-31. space: the Astronaut Suit, the Astronaut Helmet and the
-  // Rocket, for going to space, the user asked 2026-11-02). unlock() says whether it was new.
+  // Rocket, for going to space, the user asked 2026-11-02. bossRun: Boss Fight on the main menu, for reaching Gloop's
+  // chase on Jupiter, the user asked 2026-11-05). unlock() says whether it was new.
   const UNLOCKS_KEY = 'doodad-doombad-unlocks';
   const unlocks = (() => { try { const u = JSON.parse(localStorage.getItem(UNLOCKS_KEY)); return u && typeof u === 'object' ? u : {}; } catch (e) { return {}; } })();
   function unlock(what) {
@@ -2067,6 +2075,7 @@
   function relock() {
     for (const k of Object.keys(unlocks)) delete unlocks[k];
     try { localStorage.removeItem(UNLOCKS_KEY); } catch (e) {}
+    showBossBtn();
     for (const l of looks) l.pets = l.pets.filter(k => { const pet = PETS.find(x => x.key === k); return pet && !(pet.locked && pet.locked()); });
     for (const l of looks) for (const [slot, list] of [['suit', SUITS], ['hat', HATS]]) {
       const n = list.find(x => x.key === l[slot]);
@@ -2239,7 +2248,7 @@
       e.preventDefault();
       if (k) keys[k] = true;
       if (!e.repeat) {
-        if (phase === 'title' && k && k !== 'jump') moveTitle(k === 'up' || k === 'left' ? -1 : 1);
+        if (phase === 'title' && k && k !== 'jump') moveTitle(k === 'up' || k === 'left' ? -1 : 1, k === 'up' || k === 'down');
         else if (phase === 'title' && titleSel) pickTitle(kbBy());
         else { claimKeyboard(true); startClicked(); }
       }
@@ -2459,8 +2468,8 @@
       }
       // on the main menu the stick or D-pad chooses Start or Store (unless it is dragging the cursor)
       if (ph === 'title' && phase === 'title' && !curMode) {
-        if (fresh('up') || fresh('left')) moveTitle(-1);
-        else if (fresh('down') || fresh('right')) moveTitle(1);
+        if (fresh('up') || fresh('left')) moveTitle(-1, fresh('up'));
+        else if (fresh('down') || fresh('right')) moveTitle(1, fresh('down'));
       }
       // On a controller only A jumps: up on the stick or D-pad just climbs ladders
       // (the keyboard's Up arrow still jumps away from ladders)
@@ -2615,8 +2624,24 @@
     titleSel = sel; titleBtns.forEach((b, i) => b.classList.toggle('chosen', i === sel));
     if (focus) titleBtns[sel].focus({ preventScroll: true });
   }
-  function moveTitle(d) { markTitle((titleSel + d + titleBtns.length) % titleBtns.length, true); sfx.tick(); }
-  function pickTitle(by) { if (titleSel) openFromTitle(TITLE_VIEWS[titleSel], by); else startClicked(); }
+  // (with Boss Fight there the buttons are two by two: Up/Down go between the rows, Left/Right along them)
+  function moveTitle(d, upDown) {
+    const four = titleBtns.length === 4;
+    markTitle(four ? titleSel ^ (upDown ? 2 : 1) : (titleSel + d + titleBtns.length) % titleBtns.length, true); sfx.tick();
+  }
+  function pickTitle(by) { if (titleBtns[titleSel] === bossBtn) pickBoss(); else if (titleSel) openFromTitle(TITLE_VIEWS[titleSel], by); else startClicked(); }
+  // Boss Fight: straight to Gloop's chase on Jupiter. Reaching the chase any way unlocks it, and the lock code locks it.
+  // (the user asked)
+  const bossBtn = document.getElementById('titleBoss');
+  function pickBoss() { if (live() && phase === 'title' && boomPic.hidden) codeBoss(); }
+  bossBtn.addEventListener('click', pickBoss);
+  function showBossBtn() {
+    const on = !!unlocks.bossRun, at = titleBtns.indexOf(bossBtn);
+    if (on && at < 0) titleBtns.push(bossBtn); else if (!on && at >= 0) titleBtns.splice(at, 1);
+    bossBtn.parentNode.classList.toggle('four', on);
+    if (titleSel >= titleBtns.length) markTitle(0, false);
+  }
+  showBossBtn();
   function openFromTitle(view, by) {
     if (!live() || phase !== 'title' || !boomPic.hidden) return;
     try { initAudio(); } catch (e) {}
@@ -2643,6 +2668,7 @@
     ov.classList.remove('menu-mode', 'arcade-mode'); ov.classList.add('title-mode');
     ovTitle.innerHTML = 'Doodad<br>Doombad'; startBtn.textContent = 'Start'; startBtn.hidden = false;
     menuEl.hidden = menuHint.hidden = coinList.hidden = storeShelf.hidden = lookShelf.hidden = true;
+    showBossBtn();
     ov.hidden = false; markTitle(sel || 0, true);
     updateHud(true);
   }
@@ -3464,6 +3490,7 @@
     for (let i = 0; i < 4; i++) if (arenaDriven(i) || i === first) plainPug(i);
     try { initAudio(); } catch (e) {}
     releaseAll(); fromTitle = true; phase = 'mini'; hideOverlay();
+    if (unlock('bossRun')) toast('You unlocked Boss Fight!', '#ffcc3d');
   }
   function plainPug(id) {
     const x = Math.max(plain.cam + PW / 2 - 24 + id * 16, plain.gloopX + GLOOP_NEAR);
