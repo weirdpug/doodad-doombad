@@ -2916,7 +2916,7 @@
       : view === 'raceOver' ? raceWords().text
       : view === 'digPause' ? 'Mars Dig. Dig for bones and crystals, bark to make the Martians dizzy, then boop them. Look out for falling rocks!'
       : view === 'digOver' ? digWords().text
-      : view === 'plainPause' ? (plain && plain.drop ? 'Falling!' : plain && plain.isle ? 'On an island in space.' : plain && plain.space ? 'Out in space.' : 'Somewhere on Jupiter. Gloop is coming.')
+      : view === 'plainPause' ? (plain && plain.drop ? (plain.drop.walk ? "In Gloop's shop. Nobody's here." : 'Falling!') : plain && plain.isle ? 'On an island in space.' : plain && plain.space ? 'Out in space.' : 'Somewhere on Jupiter. Gloop is coming.')
       : view === 'hopPause' ? 'Saturn Scramble. Hop across Saturn\'s rings: dodge the rovers and comets, ride the ice over open space, and keep moving, or an alien will beam you up!'
       : view === 'hopOver' ? hopWords().text
       : view === 'arenaOver' ? arenaWords().text
@@ -3406,9 +3406,9 @@
   const ISLE_TAUNT = 'HOW DOES IT FEEL', ISLE_TAUNT_AT = 25, ISLE_TAUNT_T = 240;
   // (what he yells after the last one, for how many frames, and the 16 px squares the island breaks up into)
   const ISLE_YELL = 'HOW!!!!!!!!!!!', ISLE_YELL_T = 120, ISLE_COLS = 14, ISLE_ROWS = 6;
-  // (the fall from there, in frames: the wormhole, the drop to Jupiter, a pug's fall through the shop, the gap between
-  // pugs, and how long the crash lasts from the ceiling breaking; and where in the shop it comes through)
-  const DROP_HOLE = 150, DROP_SKY = 120, DROP_FALL = 14, DROP_GAP = 12, DROP_END = 300, DROP_X = 156;
+  // (the fall from there, in frames: the wormhole, the drop to Jupiter, a pug's fall through the shop and the gap between
+  // pugs; where in the shop it comes through; and the shop counter the pugs walk along)
+  const DROP_HOLE = 150, DROP_SKY = 120, DROP_FALL = 14, DROP_GAP = 12, DROP_X = 156, SHOP_Y = 190, SHOP_L = 14, SHOP_R = PW - 14;
   let isleArt = null;
   const BOSS_AT = 120, BOSS_HP = 20, SAUCER_HP = 10, BOSS_X = 176, BOSS_SHOOT = 12, SHOT_SPEED = 4.5, BOSS_SCALE = 0.6, BOSS_MOVE = 1.6;
   // (the top of whatever is highest at x, for those who walk over everything; half: how wide they are each side)
@@ -3611,27 +3611,30 @@
   function islePug(id) {
     plain.pugs.push({ id, x: PW / 2 - 24 + id * 16, y: -20, vy: 0, ground: false, face: 1, moving: false, anim: 0, barkT: 0, prev: { jump: true, bark: true } });
   }
+  // (a pug walking, jumping and barking on a flat floor at height Y, between x L and R)
+  function floorPug(p, L, R, Y, speed, jump) {
+    const inp = plainInput(p), dx = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
+    p.moving = false;
+    if (dx) {
+      const nx = clamp(p.x + dx * speed, L, R);
+      p.face = dx;
+      if (nx !== p.x) { p.x = nx; p.moving = true; if (++p.anim % 12 === 0 && p.ground) sfx.step(); }
+    }
+    if (inp.jump && p.ground) { p.ground = false; p.vy = jump; sfx.jump(); }
+    if (!p.ground) {
+      const was = p.y;
+      p.vy += 0.16; p.y += p.vy;
+      if (was <= Y && p.y >= Y && !isleGone(p.x)) { if (p.vy > 4) tone(90, 0.2, 'sine', 0.14, -40); p.y = Y; p.vy = 0; p.ground = true; }
+    }
+    if (inp.bark && p.barkT < 25) { p.barkT = 45; sfx.bark(LOOK[p.id].bark); }
+    if (p.barkT > 0) p.barkT--;
+  }
   function stepIsle() {
     const g = plain;
     for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.pugs.some(p => p.id === i)) islePug(i);
     g.pugs = g.pugs.filter(p => arenaDriven(p.id));
     for (const p of g.pugs) {
-      if (p.dead) continue;
-      const inp = plainInput(p), dx = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
-      p.moving = false;
-      if (dx) {
-        const nx = clamp(p.x + dx * 1.25, ISLE_L, ISLE_R);
-        p.face = dx;
-        if (nx !== p.x) { p.x = nx; p.moving = true; if (++p.anim % 12 === 0 && p.ground) sfx.step(); }
-      }
-      if (inp.jump && p.ground) { p.ground = false; p.vy = -3.4; sfx.jump(); }
-      if (!p.ground) {
-        const was = p.y;
-        p.vy += 0.16; p.y += p.vy;
-        if (was <= ISLE_Y && p.y >= ISLE_Y && !isleGone(p.x)) { if (p.vy > 4) tone(90, 0.2, 'sine', 0.14, -40); p.y = ISLE_Y; p.vy = 0; p.ground = true; }
-      }
-      if (inp.bark && p.barkT < 25) { p.barkT = 45; sfx.bark(LOOK[p.id].bark); }
-      if (p.barkT > 0) p.barkT--;
+      if (!p.dead) floorPug(p, ISLE_L, ISLE_R, ISLE_Y, 1.25, -3.4);
     }
     g.kbAtk = false;
     // (the words are timed from the first pug to land)
@@ -3695,10 +3698,13 @@
     if (g.pugs.every(p => p.y > PH + 24)) { g.drop = { t: 0, ids: g.pugs.map(p => p.id), planks: [], shake: 0 }; g.bits = []; }
   }
   // Down a wormhole, out over Jupiter, into its red spot (where the shop is) and through the ceiling of Gloop's shop,
-  // landing on his counter among the broken planks. Then it's back to the main menu. (the user asked)
+  // landing on his counter among the broken planks. Gloop's out, and the pugs can walk up and down the counter for as long
+  // as they like, twice their usual size; the pause menu is the way back to the main menu. (the user asked)
+  function shopPug(id, x, y) {
+    return { id, x, y, vy: 0, ground: y === SHOP_Y, face: 1, moving: false, anim: 0, barkT: 0, prev: { jump: true, bark: true } };
+  }
   function stepDrop() {
     const g = plain, d = g.drop;
-    g.kbAtk = false;
     d.t++;
     const c = d.t - DROP_HOLE - DROP_SKY, n = d.ids.length;
     if (d.shake > 0) d.shake--;
@@ -3723,7 +3729,17 @@
     }
     for (const b of g.bits) { b.x += b.vx; b.y += b.vy; b.t--; }
     g.bits = g.bits.filter(b => b.t > 0);
-    if (c === DROP_END) leavePlain();
+    // (once the last pug is down they are all yours; a player who joins now comes in through the hole)
+    if (!d.walk && c === DROP_FALL + (n - 1) * DROP_GAP) {
+      d.walk = true;
+      g.pugs = d.ids.map((id, i) => shopPug(id, DROP_X + Math.round((i - (n - 1) / 2) * 34), SHOP_Y));
+    }
+    if (d.walk) {
+      for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.pugs.some(p => p.id === i)) g.pugs.push(shopPug(i, DROP_X, -30));
+      g.pugs = g.pugs.filter(p => arenaDriven(p.id));
+      for (const p of g.pugs) floorPug(p, SHOP_L, SHOP_R, SHOP_Y, 1.6, -4.4);
+    }
+    g.kbAtk = false;
   }
   // (a pug tumbling, its middle at x, y, wide awake: it isn't dead, the user said)
   function tumblePug(id, x, y, size, ang) {
@@ -3788,20 +3804,20 @@
       ctx.strokeStyle = '#2a160a'; ctx.lineWidth = 2; path(); ctx.stroke();
     }
     for (const k of d.planks) { ctx.save(); ctx.translate(k.x, k.y); ctx.rotate(k.a); ctx.fillStyle = k.col; ctx.fillRect(-k.w / 2, -k.h / 2, k.w, k.h); ctx.restore(); }
-    d.ids.forEach((id, i) => {
+    // (twice the size, as the shop is seen close up)
+    const big = (p, x, y) => { ctx.save(); ctx.translate(x, y); ctx.scale(2, 2); drawPlainPug(p, 0, 0, 'gold'); ctx.restore(); };
+    if (d.walk) for (const p of plain.pugs) big(p, Math.round(p.x), Math.round(p.y));
+    else d.ids.forEach((id, i) => {
       if (c <= i * DROP_GAP) return;
       const u = Math.min(1, (c - i * DROP_GAP) / DROP_FALL);
-      // (twice the size, as the shop is seen close up)
-      ctx.save(); ctx.translate(DROP_X + Math.round((i - (n - 1) / 2) * 34), Math.round(-30 + 220 * u * u)); ctx.scale(2, 2);
-      drawPlainPug({ id, face: 1, ground: u >= 1, moving: false, barkT: 0, anim: 0 }, 0, 0, 'gold');
-      ctx.restore();
+      big({ id, face: 1, ground: u >= 1, moving: false, barkT: 0, anim: 0 }, DROP_X + Math.round((i - (n - 1) / 2) * 34), Math.round(-30 + 220 * u * u));
     });
     ctx.restore();
   }
   // (has the ground at this x crumbled away yet? The top row of cells comes first in the list)
   function isleGone(x) {
     const c = plain.crumble;
-    return !!c && c.t - ISLE_YELL_T >= c.cells[clamp(Math.floor((x - 12) / 16), 0, ISLE_COLS - 1)].wait;
+    return !!c && !plain.drop && c.t - ISLE_YELL_T >= c.cells[clamp(Math.floor((x - 12) / 16), 0, ISLE_COLS - 1)].wait;
   }
   // (a floating lump of land: grass on top with a few flowers, dirt under it, and rock tapering away at the bottom)
   function buildIsle() {
