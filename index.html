@@ -3407,6 +3407,8 @@
   const ISLE_BURRITOS = 50, ISLE_AIM = 60, ISLE_FLY = 16, ISLE_HIT = 14;
   // (what he says after that many burritos, and for how many frames)
   const ISLE_TAUNT = 'HOW DOES IT FEEL', ISLE_TAUNT_AT = 25, ISLE_TAUNT_T = 240;
+  // (what he yells after the last one, for how many frames, and the 16 px squares the island breaks up into)
+  const ISLE_YELL = 'HOW!!!!!!!!!!!', ISLE_YELL_T = 120, ISLE_COLS = 14, ISLE_ROWS = 6;
   let isleArt = null;
   const BOSS_AT = 120, BOSS_HP = 20, SAUCER_HP = 10, BOSS_X = 176, BOSS_SHOOT = 12, SHOT_SPEED = 4.5, BOSS_SCALE = 0.6, BOSS_MOVE = 1.6;
   // (the top of whatever is highest at x, for those who walk over everything; half: how wide they are each side)
@@ -3495,7 +3497,7 @@
     banana = arena = race = dig = hop = null;
     document.body.classList.remove('blackout');
     const spot = PLAIN_SPOTS[Math.floor(Math.random() * PLAIN_SPOTS.length)], x0 = Math.floor(Math.random() * 100000);
-    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300, martians: [], martianT: 420, ships: [], obsCount: 0, shipAt: 25, space: null, shots: [], zaps: [], boss: null, spaceT: 0, nuke: null, hole: null, warp: null, isle: false, isleT: 0, aim: null, thrown: [], isleShot: 0 };
+    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300, martians: [], martianT: 420, ships: [], obsCount: 0, shipAt: 25, space: null, shots: [], zaps: [], boss: null, spaceT: 0, nuke: null, hole: null, warp: null, isle: false, isleT: 0, aim: null, thrown: [], isleShot: 0, tauntT: 0, crumble: null };
     const first = kbSlot !== null && joined[kbSlot] ? kbSlot : 0;
     for (let i = 0; i < 4; i++) if (arenaDriven(i) || i === first) plainPug(i);
     try { initAudio(); } catch (e) {}
@@ -3591,7 +3593,7 @@
   function landOnIsle(ids) {
     plain.isle = true; plain.pugs = [];
     ids.forEach(islePug);
-    plain.isleT = 0; plain.endT = 0; plain.bits = []; plain.aim = null; plain.thrown = []; plain.isleShot = 0; plain.tauntT = 0;
+    plain.isleT = 0; plain.endT = 0; plain.bits = []; plain.aim = null; plain.thrown = []; plain.isleShot = 0; plain.tauntT = 0; plain.crumble = null;
     if (unlock('bossIsle')) toast('You can now start Boss Fight from The Island!', '#ffcc3d');
   }
   function islePug(id) {
@@ -3612,8 +3614,9 @@
       }
       if (inp.jump && p.ground) { p.ground = false; p.vy = -3.4; sfx.jump(); }
       if (!p.ground) {
+        const was = p.y;
         p.vy += 0.16; p.y += p.vy;
-        if (p.y >= ISLE_Y) { if (p.vy > 4) tone(90, 0.2, 'sine', 0.14, -40); p.y = ISLE_Y; p.vy = 0; p.ground = true; }
+        if (was <= ISLE_Y && p.y >= ISLE_Y && !isleGone(p.x)) { if (p.vy > 4) tone(90, 0.2, 'sine', 0.14, -40); p.y = ISLE_Y; p.vy = 0; p.ground = true; }
       }
       if (inp.bark && p.barkT < 25) { p.barkT = 45; sfx.bark(LOOK[p.id].bark); }
       if (p.barkT > 0) p.barkT--;
@@ -3625,8 +3628,7 @@
   }
   // Three seconds after his last word Gloop starts on the burritos: a target locks onto the spot one of the pugs is on and
   // stays there for a second (it doesn't follow, the user said), a burrito is thrown there, the next target shows, and so
-  // on for 50. One that lands on a pug kills it; if none are left it's back to the main menu. After the fiftieth nothing
-  // more happens. (the user asked)
+  // on for 50. One that lands on a pug kills it; if none are left it's back to the main menu. (the user asked)
   function stepIsleBurritos() {
     const g = plain, alive = g.pugs.filter(p => !p.dead);
     if (g.isleT >= ISLE_WORDS_END && g.isleShot < ISLE_BURRITOS && alive.length) {
@@ -3654,6 +3656,36 @@
     g.thrown = g.thrown.filter(b => b.t < ISLE_FLY);
     for (const b of g.bits) { b.x += b.vx; b.y += b.vy; b.vy += 0.12; b.t--; }
     g.bits = g.bits.filter(b => b.t > 0);
+    if (!g.crumble && g.isleShot >= ISLE_BURRITOS && !g.thrown.length && g.pugs.some(p => !p.dead)) startCrumble();
+    if (g.crumble) stepCrumble();
+  }
+  // Once the fiftieth burrito has landed with a pug still alive, Gloop yells, the island shakes, and then it crumbles from
+  // its ends and its underside inwards, each pug dropping as the ground under it goes. When they have all fallen out of
+  // sight it's back to the main menu. (the user asked)
+  function startCrumble() {
+    const cells = [];
+    for (let r = 0; r < ISLE_ROWS; r++) for (let col = 0; col < ISLE_COLS; col++) {
+      const inward = (ISLE_COLS - 1) / 2 - Math.abs(col - (ISLE_COLS - 1) / 2);
+      cells.push({ r, col, wait: Math.round(inward * 14 + (ISLE_ROWS - 1 - r) * 5 + Math.random() * 12), spin: (Math.random() - 0.5) * 0.14, drift: (col - (ISLE_COLS - 1) / 2) * 0.06 });
+    }
+    plain.crumble = { t: 0, cells };
+    sfx.braam();
+  }
+  function stepCrumble() {
+    const g = plain, c = g.crumble;
+    c.t++;
+    if (c.t === ISLE_YELL_T) noise(3, 0.14, 240, 50);
+    if (c.t > ISLE_YELL_T && c.t < ISLE_YELL_T + 130 && c.t % 9 === 0) noise(0.12, 0.07, 1400, 300);
+    for (const p of g.pugs) {
+      if (p.ground && isleGone(p.x)) { p.ground = false; p.vy = 0; }
+      if (p.dead && !p.ground) { p.vy += 0.16; p.y += p.vy; }   // (a pug that's alive falls in stepIsle)
+    }
+    if (!g.endT && g.pugs.every(p => p.y > PH + 24)) g.endT = 100;
+  }
+  // (has the ground at this x crumbled away yet? The top row of cells comes first in the list)
+  function isleGone(x) {
+    const c = plain.crumble;
+    return !!c && c.t - ISLE_YELL_T >= c.cells[clamp(Math.floor((x - 12) / 16), 0, ISLE_COLS - 1)].wait;
   }
   // (a floating lump of land: grass on top with a few flowers, dirt under it, and rock tapering away at the bottom)
   function buildIsle() {
@@ -3687,12 +3719,25 @@
     buildPlainStars();
     ctx.drawImage(plainStars, 0, 0);
     if (!isleArt) buildIsle();
-    ctx.drawImage(isleArt, 0, 0);
+    // (the island and the pugs shake while he yells and it starts to go; then each square drops, turning, in its turn)
+    const crumble = plain.crumble;
+    ctx.save();
+    if (crumble && crumble.t < ISLE_YELL_T + 100) ctx.translate(crumble.t % 4 < 2 ? 2 : -2, crumble.t % 6 < 3 ? 1 : -1);
+    if (!crumble) ctx.drawImage(isleArt, 0, 0);
+    else for (const s of crumble.cells) {
+      const k = crumble.t - ISLE_YELL_T - s.wait, x = 12 + s.col * 16, y = ISLE_Y - 6 + s.r * 16;
+      if (k <= 0) { ctx.drawImage(isleArt, x, y, 16, 16, x, y, 16, 16); continue; }
+      const fall = y + 8 + 0.08 * k * k;
+      if (fall > PH + 20) continue;
+      ctx.save(); ctx.translate(x + 8 + s.drift * k, fall); ctx.rotate(s.spin * k); ctx.drawImage(isleArt, x, y, 16, 16, -8, -8, 16, 16); ctx.restore();
+    }
     for (const p of plain.pugs) drawPlainPug(p, Math.round(p.x), Math.round(p.y), 'gold');
+    ctx.restore();
     // (Gloop's words: just yellow text, no bubble, the user asked)
     const said = plain.isleT < ISLE_WORDS_END && ISLE_WORDS.filter(w => plain.isleT >= w[0]).pop();
     if (said) drawText(said[1], PW / 2, 40, 'gold', 'center');
     if (plain.tauntT > 0) drawText(ISLE_TAUNT, PW / 2, 40, 'gold', 'center');
+    if (crumble && crumble.t < ISLE_YELL_T) drawText(ISLE_YELL, PW / 2, 36, 'gold', 'center', 2.5);
     // (the target: a blinking red and white ring with cross hairs)
     const aim = plain.aim;
     if (aim) {
