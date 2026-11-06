@@ -3401,6 +3401,8 @@
   // (then the burritos: how many, the frames a target shows before its burrito is thrown, the burrito's flight, and how
   // near it must land to a pug to hit)
   const ISLE_BURRITOS = 50, ISLE_AIM = 60, ISLE_FLY = 16, ISLE_HIT = 14;
+  // (what he says after that many burritos, and for how many frames)
+  const ISLE_TAUNT = 'HOW DOES IT FEEL', ISLE_TAUNT_AT = 25, ISLE_TAUNT_T = 240;
   let isleArt = null;
   const BOSS_AT = 120, BOSS_HP = 20, SAUCER_HP = 10, BOSS_X = 176, BOSS_SHOOT = 12, SHOT_SPEED = 4.5, BOSS_SCALE = 0.6, BOSS_MOVE = 1.6;
   // (the top of whatever is highest at x, for those who walk over everything; half: how wide they are each side)
@@ -3585,7 +3587,7 @@
   function landOnIsle(ids) {
     plain.isle = true; plain.pugs = [];
     ids.forEach(islePug);
-    plain.isleT = 0; plain.endT = 0; plain.bits = []; plain.aim = null; plain.thrown = []; plain.isleShot = 0;
+    plain.isleT = 0; plain.endT = 0; plain.bits = []; plain.aim = null; plain.thrown = []; plain.isleShot = 0; plain.tauntT = 0;
     if (unlock('bossIsle')) toast('You can now start Boss Fight from The Island!', '#ffcc3d');
   }
   function islePug(id) {
@@ -3632,8 +3634,10 @@
         g.thrown.push({ x: g.aim.x, y: g.aim.y, from: g.aim.x + (Math.random() < 0.5 ? -80 : 80), t: 0 });
         g.aim = null; g.isleShot++;
         tone(500, 0.2, 'square', 0.03, -320);
+        if (g.isleShot === ISLE_TAUNT_AT) g.tauntT = ISLE_TAUNT_T;
       }
     } else g.aim = null;
+    if (g.tauntT > 0) g.tauntT--;
     for (const b of g.thrown) {
       if (++b.t < ISLE_FLY) continue;
       noise(0.18, 0.12, 1200, 200);
@@ -3684,6 +3688,7 @@
     // (Gloop's words: just yellow text, no bubble, the user asked)
     const said = plain.isleT < ISLE_WORDS_END && ISLE_WORDS.filter(w => plain.isleT >= w[0]).pop();
     if (said) drawText(said[1], PW / 2, 40, 'gold', 'center');
+    if (plain.tauntT > 0) drawText(ISLE_TAUNT, PW / 2, 40, 'gold', 'center');
     // (the target: a blinking red and white ring with cross hairs)
     const aim = plain.aim;
     if (aim) {
