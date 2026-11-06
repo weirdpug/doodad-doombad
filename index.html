@@ -3348,9 +3348,10 @@
   const PLAIN_ROVERS = [['scout', 16], ['six', 24], ['buggy', 24], ['hauler', 32]];   // (Saturn's rovers, and how wide each is)
   // (how far a bark reaches in front of a pug)
   const PLAIN_BARK = 56;
-  // (the space fight: when Gloop arrives, in frames, his hits, each saucer's hearts, where he hovers, and the frames
-  // between his shots, about as quick as a player can tap; SHOT_SPEED is everyone's, so his shots match the saucers')
-  const BOSS_AT = 120, BOSS_HP = 20, SAUCER_HP = 10, BOSS_X = 176, BOSS_SHOOT = 12, SHOT_SPEED = 4.5;
+  // (the space fight: when Gloop arrives, in frames, his hits, each saucer's hearts, where he stops first, the frames
+  // between his shots, about as quick as a player can tap, the size of his ship and how fast it roams (the same as a saucer); SHOT_SPEED is
+  // everyone's, so his shots match the saucers')
+  const BOSS_AT = 120, BOSS_HP = 20, SAUCER_HP = 10, BOSS_X = 176, BOSS_SHOOT = 12, SHOT_SPEED = 4.5, BOSS_SCALE = 0.6, BOSS_MOVE = 1.6;
   // (the top of whatever is highest at x, for those who walk over everything; half: how wide they are each side)
   const plainTop = (x, half) => plain.obs.reduce((t, o) => x + half > o.x1 && x - half < o.x2 ? Math.min(t, o.top) : t, PLAIN_Y);
   // (the obstacle a pug at x with feet at y is inside, if any: PLAIN_W either side of it, PLAIN_H tall)
@@ -3457,15 +3458,15 @@
     const g = plain;
     if (g.endT && --g.endT === 0) return leavePlain();
     if (++g.spaceT === BOSS_AT) {
-      g.boss = { x: PW + 70, y: 100, hp: BOSS_HP, hit: 0, shootT: 90, volley: 0, dead: 0 };
+      g.boss = { x: PW + 45, y: 100, tx: BOSS_X, ty: 100, face: -1, on: false, hp: BOSS_HP, hit: 0, shootT: 90, volley: 0, dead: 0 };
       noise(1.6, 0.1, 300, 60); tone(70, 1.4, 'sawtooth', 0.05, -30);   // (something big is coming)
     }
     const flying = g.space.filter(a => a.hp > 0);
     for (const a of flying) {
       const inp = plainInput(a), dx = (inp.right ? 1 : 0) - (inp.left ? 1 : 0), dy = (inp.down ? 1 : 0) - (inp.up ? 1 : 0);
       if (dx) a.face = dx;
-      a.x = clamp(a.x + dx * 1.6, 22, PW - 22); a.y = clamp(a.y + dy * 1.6, 12, PH - 12);
-      if (inp.shot || inp.bark) { g.shots.push({ x: a.x + a.face * 24, y: a.y + 2, dir: a.face }); tone(900, 0.12, 'square', 0.03, -600); }
+      a.x = clamp(a.x + dx * 1.6, 11, PW - 11); a.y = clamp(a.y + dy * 1.6, 6, PH - 6);
+      if (inp.shot || inp.bark) { g.shots.push({ x: a.x + a.face * 12, y: a.y + 1, dir: a.face }); tone(900, 0.12, 'square', 0.03, -600); }
     }
     for (const a of flying) if (a.hit > 0) a.hit--;
     for (const b of g.shots) b.x += b.dir * SHOT_SPEED;
@@ -3473,30 +3474,33 @@
     const boss = g.boss;
     if (boss && boss.dead) {
       // (he goes up in a long string of blasts, then it's back to the main menu)
-      if (boss.dead % 6 === 1) { blastAt(boss.x - 44 + Math.random() * 88, boss.y - 24 + Math.random() * 48, '#ffcc3d'); noise(0.2, 0.06, 1500, 200); }
+      if (boss.dead % 6 === 1) { blastAt(boss.x - 28 + Math.random() * 56, boss.y - 15 + Math.random() * 30, '#ffcc3d'); noise(0.2, 0.06, 1500, 200); }
       if (++boss.dead === 110) { g.boss = null; g.endT = 90; toast('You beat Gloop!', '#ffcc3d'); sfx.oneUp(); }
     } else if (boss) {
       if (boss.hit > 0) boss.hit--;
-      boss.x += (BOSS_X - boss.x) * 0.03;
-      // (he follows the nearest saucer up and down and fires at it, and every fourth time fires a fan of three)
+      // (he roams the whole screen, gliding from one spot to the next)
+      const gap = Math.hypot(boss.tx - boss.x, boss.ty - boss.y);
+      if (gap < 2) { boss.on = true; boss.tx = 46 + Math.random() * (PW - 92); boss.ty = 30 + Math.random() * (PH - 60); }
+      else { boss.x += (boss.tx - boss.x) / gap * BOSS_MOVE; boss.y += (boss.ty - boss.y) / gap * BOSS_MOVE; }
+      // (he turns to face the nearest saucer and fires at it, and every fourth time fires a fan of three)
       if (flying.length) {
         const prey = flying.reduce((p, a) => Math.hypot(a.x - boss.x, a.y - boss.y) < Math.hypot(p.x - boss.x, p.y - boss.y) ? a : p);
-        boss.y = clamp(boss.y + clamp(prey.y - boss.y, -0.7, 0.7), 44, PH - 44);
-        if (boss.x < BOSS_X + 12 && --boss.shootT <= 0) {
+        if (Math.abs(prey.x - boss.x) > 20) boss.face = prey.x < boss.x ? -1 : 1;
+        if (boss.on && --boss.shootT <= 0) {
           boss.shootT = BOSS_SHOOT; boss.volley++;
-          const ang = Math.atan2(prey.y - boss.y, prey.x - (boss.x - 50));
-          for (const d of boss.volley % 4 === 0 ? [-0.3, 0, 0.3] : [0]) g.zaps.push({ x: boss.x - 50, y: boss.y + 2, vx: Math.cos(ang + d) * SHOT_SPEED, vy: Math.sin(ang + d) * SHOT_SPEED });
+          const mx = boss.x + boss.face * 40, my = boss.y + 2, ang = Math.atan2(prey.y - my, prey.x - mx);
+          for (const d of boss.volley % 4 === 0 ? [-0.3, 0, 0.3] : [0]) g.zaps.push({ x: mx, y: my, vx: Math.cos(ang + d) * SHOT_SPEED, vy: Math.sin(ang + d) * SHOT_SPEED });
           tone(220, 0.12, 'sawtooth', 0.04, -140);
         }
       }
       // (the saucers' shots)
-      for (const b of g.shots) if (!boss.dead && Math.abs(b.x - boss.x) < 46 && Math.abs(b.y - boss.y) < 24) {
+      for (const b of g.shots) if (!boss.dead && Math.abs(b.x - boss.x) < 30 && Math.abs(b.y - boss.y) < 15) {
         b.gone = true; boss.hp--; boss.hit = 8; blastAt(b.x, b.y, '#5fd068'); tone(160, 0.1, 'square', 0.05, -60);
         if (boss.hp <= 0) { boss.dead = 1; g.zaps = []; sfx.boom(); }
       }
     }
     // (his shots)
-    for (const z of g.zaps) for (const a of flying) if (!z.gone && !a.hit && a.hp > 0 && Math.abs(z.x - a.x) < 20 && Math.abs(z.y - a.y) < 10) {
+    for (const z of g.zaps) for (const a of flying) if (!z.gone && !a.hit && a.hp > 0 && Math.abs(z.x - a.x) < 11 && Math.abs(z.y - a.y) < 6) {
       z.gone = true; a.hp--; a.hit = 45; blastAt(a.x, a.y, '#ff6a50');
       if (a.hp > 0) tone(300, 0.15, 'square', 0.05, -160);
       else { sfx.die(); for (let i = 0; i < 4; i++) blastAt(a.x - 12 + i * 8, a.y, '#ffcc3d'); }
@@ -3640,8 +3644,8 @@
       plain.space.forEach((a, row) => {
         if (a.hp > 0 && !(a.hit > 0 && a.hit % 6 < 3)) {
           const pic = sprite('ufo_' + ((plain.t >> 3) & 1), a.face < 0);
-          if (pic) ctx.drawImage(pic, Math.round(a.x) - 22, Math.round(a.y) - 11, 44, 22);
-          if (plain.space.length > 1) drawText('P' + (a.id + 1), Math.round(a.x), Math.round(a.y) - 20, LOOK[a.id].tag, 'center');
+          if (pic) ctx.drawImage(pic, Math.round(a.x) - 11, Math.round(a.y) - 6, 22, 11);
+          if (plain.space.length > 1) drawText('P' + (a.id + 1), Math.round(a.x), Math.round(a.y) - 13, LOOK[a.id].tag, 'center');
         }
         // (each saucer's hearts, top left)
         for (let i = 0; i < SAUCER_HP; i++) drawArenaHeart(5 + i * 7, 5 + row * 7, i < a.hp);
@@ -3707,7 +3711,8 @@
   // glaring out of a dark red dome; it flashes white when hit
   function drawBossShip(b) {
     if (!gloopPics) gloopPics = Object.fromEntries(Object.entries(GLOOP).map(([k, v]) => [k, bakeWith(v, GLOOP_COLS)]));
-    const x = Math.round(b.x), y = Math.round(b.y) + Math.round(Math.sin(plain.t / 20) * 2), t = plain.t, flash = b.hit % 4 > 1;
+    const x = 0, y = 0, t = plain.t, flash = b.hit % 4 > 1;
+    ctx.save(); ctx.translate(Math.round(b.x), Math.round(b.y) + Math.round(Math.sin(t / 20) * 2)); ctx.scale(-b.face * BOSS_SCALE, BOSS_SCALE);   // (drawn nose left)
     const poly = (col, ...pts) => { ctx.fillStyle = col; ctx.beginPath(); pts.forEach(([px1, py1], i) => i ? ctx.lineTo(px1, py1) : ctx.moveTo(px1, py1)); ctx.closePath(); ctx.fill(); };
     const dark = flash ? '#ffffff' : '#1a0f2a', rim = flash ? '#ffffff' : '#5a0f2a';
     // (spikes along the top and bottom, and the tail fins)
@@ -3718,13 +3723,14 @@
     poly(rim, [x - 58, y + 2], [x - 22, y - 16], [x + 40, y - 18], [x + 54, y], [x + 40, y + 18], [x - 22, y + 16]);
     poly(dark, [x - 54, y + 2], [x - 21, y - 14], [x + 38, y - 16], [x + 50, y], [x + 38, y + 16], [x - 21, y + 14]);
     // (the dome with Gloop in it, facing the saucers)
-    ctx.fillStyle = 'rgba(200,40,50,0.45)'; ctx.beginPath(); ctx.ellipse(x + 8, y - 13, 18, 19, 0, Math.PI, 0); ctx.fill();
-    ctx.save(); ctx.translate(x + 8, y - 14); ctx.scale(-1, 1); ctx.drawImage(gloopPics.sad, 0, 0, 22, 16, -11, -16, 22, 16); ctx.restore();
-    ctx.strokeStyle = rim; ctx.beginPath(); ctx.ellipse(x + 8, y - 13, 18, 19, 0, Math.PI, 0); ctx.stroke();
+    ctx.fillStyle = 'rgba(200,40,50,0.45)'; ctx.beginPath(); ctx.ellipse(x + 8, y - 13, 22, 25, 0, Math.PI, 0); ctx.fill();
+    ctx.save(); ctx.translate(x + 8, y - 14); ctx.scale(-1, 1); ctx.drawImage(gloopPics.sad, 0, 0, 22, 16, -14, -21, 28, 21); ctx.restore();
+    ctx.strokeStyle = rim; ctx.beginPath(); ctx.ellipse(x + 8, y - 13, 22, 25, 0, Math.PI, 0); ctx.stroke();
     // (the red lights, chasing along the hull, and the cannon, glowing as it is about to fire)
     for (let i = 0; i < 8; i++) { ctx.fillStyle = (i + (t >> 2)) % 8 < 3 ? '#ff3e30' : '#5a0f2a'; ctx.fillRect(x - 34 + i * 10, y + 3, 6, 3); }
     ctx.fillStyle = '#55556a'; ctx.fillRect(x - 66, y, 18, 5);
     ctx.fillStyle = b.shootT < 5 ? '#ffcc3d' : '#e8282f'; ctx.fillRect(x - 68, y + 1, 3, 3);
+    ctx.restore();
   }
   // (Gloop, sad, all of him, waddling after them)
   function drawPlainGloop() {
