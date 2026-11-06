@@ -3725,14 +3725,14 @@
     g.bits = g.bits.filter(b => b.t > 0);
     if (c === DROP_END) leavePlain();
   }
-  // (a pug tumbling, its middle at x, y)
+  // (a pug tumbling, its middle at x, y, wide awake: it isn't dead, the user said)
   function tumblePug(id, x, y, size, ang) {
     const L = looks[id], layer = (name, sw) => { const b = sprite(name, false, sw); if (b) ctx.drawImage(b, -b.width / 2, -b.height / 2); };
     ctx.save(); ctx.translate(Math.round(x), Math.round(y)); ctx.rotate(ang); ctx.scale(size, size);
-    layer('player_dead', LOOK[id].swap);
-    if (L.suit) layer(L.suit + '_dead');
-    if (L.hat) layer(L.hat + '_dead');
-    if (L.necklace) layer(L.necklace + '_dead');
+    layer('player_jump', LOOK[id].swap);
+    if (L.suit) layer(L.suit + '_jump');
+    if (L.hat) layer(L.hat + '_jump');
+    if (L.necklace) layer(L.necklace + '_jump');
     ctx.restore();
   }
   // (where pug i of n is on the way down to Jupiter, u from 0 to 1)
@@ -3777,7 +3777,9 @@
     ctx.save();
     if (d.shake > 0) ctx.translate(d.shake % 4 < 2 ? 3 : -3, d.shake % 6 < 3 ? 2 : -2);
     spaceT++;
-    drawJupiterShop();
+    // (Gloop isn't in, this way: he's only there when you come from The Arcade, the user said)
+    const gone = shop.gone;
+    shop.gone = true; drawJupiterShop(); shop.gone = gone;
     if (c >= 1) {
       const path = () => { ctx.beginPath(); hole.forEach(([x, y], i) => i ? ctx.lineTo(DROP_X + x, y) : ctx.moveTo(DROP_X + x, y)); ctx.closePath(); };
       ctx.save(); path(); ctx.clip();
@@ -3791,7 +3793,7 @@
       const u = Math.min(1, (c - i * DROP_GAP) / DROP_FALL);
       // (twice the size, as the shop is seen close up)
       ctx.save(); ctx.translate(DROP_X + Math.round((i - (n - 1) / 2) * 34), Math.round(-30 + 220 * u * u)); ctx.scale(2, 2);
-      drawPlainPug({ id, face: 1, dead: true, ground: true, barkT: 0, anim: 0 }, 0, 0, 'gold');
+      drawPlainPug({ id, face: 1, ground: u >= 1, moving: false, barkT: 0, anim: 0 }, 0, 0, 'gold');
       ctx.restore();
     });
     ctx.restore();
