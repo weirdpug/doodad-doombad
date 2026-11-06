@@ -1216,7 +1216,8 @@
   // Things unlocked by doing something in the game, saved in the browser for every pug (alien: Zorp the Alien, for
   // blowing up the mother ship; the user asked 2026-10-31. space: the Astronaut Suit, the Astronaut Helmet and the
   // Rocket, for going to space, the user asked 2026-11-02. bossRun: Boss Fight on the main menu, for reaching Gloop's
-  // chase on Jupiter, the user asked 2026-11-05). unlock() says whether it was new.
+  // chase on Jupiter, the user asked 2026-11-05. bossIsle: The Island on Boss Fight's list, for reaching the island in
+  // space, the same day). unlock() says whether it was new.
   const UNLOCKS_KEY = 'doodad-doombad-unlocks';
   const unlocks = (() => { try { const u = JSON.parse(localStorage.getItem(UNLOCKS_KEY)); return u && typeof u === 'object' ? u : {}; } catch (e) { return {}; } })();
   function unlock(what) {
@@ -2619,7 +2620,7 @@
   // controller always starts. Store and Customize open their screens, and Back (or Esc, B, P or Menu)
   // comes back here. Customize is empty for now: just its title and Back.
   const titleBtns = [startBtn, titleStoreBtn, document.getElementById('titleCustom')];
-  const TITLE_VIEWS = [null, 'store', 'custom'];   // (what each button opens; Start starts instead)
+  const TITLE_VIEWS = [null, 'store', 'custom', 'boss'];   // (what each button opens; Start starts instead)
   function markTitle(sel, focus) {
     titleSel = sel; titleBtns.forEach((b, i) => b.classList.toggle('chosen', i === sel));
     if (focus) titleBtns[sel].focus({ preventScroll: true });
@@ -2629,12 +2630,11 @@
     const four = titleBtns.length === 4;
     markTitle(four ? titleSel ^ (upDown ? 2 : 1) : (titleSel + d + titleBtns.length) % titleBtns.length, true); sfx.tick();
   }
-  function pickTitle(by) { if (titleBtns[titleSel] === bossBtn) pickBoss(); else if (titleSel) openFromTitle(TITLE_VIEWS[titleSel], by); else startClicked(); }
-  // Boss Fight: straight to Gloop's chase on Jupiter. Reaching the chase any way unlocks it, and the lock code locks it.
-  // (the user asked)
+  function pickTitle(by) { if (titleSel) openFromTitle(TITLE_VIEWS[titleSel], by); else startClicked(); }
+  // Boss Fight: a list of the parts to start from (MENUS.boss), the beginning at first, and the island once it has been
+  // reached. Reaching the chase any way unlocks the button, and the lock code locks it. (the user asked)
   const bossBtn = document.getElementById('titleBoss');
-  function pickBoss() { if (live() && phase === 'title' && boomPic.hidden) codeBoss(); }
-  bossBtn.addEventListener('click', pickBoss);
+  bossBtn.addEventListener('click', () => openFromTitle('boss', kbBy()));
   function showBossBtn() {
     const on = !!unlocks.bossRun, at = titleBtns.indexOf(bossBtn);
     if (on && at < 0) titleBtns.push(bossBtn); else if (!on && at >= 0) titleBtns.splice(at, 1);
@@ -2648,11 +2648,11 @@
     releaseAll(); fromTitle = true; phase = 'paused';
     showPause(view, 0, null, by);
   }
-  titleBtns.forEach((b, i) => { if (i) b.addEventListener('click', () => openFromTitle(TITLE_VIEWS[i], kbBy())); });
+  titleBtns.forEach((b, i) => { if (i && b !== bossBtn) b.addEventListener('click', () => openFromTitle(TITLE_VIEWS[i], kbBy())); });
   // back to the main menu from the Store or Customize, with that one's button chosen
   // (from Customize or one of its sections, Customize is chosen)
   // (from The Arcade the view scrolls back down to the castle first: scrollSky)
-  const backToTitle = () => pauseView === 'arcade' ? scrollSky(-1) : showTitle(pauseView === 'store' ? 1 : 2);
+  const backToTitle = () => pauseView === 'arcade' ? scrollSky(-1) : showTitle(pauseView === 'boss' ? 3 : pauseView === 'store' ? 1 : 2);
   // the main menu again (sel: the button to choose), from the pause menu, the Store or Customize
   function showTitle(sel) {
     fromTitle = false; phase = 'title';
@@ -2875,6 +2875,11 @@
     hopOver: () => [{ label: 'Play again', act: by => startHop(by) }, { label: 'Back', act: () => backFromHop() }],
     // (Jupiter's flat plain: only one way home)
     plainPause: () => [{ label: 'Resume', act: () => resumeGame() }, { label: 'Main Menu', act: () => leavePlain() }],
+    boss: () => [
+      { label: 'The Beginning', act: () => codeBoss() },
+      ...(unlocks.bossIsle ? [{ label: 'The Island', act: () => codeIsle() }] : []),
+      { label: 'Back', act: () => backToTitle() },
+    ],
     arcade: () => [
       ...(arcadeZoom.target && !arcadeZoom.out && !onShip() && !arcadeZoom.target.shop ? [{ label: 'Play', act: by => playFromArcade(by) }] : []),
       // (zoomed in on the spaceship, Back zooms out to Saturn first)
@@ -2902,9 +2907,9 @@
     if ((store || neck) && by !== undefined && joined[by]) storeBy = by;
     if (!joined[storeBy]) storeBy = kbBy();
     const bpause = /^(banana|arena|race|dig|hop|plain)Pause$/.test(view), bover = /^(banana|arena|race|dig|hop)Over$/.test(view);
-    ovTitle.textContent = bpause ? 'Paused' : view === 'arenaOver' ? arenaWords().title : view === 'raceOver' ? raceWords().title : view === 'digOver' ? digWords().title : view === 'hopOver' ? hopWords().title : bover ? 'Splat!' : arcade ? (onShip() ? 'Alien Spaceship' : inShop() ? SHOP_NAME : arcadeZoom.target && !arcadeZoom.out ? arcadeZoom.target.name : 'The Arcade') : store ? 'Store' : part ? part.name : custom ? 'Customize' : 'Paused';
+    ovTitle.textContent = view === 'boss' ? 'Boss Fight' : bpause ? 'Paused' : view === 'arenaOver' ? arenaWords().title : view === 'raceOver' ? raceWords().title : view === 'digOver' ? digWords().title : view === 'hopOver' ? hopWords().title : bover ? 'Splat!' : arcade ? (onShip() ? 'Alien Spaceship' : inShop() ? SHOP_NAME : arcadeZoom.target && !arcadeZoom.out ? arcadeZoom.target.name : 'The Arcade') : store ? 'Store' : part ? part.name : custom ? 'Customize' : 'Paused';
     // (Necklaces keeps a line for what was just put on, and with 2-4 pugs, whose look it is)
-    ovText.hidden = arcade || (custom && !neck);
+    ovText.hidden = arcade || (custom && !neck) || view === 'boss';
     ovText.textContent = note || (store
       ? (multi() ? `${LOOK[storeBy].name}'s bag. Each pug pays with its own coins!` : 'Buy things, then equip them!')
       : neck ? [multi() ? `${LOOK[storeBy].name}'s ${part.name.toLowerCase()}` : '',
@@ -2934,7 +2939,7 @@
     if (neck) renderLooks();
     // (an item only hops right after it is bought, not every time the Store opens again)
     for (const it of SHOP) it.card.classList.remove('bought');
-    coinList.hidden = storeShelf.hidden = !store; lookShelf.hidden = !neck; ovKeys.hidden = store || custom || arcade || bpause || bover; startBtn.hidden = true;
+    coinList.hidden = storeShelf.hidden = !store; lookShelf.hidden = !neck; ovKeys.hidden = store || custom || arcade || bpause || bover || view === 'boss'; startBtn.hidden = true;
     menuEl.hidden = false; menuHint.hidden = store || custom || arcade || bpause || bover;   // (the Store needs the room on small screens)
     // (a game started from the main menu leaves its look on the hidden screen: the menus never use it)
     ov.classList.remove('title-mode'); ov.classList.add('menu-mode'); ov.classList.toggle('arcade-mode', arcade); ov.hidden = false;
@@ -3472,9 +3477,7 @@
     if (!plain || plain.isle) return;
     if (!plain.space) plainSpace(plain.pugs);
     boomPic.hidden = true; boomPicT = 0;
-    const ids = plain.pugs.map(p => p.id);
-    plain.isle = true; plain.pugs = [];
-    ids.forEach(islePug);
+    landOnIsle(plain.pugs.map(p => p.id));
   }
   // (the space screen: one saucer for each of these pugs, side by side)
   function plainSpace(pugs) {
@@ -3568,8 +3571,7 @@
     const g = plain, w = g.warp;
     g.kbAtk = false;
     if (++w.t === WARP_T) {
-      g.isle = true; g.pugs = [];
-      g.hole.pugs.forEach(islePug);
+      landOnIsle(g.hole.pugs);
       tone(600, 0.25, 'sine', 0.06, -320);
       return;
     }
@@ -3579,6 +3581,11 @@
   // The island: the pugs drop out of the sky onto it, back to normal, and walk, jump and bark just as they do on Jupiter,
   // but nothing else happens here; they can't walk off its ends, and the pause menu is the way back to the main menu.
   // (the user asked)
+  function landOnIsle(ids) {
+    plain.isle = true; plain.pugs = [];
+    ids.forEach(islePug);
+    if (unlock('bossIsle')) toast('You can now start Boss Fight from The Island!', '#ffcc3d');
+  }
   function islePug(id) {
     plain.pugs.push({ id, x: PW / 2 - 24 + id * 16, y: -20, vy: 0, ground: false, face: 1, moving: false, anim: 0, barkT: 0, prev: { jump: true, bark: true } });
   }
