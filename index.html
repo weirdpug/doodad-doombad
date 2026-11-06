@@ -2047,6 +2047,7 @@
   //   L0CK2     only resets Gloop's missions and locks their prizes again (codeMissions)
   //   YAY!      unlocks every customization there is, mission prizes too (unlockAll)
   //   B0SS      goes straight to Gloop's chase on Jupiter (codeBoss), from any screen
+  //   B0SS2     goes straight to the space screen where you steer the alien's saucer (codeSpace), from any screen
   // A code's first key still does its usual job if it is a game key (B barks, ZER0's Z jumps), but once a
   // code has begun, its next keys only type the code: the coin code's S doesn't also climb down or pick a
   // menu choice, the skip code's X makes no tacos. A key that doesn't fit, or nothing typed for 25 seconds,
@@ -2056,7 +2057,7 @@
     { code: 'ZER0', at: 0, run: () => zeroCoins() }, { code: 'C0/\\/\\E', at: 0, run: () => codeCome() },
     { code: 'EXP', at: 0, run: () => codeExp() }, { code: 'L0CK', at: 0, run: () => relock() },
     { code: 'L0CK2', at: 0, run: () => codeMissions() }, { code: 'YAY!', at: 0, run: () => unlockAll() },
-    { code: 'B0SS', at: 0, run: () => codeBoss() }];
+    { code: 'B0SS', at: 0, run: () => codeBoss() }, { code: 'B0SS2', at: 0, run: () => codeSpace() }];
   // The zero code (the user asked for one to reset their coins): every pug's coins are set to 0 and saved.
   // Store things already bought are kept.
   // (the lock code, the user asked 2026-10-31: every unlock forgotten, and a pet that is locked again goes home, and a
@@ -3409,6 +3410,15 @@
     boom = null; boomPic.hidden = true; boomPicT = 0;
     startPlain();
   }
+  // (the space code, the user asked 2026-11-05: on to the space screen, by way of Jupiter)
+  function codeSpace() {
+    if (!plain) codeBoss();
+    if (plain && !plain.space) plainSpace(plain.pugs);
+  }
+  // (the space screen: one saucer for each of these pugs, side by side)
+  function plainSpace(pugs) {
+    plain.space = pugs.map((p, i) => ({ id: p.id, x: PW / 2 + (i - (pugs.length - 1) / 2) * 50, y: PH / 2, face: 1, prev: { jump: true, bark: true } }));
+  }
   function startPlain() {
     banana = arena = race = dig = hop = null;
     document.body.classList.remove('blackout');
@@ -3490,7 +3500,7 @@
     }
     g.ships = g.ships.filter(s => s.pug || s.x > g.gloopX - 200);
     if (!alive.length && carried.length && carried.every(p => p.aboard.y < -40)) {
-      g.space = carried.map((p, i) => ({ id: p.id, x: PW / 2 + (i - (carried.length - 1) / 2) * 50, y: PH / 2, face: 1, prev: { jump: true, bark: true } }));
+      plainSpace(carried);
       return;
     }
     if (alive.length) {
