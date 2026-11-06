@@ -3334,13 +3334,18 @@
   // After the black screen (the user asked 2026-11-05): a random spot on Jupiter, a completely flat plain under the
   // planet's bands that goes on for ever, with obstacles to get past as you run (plainObstacle). The pugs can walk, jump
   // and bark, and Gloop chases them on foot all the time, walking over everything: a pug he catches dies, and so does one
-  // hit by the barrels that sometimes fall from the sky or the rovers that sometimes drive through, to be jumped; with
-  // none left it's back to the main menu, as is the pause menu's Main Menu. (plain: the
+  // hit by the barrels that sometimes fall from the sky, the rovers that sometimes drive through, to be jumped, or the
+  // Martians that come at them, to be barked at; with none left it's back to the main menu, as is the pause menu's Main
+  // Menu. (plain: the
   // state, phase 'mini' like the Arcade's games; PLAIN_Y: the ground on the screen; PLAIN_SPOTS: the spots, each the
   // sky's bands, the ground and what's in the sky; GLOOP_NEAR: how far off he stays at most, however fast they run)
   let plain = null;
   const PLAIN_Y = 238, PLAIN_SKY_W = 480, GLOOP_NEAR = 104, PLAIN_W = 6, PLAIN_H = 13;
   const PLAIN_ROVERS = [['scout', 16], ['six', 24], ['buggy', 24], ['hauler', 32]];   // (Saturn's rovers, and how wide each is)
+  // (how far a bark reaches in front of a pug)
+  const PLAIN_BARK = 56;
+  // (the top of whatever is highest at x, for those who walk over everything; half: how wide they are each side)
+  const plainTop = (x, half) => plain.obs.reduce((t, o) => x + half > o.x1 && x - half < o.x2 ? Math.min(t, o.top) : t, PLAIN_Y);
   // (the obstacle a pug at x with feet at y is inside, if any: PLAIN_W either side of it, PLAIN_H tall)
   const plainHit = (x, y) => plain.obs.find(o => x + PLAIN_W > o.x1 && x - PLAIN_W < o.x2 && y > o.top && y - PLAIN_H < o.bot);
   // (what feet at y would land on at x: the highest top at or below them, or the ground)
@@ -3397,7 +3402,7 @@
     banana = arena = race = dig = hop = null;
     document.body.classList.remove('blackout');
     const spot = PLAIN_SPOTS[Math.floor(Math.random() * PLAIN_SPOTS.length)], x0 = Math.floor(Math.random() * 100000);
-    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300 };
+    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300, martians: [], martianT: 420 };
     const first = kbSlot !== null && joined[kbSlot] ? kbSlot : 0;
     for (let i = 0; i < 4; i++) if (arenaDriven(i) || i === first) plainPug(i);
     try { initAudio(); } catch (e) {}
@@ -3422,15 +3427,17 @@
     if (g.endT && --g.endT === 0) return leavePlain();
     if (!g.endT) for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.pugs.some(p => p.id === i)) plainPug(i);
     g.pugs = g.pugs.filter(p => arenaDriven(p.id));   // (one nobody drives any more goes, so it can't hold the view back)
+    const leftNow = g.pugs.reduce((n, p) => p.dead ? n : Math.min(n, p.x), Infinity);
     for (const p of g.pugs) {
       if (p.dead) continue;
       const inp = plainInput(p), dx = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
       p.moving = false;
       if (dx) {
-        // (a step, unless it's off the edge of the view or into an obstacle)
+        // (a step, unless it's into an obstacle, or off the front of the view or too far ahead of the pug at the back, who
+        // must always be able to back out of a dead end: going left, only Gloop limits a pug)
         const nx = p.x + dx * 1.25;
         p.face = dx;
-        if ((dx > 0 ? nx <= g.cam + PW - 8 : nx >= g.cam + 8) && !plainHit(nx, p.y)) { p.x = nx; p.moving = true; if (++p.anim % 12 === 0 && p.ground) sfx.step(); }
+        if ((dx < 0 || nx <= Math.min(g.cam + PW - 8, leftNow + 180)) && !plainHit(nx, p.y)) { p.x = nx; p.moving = true; if (++p.anim % 12 === 0 && p.ground) sfx.step(); }
       }
       if (inp.jump && p.ground) { p.ground = false; p.vy = -3.4; sfx.jump(); }
       if (p.ground && plainFloor(p.x, p.y) > p.y) { p.ground = false; p.vy = 0; }   // (walked off the edge of something)
@@ -3441,29 +3448,34 @@
         else { const f = plainFloor(p.x, p.y); if (ny >= f) { ny = f; p.vy = 0; p.ground = true; } }
         p.y = ny;
       }
-      if (inp.bark && p.barkT < 25) { p.barkT = 45; sfx.bark(LOOK[p.id].bark); }
+      if (inp.bark && p.barkT < 25) {
+        p.barkT = 45; sfx.bark(LOOK[p.id].bark);
+        // (a Martian within reach in front of the pug goes dizzy and pops)
+        for (const m of g.martians) { const d = (m.x - p.x) * p.face; if (!m.pop && d > -8 && d < PLAIN_BARK) { m.pop = 20; sfx.stun(); } }
+      }
       if (p.barkT > 0) p.barkT--;
     }
     g.kbAtk = false;
     // (the view stays on the pugs still alive)
     const alive = g.pugs.filter(p => !p.dead);
-    if (!alive.length) { if (!g.endT) g.endT = 150; return; }
-    const mid = alive.reduce((n, p) => n + p.x, 0) / alive.length;
-    g.cam += (mid - PW / 2 - g.cam) * 0.1;
-    while (g.nextObs < g.cam + PW + 120) plainObstacle();
-    g.obs = g.obs.filter(o => o.x2 > g.gloopX - 140);
-    // Gloop is always on the pugs' left (the user asked) and goes after the leftmost: slower than a pug, but faster once
-    // it has got away from him, so he never drops out of sight. He walks up and over the obstacles, and a pug he reaches
-    // dies, however high up it is.
-    const gap = alive.reduce((n, p) => Math.min(n, p.x), Infinity) - g.gloopX;
-    g.gloopX += gap > GLOOP_NEAR ? 1.35 : 0.9;
-    const under = g.obs.reduce((t, o) => g.gloopX + 8 > o.x1 && g.gloopX - 8 < o.x2 ? Math.min(t, o.top) : t, PLAIN_Y);
-    g.gloopY += (under - g.gloopY) * 0.2;
+    if (!alive.length && !g.endT) g.endT = 150;
+    if (alive.length) {
+      const xs = alive.map(p => p.x);
+      g.cam += ((Math.min(...xs) + Math.max(...xs)) / 2 - PW / 2 - g.cam) * 0.1;
+      while (g.nextObs < g.cam + PW + 120) plainObstacle();
+      g.obs = g.obs.filter(o => o.x2 > g.gloopX - 140);
+      // Gloop is always on the pugs' left (the user asked) and goes after the leftmost: slower than a pug, but faster
+      // once it has got away from him, so he never drops out of sight. He walks up and over the obstacles, and a pug he
+      // reaches dies, however high up it is.
+      const gap = Math.min(...xs) - g.gloopX;
+      g.gloopX += gap > GLOOP_NEAR ? 1.35 : 0.9;
+    }
+    g.gloopY += (plainTop(g.gloopX, 8) - g.gloopY) * 0.2;
     const kill = p => { if (p.dead) return; p.dead = true; p.y = plainFloor(p.x, p.y); p.ground = true; p.barkT = 0; sfx.die(); };
     for (const p of alive) if (Math.abs(p.x - g.gloopX) < 12) kill(p);
     // Barrels now and then fall out of the sky, each with a shadow showing where it will land. One that hits a pug
     // kills it; one that hits the ground or an obstacle smashes.
-    if (--g.dropT <= 0) { g.dropT = 80 + Math.random() * 170; g.drops.push({ x: g.cam + 30 + Math.random() * (PW - 40), y: -16, vy: 0.4, spin: 0 }); }
+    if (alive.length && --g.dropT <= 0) { g.dropT = 80 + Math.random() * 170; g.drops.push({ x: g.cam + 30 + Math.random() * (PW - 40), y: -16, vy: 0.4, spin: 0 }); }
     for (const b of g.drops) {
       b.vy = Math.min(b.vy + 0.18, 6.5); b.y += b.vy; b.spin++;
       for (const p of alive) if (Math.abs(b.x - p.x) < 11 && b.y + 5 > p.y - PLAIN_H && b.y - 5 < p.y) kill(p);
@@ -3475,7 +3487,7 @@
     g.drops = g.drops.filter(b => !b.gone);
     // Rovers now and then drive through along the ground, mostly from ahead, going right through the obstacles. A pug
     // has to be off the ground above one as it passes: a jump clears any of them.
-    if (--g.roverT <= 0) {
+    if (alive.length && --g.roverT <= 0) {
       g.roverT = 240 + Math.random() * 300;
       const [kind, w] = PLAIN_ROVERS[Math.floor(Math.random() * PLAIN_ROVERS.length)], dir = Math.random() < 0.7 ? -1 : 1;
       g.rovers.push({ kind, w, dir, x: dir < 0 ? g.cam + PW + w : g.cam - w, t: 0 });
@@ -3486,9 +3498,25 @@
       for (const p of alive) if (Math.abs(r.x - p.x) < r.w / 2 + 4 && p.y > PLAIN_Y - 11) kill(p);
     }
     g.rovers = g.rovers.filter(r => r.dir < 0 ? r.x > g.cam - 60 : r.x < g.cam + PW + 60);
+    // Martians from Mars Dig now and then come along from ahead, walking over everything. Jumping doesn't save a pug: one
+    // that reaches it kills it, however high up, so it has to be barked at (the user asked).
+    if (alive.length && --g.martianT <= 0) { g.martianT = 260 + Math.random() * 320; g.martians.push({ x: g.cam + PW + 16, y: PLAIN_Y, t: 0, pop: 0 }); }
+    for (const m of g.martians) {
+      m.t++;
+      if (m.pop) {
+        if (--m.pop === 0) {
+          m.gone = true; sfx.pop();
+          for (let i = 0; i < 8; i++) g.bits.push({ x: m.x, y: m.y - 6, vx: (Math.random() - 0.5) * 3, vy: -1 - Math.random() * 2, t: 24, col: '#5fc88f' });
+        }
+        continue;
+      }
+      m.x -= 0.8; m.y += (plainTop(m.x, 6) - m.y) * 0.2;
+      for (const p of alive) if (Math.abs(m.x - p.x) < 11) kill(p);
+    }
+    g.martians = g.martians.filter(m => !m.gone && m.x > g.gloopX - 40);
     for (const b of g.bits) { b.vy += 0.2; b.x += b.vx; b.y += b.vy; b.t--; }
     g.bits = g.bits.filter(b => b.t > 0);
-    if (alive.every(q => q.dead)) g.endT = 150;
+    if (!g.endT && alive.every(q => q.dead)) g.endT = 150;
   }
   function pausePlain(note) {
     if (phase !== 'mini' || !plain) return;
@@ -3522,9 +3550,12 @@
     }
     drawPlainGloop();
     for (const r of g.rovers) blit(`rover_${r.kind}_${(r.t >> 3) & 1}`, Math.round(r.x - g.cam) - (r.w >> 1), PLAIN_Y - 12, r.dir < 0);
+    for (const m of g.martians) {
+      const pic = sprite(m.pop ? 'dg_blob_dizzy' : (m.t >> 3) & 1 ? 'dg_blob2' : 'dg_blob1');
+      if (pic) ctx.drawImage(pic, Math.round(m.x - g.cam) - (pic.width >> 1), Math.round(m.y) - pic.height);
+    }
     for (const b of g.drops) blit('barrel_roll' + (Math.floor(b.spin / 6) % 4), Math.round(b.x - g.cam) - 5, Math.round(b.y) - 5);
-    ctx.fillStyle = '#8a5630';
-    for (const b of g.bits) ctx.fillRect(Math.round(b.x - g.cam), Math.round(b.y), 2, 2);
+    for (const b of g.bits) { ctx.fillStyle = b.col || '#8a5630'; ctx.fillRect(Math.round(b.x - g.cam), Math.round(b.y), 2, 2); }
     for (const p of g.pugs) {
       const X = Math.round(p.x - g.cam), Y = Math.round(p.y), flip = p.face < 0, L = looks[p.id];
       const pose = p.dead ? 'dead' : !p.ground ? 'jump' : p.moving ? (Math.floor(p.anim / 6) % 2 ? 'walk2' : 'walk1') : 'stand';
