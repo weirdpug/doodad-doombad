@@ -3339,8 +3339,9 @@
   // Martians that come at them, to be barked at; with none left it's back to the main menu, as is the pause menu's Main
   // Menu. Now and then, far along (about 25 obstacles), there is one alien spaceship for each pug still alive: a pug that
   // jumps on one is carried off, and once everyone still alive has gone, each drives its alien's saucer round space
-  // (plain.space). Two seconds later Gloop arrives in a huge spaceship (the user asked): he shoots, and dies after 20
-  // hits, and each saucer has 10 hearts. Either way the fight ends at the main menu. (plain: the
+  // (plain.space). Two seconds later Gloop arrives in a huge spaceship (the user asked): he shoots, and each saucer has 10
+  // hearts. After 20 hits he doesn't die: he fires a space nuke that blows everyone up (stepNuke). Either way the fight
+  // ends at the main menu. (plain: the
   // state, phase 'mini' like the Arcade's games; PLAIN_Y: the ground on the screen; PLAIN_SPOTS: the spots, each the
   // sky's bands, the ground and what's in the sky; GLOOP_NEAR: how far off he stays at most, however fast they run)
   let plain = null;
@@ -3351,6 +3352,11 @@
   // (the space fight: when Gloop arrives, in frames, his hits, each saucer's hearts, where he stops first, the frames
   // between his shots, about as quick as a player can tap, the size of his ship and how fast it roams (the same as a saucer); SHOT_SPEED is
   // everyone's, so his shots match the saucers')
+  // (his nuke, in frames: it slides out, the view zooms in on it, holds, zooms out, it flies, and the explosion picture
+  // stays up 2 seconds; NUKE_Z is how far the view zooms, and the nuke is drawn that many times too small so that its
+  // letters are only readable zoomed in)
+  const NUKE = { ready: 70, zoomIn: 50, hold: 140, zoomOut: 50, fly: 45, pic: 120 }, NUKE_Z = 4;
+  const NUKE_LAUNCH = NUKE.ready + NUKE.zoomIn + NUKE.hold + NUKE.zoomOut, NUKE_HIT = NUKE_LAUNCH + NUKE.fly;
   const BOSS_AT = 120, BOSS_HP = 20, SAUCER_HP = 10, BOSS_X = 176, BOSS_SHOOT = 12, SHOT_SPEED = 4.5, BOSS_SCALE = 0.6, BOSS_MOVE = 1.6;
   // (the top of whatever is highest at x, for those who walk over everything; half: how wide they are each side)
   const plainTop = (x, half) => plain.obs.reduce((t, o) => x + half > o.x1 && x - half < o.x2 ? Math.min(t, o.top) : t, PLAIN_Y);
@@ -3430,7 +3436,7 @@
     banana = arena = race = dig = hop = null;
     document.body.classList.remove('blackout');
     const spot = PLAIN_SPOTS[Math.floor(Math.random() * PLAIN_SPOTS.length)], x0 = Math.floor(Math.random() * 100000);
-    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300, martians: [], martianT: 420, ships: [], obsCount: 0, shipAt: 25, space: null, shots: [], zaps: [], boss: null, spaceT: 0 };
+    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300, martians: [], martianT: 420, ships: [], obsCount: 0, shipAt: 25, space: null, shots: [], zaps: [], boss: null, spaceT: 0, nuke: null };
     const first = kbSlot !== null && joined[kbSlot] ? kbSlot : 0;
     for (let i = 0; i < 4; i++) if (arenaDriven(i) || i === first) plainPug(i);
     try { initAudio(); } catch (e) {}
@@ -3450,6 +3456,63 @@
     p.prev = { jump, bark, shot };
     return inp;
   }
+  // Beaten, Gloop fires a space nuke: everything else stops while it slides out from under his ship, the view zooms in
+  // until its letters can be read, zooms back out, and it flies at the nearest saucer. The explosion picture goes up for
+  // 2 seconds, and when it lifts every saucer is gone (the same ending as losing all your hearts). (the user asked)
+  function stepNuke() {
+    const g = plain, n = g.nuke, boss = g.boss;
+    n.t++;
+    if (boss.hit > 0) boss.hit--;
+    for (const a of g.space) if (a.hit > 0) a.hit--;
+    if (n.t < NUKE.ready) {
+      // (he drifts away from the edges, so the nuke has room, and an alarm goes)
+      boss.x += (clamp(boss.x, 70, 170) - boss.x) * 0.06; boss.y += (clamp(boss.y, 60, 200) - boss.y) * 0.06;
+      if (n.t % 16 === 1) tone(880, 0.1, 'square', 0.04, -240);
+    }
+    if (n.t === NUKE.ready + NUKE.zoomIn) sfx.braam();   // (there it is)
+    if (n.t <= NUKE_LAUNCH) { n.x = boss.x; n.y = boss.y + 22 * Math.min(1, n.t / NUKE.ready); n.dir = boss.face; }
+    if (n.t === NUKE_LAUNCH) {
+      const alive = g.space.filter(a => a.hp > 0), prey = alive.reduce((p, a) => Math.hypot(a.x - n.x, a.y - n.y) < Math.hypot(p.x - n.x, p.y - n.y) ? a : p);
+      n.from = { x: n.x, y: n.y }; n.to = { x: prey.x, y: prey.y }; n.dir = prey.x < n.x ? -1 : 1;
+      noise(0.9, 0.12, 500, 3000); tone(120, 0.7, 'sawtooth', 0.06, 500);
+    } else if (n.t > NUKE_LAUNCH && n.t <= NUKE_HIT) {
+      const u = (n.t - NUKE_LAUNCH) / NUKE.fly, ang = Math.atan2(n.to.y - n.from.y, (n.to.x - n.from.x) * n.dir);
+      n.x = n.from.x + (n.to.x - n.from.x) * u * u; n.y = n.from.y + (n.to.y - n.from.y) * u * u;
+      n.ang = ang * Math.min(1, u * 4);
+      g.bits.push({ x: n.x - Math.cos(n.ang) * n.dir * 26, y: n.y - Math.sin(n.ang) * 26, vx: (Math.random() - 0.5) * 1.2, vy: (Math.random() - 0.5) * 1.2, t: 18, col: Math.random() < 0.5 ? '#ffcc3d' : '#ff6a50' });
+    }
+    if (n.t === NUKE_HIT) { n.gone = true; sfx.boom(); boomPic.hidden = false; boomPicT = NUKE.pic; }
+    if (n.t === NUKE_HIT + NUKE.pic) {
+      for (const a of g.space) if (a.hp > 0) { a.hp = 0; for (let i = 0; i < 4; i++) blastAt(a.x - 12 + i * 8, a.y, '#ffcc3d'); }
+      sfx.die(); g.endT = 110;
+    }
+    for (const b of g.bits) { b.x += b.vx; b.y += b.vy; b.vy += 0.03; b.t--; }
+    g.bits = g.bits.filter(b => b.t > 0);
+    g.kbAtk = false;
+  }
+  // (how far the view is zoomed in on the nuke, from 0 to 1)
+  function nukeZoom(n) {
+    const a = NUKE.ready, b = a + NUKE.zoomIn, c = b + NUKE.hold;
+    const u = n.t < a || n.t >= NUKE_LAUNCH ? 0 : n.t < b ? (n.t - a) / NUKE.zoomIn : n.t < c ? 1 : 1 - (n.t - c) / NUKE.zoomOut;
+    return u * u * (3 - 2 * u);
+  }
+  // the nuke: a white body, red nose and fins, hazard stripes at the tail and its name down the side, nose pointing the
+  // way it faces; the letters always read left to right
+  function drawNuke(n) {
+    const box = (col, x, y, w, h) => { ctx.fillStyle = col; ctx.fillRect(x, y, w, h); };
+    const tri = (col, x1, y1, x2, y2, x3, y3) => { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.lineTo(x3, y3); ctx.closePath(); ctx.fill(); };
+    ctx.save(); ctx.translate(Math.round(n.x), Math.round(n.y)); ctx.scale(n.dir / NUKE_Z, 1 / NUKE_Z); ctx.rotate(n.ang);
+    if (n.t > NUKE_LAUNCH) tri((plain.t >> 1) & 1 ? '#ffcc3d' : '#ff6a50', -92, -12, -130 - (plain.t % 4) * 6, 0, -92, 12);
+    tri('#b0242c', -84, -20, -110, -40, -62, -20); tri('#b0242c', -84, 20, -110, 40, -62, 20);
+    box('#55556a', -92, -12, 8, 24);
+    box('#d8dbe4', -84, -20, 140, 40); box('#ffffff', -84, -17, 140, 4); box('#8d90a0', -84, 13, 140, 7);
+    for (let i = 0; i < 6; i++) box('#d02a30', 56 + i * 7, -20 + i * 3, 7, 40 - i * 6);
+    box('#22222c', 52, -20, 4, 40);
+    for (let i = 0; i < 5; i++) box(i % 2 ? '#22222c' : '#ffcc3d', -84, -20 + i * 8, 10, 8);
+    ctx.scale(n.dir, 1);
+    drawText('HOVERACKS', -11 * n.dir, -7, 'black', 'center', 2);
+    ctx.restore();
+  }
   // (a little burst of bits)
   function blastAt(x, y, col) { for (let i = 0; i < 8; i++) plain.bits.push({ x, y, vx: (Math.random() - 0.5) * 3, vy: (Math.random() - 0.5) * 3, t: 22, col }); }
   // (out in space: each player's saucer goes wherever it is steered, inside the screen, and shoots the way it last moved
@@ -3457,8 +3520,9 @@
   function stepPlainSpace() {
     const g = plain;
     if (g.endT && --g.endT === 0) return leavePlain();
+    if (g.nuke) return stepNuke();
     if (++g.spaceT === BOSS_AT) {
-      g.boss = { x: PW + 45, y: 100, tx: BOSS_X, ty: 100, face: -1, on: false, hp: BOSS_HP, hit: 0, shootT: 90, volley: 0, dead: 0 };
+      g.boss = { x: PW + 45, y: 100, tx: BOSS_X, ty: 100, face: -1, on: false, hp: BOSS_HP, hit: 0, shootT: 90, volley: 0 };
       noise(1.6, 0.1, 300, 60); tone(70, 1.4, 'sawtooth', 0.05, -30);   // (something big is coming)
     }
     const flying = g.space.filter(a => a.hp > 0);
@@ -3473,11 +3537,7 @@
     for (const b of g.shots) { b.x += b.vx; b.y += b.vy; }
     for (const z of g.zaps) { z.x += z.vx; z.y += z.vy; }
     const boss = g.boss;
-    if (boss && boss.dead) {
-      // (he goes up in a long string of blasts, then it's back to the main menu)
-      if (boss.dead % 6 === 1) { blastAt(boss.x - 28 + Math.random() * 56, boss.y - 15 + Math.random() * 30, '#ffcc3d'); noise(0.2, 0.06, 1500, 200); }
-      if (++boss.dead === 110) { g.boss = null; g.endT = 90; toast('You beat Gloop!', '#ffcc3d'); sfx.oneUp(); }
-    } else if (boss) {
+    if (boss) {
       if (boss.hit > 0) boss.hit--;
       // (he roams the whole screen, gliding from one spot to the next)
       const gap = Math.hypot(boss.tx - boss.x, boss.ty - boss.y);
@@ -3495,9 +3555,9 @@
         }
       }
       // (the saucers' shots)
-      for (const b of g.shots) if (!boss.dead && Math.abs(b.x - boss.x) < 30 && Math.abs(b.y - boss.y) < 15) {
+      for (const b of g.shots) if (flying.length && !g.nuke && Math.abs(b.x - boss.x) < 30 && Math.abs(b.y - boss.y) < 15) {
         b.gone = true; boss.hp--; boss.hit = 8; blastAt(b.x, b.y, '#5fd068'); tone(160, 0.1, 'square', 0.05, -60);
-        if (boss.hp <= 0) { boss.dead = 1; g.zaps = []; sfx.boom(); }
+        if (boss.hp <= 0) { g.nuke = { t: 0, x: boss.x, y: boss.y, dir: boss.face, ang: 0 }; g.zaps = []; }
       }
     }
     // (his shots)
@@ -3638,7 +3698,17 @@
         c.fillStyle = '#050614'; c.fillRect(0, 0, PW, PH);
         for (let i = 0; i < 140; i++) { c.fillStyle = ['#ffffff', '#9fb4ff', '#f4e9a8'][i % 3]; c.fillRect(Math.floor(Math.random() * PW), Math.floor(Math.random() * PH), 1 + (i % 9 === 0), 1); }
       }
+      // (zooming on the nuke: at zoom 0 this is the plain view, at 1 the nuke is in the middle of the screen)
+      const nuke = plain.nuke, zoom = nuke ? nukeZoom(nuke) : 0;
+      ctx.fillStyle = '#050614'; ctx.fillRect(0, 0, PW, PH);
+      ctx.save();
+      if (zoom) {
+        const z = 1 + (NUKE_Z - 1) * zoom;
+        ctx.translate(PW / 2, PH / 2); ctx.scale(z, z);
+        ctx.translate(-(PW / 2 + (Math.round(nuke.x) - PW / 2) * zoom), -(PH / 2 + (Math.round(nuke.y) - PH / 2) * zoom));
+      }
       ctx.drawImage(plainStars, 0, 0);
+      if (nuke && !nuke.gone) drawNuke(nuke);
       if (plain.boss) drawBossShip(plain.boss);
       for (const b of plain.shots) {
         const sx = Math.round(b.x), sy = Math.round(b.y), up = !!b.vy;
@@ -3646,18 +3716,19 @@
         ctx.fillStyle = '#eef0f6'; if (up) ctx.fillRect(sx, sy - 3, 1, 6); else ctx.fillRect(sx - 3, sy, 6, 1);
       }
       for (const z of plain.zaps) { ctx.fillStyle = '#e8282f'; ctx.fillRect(Math.round(z.x) - 3, Math.round(z.y) - 3, 6, 6); ctx.fillStyle = '#ffcc3d'; ctx.fillRect(Math.round(z.x) - 1, Math.round(z.y) - 1, 2, 2); }
-      plain.space.forEach((a, row) => {
+      for (const a of plain.space) {
         if (a.hp > 0 && !(a.hit > 0 && a.hit % 6 < 3)) {
           const pic = sprite('ufo_' + ((plain.t >> 3) & 1), a.face < 0);
           if (pic) ctx.drawImage(pic, Math.round(a.x) - 11, Math.round(a.y) - 6, 22, 11);
           if (plain.space.length > 1) drawText('P' + (a.id + 1), Math.round(a.x), Math.round(a.y) - 13, LOOK[a.id].tag, 'center');
         }
-        // (each saucer's hearts, top left)
-        for (let i = 0; i < SAUCER_HP; i++) drawArenaHeart(5 + i * 7, 5 + row * 7, i < a.hp);
-      });
+      }
       for (const b of plain.bits) { ctx.fillStyle = b.col; ctx.fillRect(Math.round(b.x), Math.round(b.y), 2, 2); }
+      ctx.restore();
+      // (each saucer's hearts, top left)
+      plain.space.forEach((a, row) => { for (let i = 0; i < SAUCER_HP; i++) drawArenaHeart(5 + i * 7, 5 + row * 7, i < a.hp); });
       // (Gloop's health, top right)
-      if (plain.boss && !plain.boss.dead) {
+      if (plain.boss && !plain.nuke) {
         ctx.fillStyle = '#ffffff'; ctx.fillRect(162, 5, 73, 6); ctx.fillStyle = '#2a1638'; ctx.fillRect(163, 6, 71, 4);
         ctx.fillStyle = '#e8282f'; ctx.fillRect(163, 6, Math.ceil(71 * plain.boss.hp / BOSS_HP), 4);
       }
