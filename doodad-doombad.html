@@ -2882,7 +2882,7 @@
       : view === 'raceOver' ? raceWords().text
       : view === 'digPause' ? 'Mars Dig. Dig for bones and crystals, bark to make the Martians dizzy, then boop them. Look out for falling rocks!'
       : view === 'digOver' ? digWords().text
-      : view === 'plainPause' ? (plain && plain.space ? 'Out in space.' : 'Somewhere on Jupiter. Gloop is coming.')
+      : view === 'plainPause' ? (plain && plain.isle ? 'On an island in space.' : plain && plain.space ? 'Out in space.' : 'Somewhere on Jupiter. Gloop is coming.')
       : view === 'hopPause' ? 'Saturn Scramble. Hop across Saturn\'s rings: dodge the rovers and comets, ride the ice over open space, and keep moving, or an alien will beam you up!'
       : view === 'hopOver' ? hopWords().text
       : view === 'arenaOver' ? arenaWords().text
@@ -3337,8 +3337,8 @@
   // jumps on one is carried off, and once everyone still alive has gone, each drives its alien's saucer round space
   // (plain.space). Two seconds later Gloop arrives in a huge spaceship (the user asked): he shoots, and each saucer has 10
   // hearts. After 20 hits he doesn't die: he fires a space nuke that blows everyone up (stepNuke) and launches their
-  // pugs into a black hole (stepHole), where they get warped, melted and stretched into noodles (stepWarp). Either way
-  // the fight ends at the main menu. (plain: the
+  // pugs into a black hole (stepHole), where they get warped, melted and stretched into noodles (stepWarp), and then they
+  // land on an island in space, back to normal, to walk around on (stepIsle). Losing all the hearts ends at the main menu. (plain: the
   // state, phase 'mini' like the Arcade's games; PLAIN_Y: the ground on the screen; PLAIN_SPOTS: the spots, each the
   // sky's bands, the ground and what's in the sky; GLOOP_NEAR: how far off he stays at most, however fast they run)
   let plain = null;
@@ -3361,6 +3361,9 @@
   // (inside the hole, in frames: 4 seconds in all, and when the melting and the noodling start; WARP_U and WARP_V are how
   // many strips along and across each pug is cut into)
   const WARP_T = 240, WARP_MELT = 70, WARP_NOODLE = 150, WARP_U = 110, WARP_V = 28;
+  // (the island: where its grass is, and how far along it a pug can walk)
+  const ISLE_Y = 176, ISLE_L = 22, ISLE_R = PW - 22;
+  let isleArt = null;
   const BOSS_AT = 120, BOSS_HP = 20, SAUCER_HP = 10, BOSS_X = 176, BOSS_SHOOT = 12, SHOT_SPEED = 4.5, BOSS_SCALE = 0.6, BOSS_MOVE = 1.6;
   // (the top of whatever is highest at x, for those who walk over everything; half: how wide they are each side)
   const plainTop = (x, half) => plain.obs.reduce((t, o) => x + half > o.x1 && x - half < o.x2 ? Math.min(t, o.top) : t, PLAIN_Y);
@@ -3440,7 +3443,7 @@
     banana = arena = race = dig = hop = null;
     document.body.classList.remove('blackout');
     const spot = PLAIN_SPOTS[Math.floor(Math.random() * PLAIN_SPOTS.length)], x0 = Math.floor(Math.random() * 100000);
-    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300, martians: [], martianT: 420, ships: [], obsCount: 0, shipAt: 25, space: null, shots: [], zaps: [], boss: null, spaceT: 0, nuke: null, hole: null, warp: null };
+    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300, martians: [], martianT: 420, ships: [], obsCount: 0, shipAt: 25, space: null, shots: [], zaps: [], boss: null, spaceT: 0, nuke: null, hole: null, warp: null, isle: false };
     const first = kbSlot !== null && joined[kbSlot] ? kbSlot : 0;
     for (let i = 0; i < 4; i++) if (arenaDriven(i) || i === first) plainPug(i);
     try { initAudio(); } catch (e) {}
@@ -3517,14 +3520,73 @@
     if (h.t === HOLE_FLY + (h.pugs.length - 1) * HOLE_GAP + HOLE_HOLD) g.warp = { t: 0, pugs: h.pugs.map(warpPug) };
   }
   // Inside the black hole, for 4 seconds, over rings of colour that keep changing: each pug appears and goes wavy and
-  // twisted, melts into a puddle, then pulls out into one long wiggling noodle with its head on the end, and then it's
-  // back to the main menu. (the user asked)
+  // twisted, melts into a puddle, then pulls out into one long wiggling noodle with its head on the end. (the user asked)
   function stepWarp() {
     const g = plain, w = g.warp;
     g.kbAtk = false;
-    if (++w.t === WARP_T) return leavePlain();
+    if (++w.t === WARP_T) {
+      g.isle = true; g.pugs = [];
+      g.hole.pugs.forEach(islePug);
+      tone(600, 0.25, 'sine', 0.06, -320);
+      return;
+    }
     if (w.t % 22 === 1) tone(180 + Math.random() * 500, 0.22, 'sine', 0.06, (Math.random() - 0.5) * 700);
     if (w.t === WARP_NOODLE) tone(300, 1.4, 'triangle', 0.05, 900);   // (a slide whistle)
+  }
+  // The island: the pugs drop out of the sky onto it, back to normal, and walk, jump and bark just as they do on Jupiter,
+  // but nothing else happens here; they can't walk off its ends, and the pause menu is the way back to the main menu.
+  // (the user asked)
+  function islePug(id) {
+    plain.pugs.push({ id, x: PW / 2 - 24 + id * 16, y: -20, vy: 0, ground: false, face: 1, moving: false, anim: 0, barkT: 0, prev: { jump: true, bark: true } });
+  }
+  function stepIsle() {
+    const g = plain;
+    for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.pugs.some(p => p.id === i)) islePug(i);
+    g.pugs = g.pugs.filter(p => arenaDriven(p.id));
+    for (const p of g.pugs) {
+      const inp = plainInput(p), dx = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
+      p.moving = false;
+      if (dx) {
+        const nx = clamp(p.x + dx * 1.25, ISLE_L, ISLE_R);
+        p.face = dx;
+        if (nx !== p.x) { p.x = nx; p.moving = true; if (++p.anim % 12 === 0 && p.ground) sfx.step(); }
+      }
+      if (inp.jump && p.ground) { p.ground = false; p.vy = -3.4; sfx.jump(); }
+      if (!p.ground) {
+        p.vy += 0.16; p.y += p.vy;
+        if (p.y >= ISLE_Y) { if (p.vy > 4) tone(90, 0.2, 'sine', 0.14, -40); p.y = ISLE_Y; p.vy = 0; p.ground = true; }
+      }
+      if (inp.bark && p.barkT < 25) { p.barkT = 45; sfx.bark(LOOK[p.id].bark); }
+      if (p.barkT > 0) p.barkT--;
+    }
+    g.kbAtk = false;
+  }
+  // (a floating lump of land: grass on top with a few flowers, dirt under it, and rock tapering away at the bottom)
+  function buildIsle() {
+    isleArt = document.createElement('canvas'); isleArt.width = PW; isleArt.height = PH;
+    const c = isleArt.getContext('2d'), box = (col, x, y, w, h) => { c.fillStyle = col; c.fillRect(x, Math.round(y), w, Math.round(h)); }, L = 12, W = PW - 24;
+    for (let i = 0; i < W; i += 2) {
+      const arch = Math.sin(Math.PI * (i + 1) / W), x = L + i;
+      const d = Math.max(8, Math.round((66 * arch ** 0.7 + (Math.sin(i * 0.37) * 5 + Math.sin(i * 0.11 + 2) * 6 + Math.sin(i * 0.9) * 3) * arch) / 2) * 2);
+      box('#8a5a34', x, ISLE_Y, 2, d);
+      box('#6a4228', x, ISLE_Y + Math.round(d * 0.2) * 2, 2, d - Math.round(d * 0.2) * 2);
+      box('#4f4a66', x, ISLE_Y + Math.round(d * 0.34) * 2, 2, d - Math.round(d * 0.34) * 2);
+      box('#35314a', x, ISLE_Y + d, 2, 2);
+      const grass = 5 + (i % 6 === 0 ? 3 : i % 10 === 0 ? 2 : 0);
+      box('#3fae5a', x, ISLE_Y, 2, grass); box('#6fdc7a', x, ISLE_Y, 2, 2);
+    }
+    // (pebbles in the dirt, kept where every column is deep enough)
+    for (let i = 0; i < 26; i++) { const x = 44 + (i * 67) % (PW - 88), y = ISLE_Y + 11 + (i * 29) % 22; box(i % 2 ? '#a87448' : '#54341f', x, y, 2 + (i % 3 === 0 ? 2 : 0), 2); }
+    for (const [x, col] of [[38, '#ff6a9a'], [72, '#ffcc3d'], [118, '#fff4d8'], [164, '#ff6a9a'], [202, '#ffcc3d']]) {
+      box('#3fae5a', x, ISLE_Y - 3, 1, 3); box(col, x - 1, ISLE_Y - 5, 3, 3);
+    }
+  }
+  function drawIsle() {
+    ctx.fillStyle = '#050614'; ctx.fillRect(0, 0, PW, PH);
+    if (plainStars) ctx.drawImage(plainStars, 0, 0);
+    if (!isleArt) buildIsle();
+    ctx.drawImage(isleArt, 0, 0);
+    for (const p of plain.pugs) drawPlainPug(p, Math.round(p.x), Math.round(p.y), 'gold');
   }
   // Cut a pug, in its costume, into little coloured cells that can each be moved on their own. a: how far along the noodle
   // the cell ends up, with the head (the right of the sprite, u over 0.55) squeezed into the last bit of it. u, v: where
@@ -3654,6 +3716,7 @@
   function stepPlainSpace() {
     const g = plain;
     if (g.endT && --g.endT === 0) return leavePlain();
+    if (g.isle) return stepIsle();
     if (g.warp) return stepWarp();
     if (g.hole) return stepHole();
     if (g.nuke) return stepNuke();
@@ -3826,6 +3889,7 @@
   }
   function leavePlain() { plain = null; toMainMenu(); }
   function drawPlain() {
+    if (plain.isle) return drawIsle();
     if (plain.warp) return drawWarp();
     if (plain.hole) return drawHole();
     if (plain.space) {
@@ -3908,18 +3972,20 @@
     }
     for (const b of g.drops) blit('barrel_roll' + (Math.floor(b.spin / 6) % 4), Math.round(b.x - g.cam) - 5, Math.round(b.y) - 5);
     for (const b of g.bits) { ctx.fillStyle = b.col || '#8a5630'; ctx.fillRect(Math.round(b.x - g.cam), Math.round(b.y), 2, 2); }
-    for (const p of g.pugs) {
-      const X = Math.round(p.x - g.cam), Y = Math.round(p.y), flip = p.face < 0, L = looks[p.id];
-      const pose = p.dead ? 'dead' : !p.ground ? 'jump' : p.moving ? (Math.floor(p.anim / 6) % 2 ? 'walk2' : 'walk1') : 'stand';
-      // (not blitFeet, which holds things on the screen: a dead pug scrolls off with the ground)
-      const feet = (name, sw) => { const b = sprite(name, flip, sw); if (b) ctx.drawImage(b, X - (b.width >> 1), Y - b.height); };
-      feet('player_' + pose, LOOK[p.id].swap);
-      if (L.suit) feet(L.suit + '_' + pose);
-      if (L.hat) feet(L.hat + '_' + pose);
-      if (L.necklace) feet(L.necklace + '_' + pose);
-      if (p.barkT > 0) drawText('WOOF!', X, Y - 24 - hatUp(p.id), 'black', 'center');
-      if (g.pugs.length > 1) drawText('P' + (p.id + 1), X, Y - 34 - hatUp(p.id), LOOK[p.id].tag, 'center');
-    }
+    for (const p of g.pugs) drawPlainPug(p, Math.round(p.x - g.cam), Math.round(p.y), 'black');
+  }
+  // (one pug with its feet at X, Y, in its costume, and its bark in the given colour)
+  function drawPlainPug(p, X, Y, woof) {
+    const flip = p.face < 0, L = looks[p.id];
+    const pose = p.dead ? 'dead' : !p.ground ? 'jump' : p.moving ? (Math.floor(p.anim / 6) % 2 ? 'walk2' : 'walk1') : 'stand';
+    // (not blitFeet, which holds things on the screen: a dead pug scrolls off with the ground)
+    const feet = (name, sw) => { const b = sprite(name, flip, sw); if (b) ctx.drawImage(b, X - (b.width >> 1), Y - b.height); };
+    feet('player_' + pose, LOOK[p.id].swap);
+    if (L.suit) feet(L.suit + '_' + pose);
+    if (L.hat) feet(L.hat + '_' + pose);
+    if (L.necklace) feet(L.necklace + '_' + pose);
+    if (p.barkT > 0) drawText('WOOF!', X, Y - 24 - hatUp(p.id), woof, 'center');
+    if (plain.pugs.length > 1) drawText('P' + (p.id + 1), X, Y - 34 - hatUp(p.id), LOOK[p.id].tag, 'center');
   }
   // Gloop's ship: a long black and plum wedge with spikes, fins and a row of red lights, a cannon at its nose and Gloop
   // glaring out of a dark red dome; it flashes white when hit
