@@ -3336,8 +3336,8 @@
   // Menu. Now and then, far along (about 25 obstacles), there is one alien spaceship for each pug still alive: a pug that
   // jumps on one is carried off, and once everyone still alive has gone, each drives its alien's saucer round space
   // (plain.space). Two seconds later Gloop arrives in a huge spaceship (the user asked): he shoots, and each saucer has 10
-  // hearts. After 20 hits he doesn't die: he fires a space nuke that blows everyone up (stepNuke). Either way the fight
-  // ends at the main menu. (plain: the
+  // hearts. After 20 hits he doesn't die: he fires a space nuke that blows everyone up (stepNuke) and blasts their pugs
+  // into Saturn, which cracks a little (stepSaturn). Either way the fight ends at the main menu. (plain: the
   // state, phase 'mini' like the Arcade's games; PLAIN_Y: the ground on the screen; PLAIN_SPOTS: the spots, each the
   // sky's bands, the ground and what's in the sky; GLOOP_NEAR: how far off he stays at most, however fast they run)
   let plain = null;
@@ -3353,6 +3353,11 @@
   // letters are only readable zoomed in)
   const NUKE = { ready: 70, zoomIn: 50, hold: 140, zoomOut: 50, fly: 45, pic: 120 }, NUKE_Z = 4;
   const NUKE_LAUNCH = NUKE.ready + NUKE.zoomIn + NUKE.hold + NUKE.zoomOut, NUKE_HIT = NUKE_LAUNCH + NUKE.fly;
+  // (the pugs' trip to Saturn, in frames: the flight, the gap between pugs, and how long the crack is looked at; the
+  // view is the Arcade's picture of space blown up SAT_K times round Saturn, and SAT_SPOT is the crack's place on screen)
+  const SAT_FLY = 120, SAT_GAP = 18, SAT_HOLD = 170, SAT_K = 2.4, SAT_SPOT = [132, 112];
+  const SAT_CRACK = [[[0, 0], [5, -4], [7, -11], [12, -14], [14, -21]], [[7, -11], [1, -15]], [[0, 0], [-6, -2], [-10, -8], [-17, -10]],
+    [[-10, -8], [-11, -15]], [[0, 0], [-3, 6], [-9, 9], [-12, 15]], [[0, 0], [7, 3], [13, 2], [19, 7]]];
   const BOSS_AT = 120, BOSS_HP = 20, SAUCER_HP = 10, BOSS_X = 176, BOSS_SHOOT = 12, SHOT_SPEED = 4.5, BOSS_SCALE = 0.6, BOSS_MOVE = 1.6;
   // (the top of whatever is highest at x, for those who walk over everything; half: how wide they are each side)
   const plainTop = (x, half) => plain.obs.reduce((t, o) => x + half > o.x1 && x - half < o.x2 ? Math.min(t, o.top) : t, PLAIN_Y);
@@ -3432,7 +3437,7 @@
     banana = arena = race = dig = hop = null;
     document.body.classList.remove('blackout');
     const spot = PLAIN_SPOTS[Math.floor(Math.random() * PLAIN_SPOTS.length)], x0 = Math.floor(Math.random() * 100000);
-    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300, martians: [], martianT: 420, ships: [], obsCount: 0, shipAt: 25, space: null, shots: [], zaps: [], boss: null, spaceT: 0, nuke: null };
+    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300, martians: [], martianT: 420, ships: [], obsCount: 0, shipAt: 25, space: null, shots: [], zaps: [], boss: null, spaceT: 0, nuke: null, saturn: null };
     const first = kbSlot !== null && joined[kbSlot] ? kbSlot : 0;
     for (let i = 0; i < 4; i++) if (arenaDriven(i) || i === first) plainPug(i);
     try { initAudio(); } catch (e) {}
@@ -3454,7 +3459,7 @@
   }
   // Beaten, Gloop fires a space nuke: everything else stops while it slides out from under his ship, the view zooms in
   // until its letters can be read, zooms back out, and it flies at the nearest saucer. The explosion picture goes up for
-  // 2 seconds, and when it lifts every saucer is gone (the same ending as losing all your hearts). (the user asked)
+  // 2 seconds, and as it lifts the pugs are on their way to Saturn. (the user asked)
   function stepNuke() {
     const g = plain, n = g.nuke, boss = g.boss;
     n.t++;
@@ -3478,13 +3483,68 @@
       g.bits.push({ x: n.x - Math.cos(n.ang) * n.dir * 26, y: n.y - Math.sin(n.ang) * 26, vx: (Math.random() - 0.5) * 1.2, vy: (Math.random() - 0.5) * 1.2, t: 18, col: Math.random() < 0.5 ? '#ffcc3d' : '#ff6a50' });
     }
     if (n.t === NUKE_HIT) { n.gone = true; sfx.boom(); boomPic.hidden = false; boomPicT = NUKE.pic; }
-    if (n.t === NUKE_HIT + NUKE.pic) {
-      for (const a of g.space) if (a.hp > 0) { a.hp = 0; for (let i = 0; i < 4; i++) blastAt(a.x - 12 + i * 8, a.y, '#ffcc3d'); }
-      sfx.die(); g.endT = 110;
+    // (the frame the picture lifts: see step)
+    if (n.t === NUKE_HIT + NUKE.pic - 1) {
+      g.saturn = { t: 0, shake: 0, pugs: g.space.filter(a => a.hp > 0).map(a => a.id) };
+      g.bits = [];
+      tone(1400, 2, 'sine', 0.05, -1100);   // (a falling whistle)
     }
     for (const b of g.bits) { b.x += b.vx; b.y += b.vy; b.vy += 0.03; b.t--; }
     g.bits = g.bits.filter(b => b.t > 0);
     g.kbAtk = false;
+  }
+  // After the nuke, each pug is blown across space, tumbling and shrinking into the distance, and hits Saturn in the same
+  // spot (one after the other, with more players). The first to land cracks Saturn a little there, and there they stay,
+  // tiny, in the crack, until it's back to the main menu. (the user asked)
+  function stepSaturn() {
+    const g = plain, s = g.saturn;
+    s.t++;
+    if (s.shake > 0) s.shake--;
+    s.pugs.forEach((id, i) => {
+      const at = SAT_FLY + i * SAT_GAP;
+      if (s.t < at && s.t > i * SAT_GAP) {
+        const q = satPug(i, s.t);
+        g.bits.push({ x: q.x + (Math.random() - 0.5) * 8 * q.size, y: q.y + (Math.random() - 0.5) * 8 * q.size, vx: 0.5, vy: 0.5, t: 26, col: Math.random() < 0.6 ? '#b8bcc8' : '#ff6a50' });
+      } else if (s.t === at) {
+        s.shake = 20; noise(0.4, 0.22, 900, 80); tone(70, 0.5, 'sine', 0.2, -40); noise(0.2, 0.14, 3000, 1200, 0.1);
+        blastAt(SAT_SPOT[0], SAT_SPOT[1], '#a8743a'); blastAt(SAT_SPOT[0], SAT_SPOT[1], '#ffd9a0');
+      }
+    });
+    for (const b of g.bits) { b.x += b.vx; b.y += b.vy; b.t--; }
+    g.bits = g.bits.filter(b => b.t > 0);
+    g.kbAtk = false;
+    if (s.t === SAT_FLY + (s.pugs.length - 1) * SAT_GAP + SAT_HOLD) leavePlain();
+  }
+  // (where pug number i of those flying is at frame t, how big, and how far it has turned)
+  function satPug(i, t) {
+    const u = clamp((t - i * SAT_GAP) / SAT_FLY, 0, 1), n = plain.saturn.pugs.length, off = (i - (n - 1) / 2) * 7;
+    return { x: PW + 40 + (SAT_SPOT[0] + off - PW - 40) * u, y: PH + 40 + (SAT_SPOT[1] - PH - 40) * u, size: 0.4 + 4.6 * (1 - u) ** 3, ang: u * Math.PI * 8 };
+  }
+  function drawSaturn() {
+    const s = plain.saturn;
+    if (!spaceBgReady) { buildSpaceBg(); spaceBgReady = true; }
+    ctx.save();
+    if (s.shake > 0) ctx.translate(s.shake % 4 < 2 ? 2 : -2, s.shake % 6 < 3 ? 1 : -1);
+    ctx.drawImage(spaceBg, 70 - PW / 2 / SAT_K, 122 - PH / 2 / SAT_K, PW / SAT_K, PH / SAT_K, 0, 0, PW, PH);
+    // (the crack, spreading out from the spot)
+    const grown = clamp((s.t - SAT_FLY) / 24, 0, 1);
+    ctx.fillStyle = '#3a2016';
+    if (grown > 0) for (const path of SAT_CRACK) for (let i = 1; i < path.length; i++) {
+      const [ax, ay] = path[i - 1], [bx, by] = path[i], len = Math.hypot(bx - ax, by - ay), part = clamp(grown * (path.length - 1) - (i - 1), 0, 1);
+      for (let d = 0; d <= len * part; d++) ctx.fillRect(Math.round(SAT_SPOT[0] + ax + (bx - ax) * d / len), Math.round(SAT_SPOT[1] + ay + (by - ay) * d / len), 2, 2);
+    }
+    for (const b of plain.bits) { ctx.fillStyle = b.col; ctx.fillRect(Math.round(b.x), Math.round(b.y), 2, 2); }
+    // (the pugs, in the costumes they had on, the nearest over the rest)
+    s.pugs.forEach((id, i) => {
+      if (s.t <= i * SAT_GAP) return;
+      const q = satPug(i, s.t), L = looks[id], layer = (name, sw) => { const b = sprite(name, false, sw); if (b) ctx.drawImage(b, -b.width / 2, -b.height / 2); };
+      ctx.save(); ctx.translate(Math.round(q.x), Math.round(q.y)); ctx.rotate(q.ang); ctx.scale(q.size, q.size);
+      layer('player_dead', LOOK[id].swap);
+      if (L.suit) layer(L.suit + '_dead');
+      if (L.hat) layer(L.hat + '_dead');
+      ctx.restore();
+    });
+    ctx.restore();
   }
   // (how far the view is zoomed in on the nuke, from 0 to 1)
   function nukeZoom(n) {
@@ -3516,6 +3576,7 @@
   function stepPlainSpace() {
     const g = plain;
     if (g.endT && --g.endT === 0) return leavePlain();
+    if (g.saturn) return stepSaturn();
     if (g.nuke) return stepNuke();
     if (++g.spaceT === BOSS_AT) {
       g.boss = { x: PW + 45, y: 100, tx: BOSS_X, ty: 100, face: -1, on: false, hp: BOSS_HP, hit: 0, shootT: 90, volley: 0 };
@@ -3686,6 +3747,7 @@
   }
   function leavePlain() { plain = null; toMainMenu(); }
   function drawPlain() {
+    if (plain.saturn) return drawSaturn();
     if (plain.space) {
       // (empty space: only stars, no planets, the user asked)
       if (!plainStars) {
