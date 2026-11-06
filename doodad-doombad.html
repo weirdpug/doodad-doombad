@@ -3337,7 +3337,8 @@
   // jumps on one is carried off, and once everyone still alive has gone, each drives its alien's saucer round space
   // (plain.space). Two seconds later Gloop arrives in a huge spaceship (the user asked): he shoots, and each saucer has 10
   // hearts. After 20 hits he doesn't die: he fires a space nuke that blows everyone up (stepNuke) and launches their
-  // pugs into a black hole (stepHole). Either way the fight ends at the main menu. (plain: the
+  // pugs into a black hole (stepHole), where they get warped, melted and stretched into noodles (stepWarp). Either way
+  // the fight ends at the main menu. (plain: the
   // state, phase 'mini' like the Arcade's games; PLAIN_Y: the ground on the screen; PLAIN_SPOTS: the spots, each the
   // sky's bands, the ground and what's in the sky; GLOOP_NEAR: how far off he stays at most, however fast they run)
   let plain = null;
@@ -3355,8 +3356,11 @@
   const NUKE_LAUNCH = NUKE.ready + NUKE.zoomIn + NUKE.hold + NUKE.zoomOut, NUKE_HIT = NUKE_LAUNCH + NUKE.fly;
   // (the pugs' trip into the black hole, in frames: the flight, the gap between pugs, and how long the hole is left on
   // screen with them gone; then where it sits, its size, and the tilt of the glowing ring of dust round it)
-  const HOLE_FLY = 170, HOLE_GAP = 18, HOLE_HOLD = 90, HOLE_X = 120, HOLE_Y = 130, HOLE_R = 32, HOLE_TILT = -0.22;
+  const HOLE_FLY = 170, HOLE_GAP = 18, HOLE_HOLD = 30, HOLE_X = 120, HOLE_Y = 130, HOLE_R = 32, HOLE_TILT = -0.22;
   let holeDust = null;
+  // (inside the hole, in frames: 4 seconds in all, and when the melting and the noodling start; WARP_U and WARP_V are how
+  // many strips along and across each pug is cut into)
+  const WARP_T = 240, WARP_MELT = 70, WARP_NOODLE = 150, WARP_U = 110, WARP_V = 28;
   const BOSS_AT = 120, BOSS_HP = 20, SAUCER_HP = 10, BOSS_X = 176, BOSS_SHOOT = 12, SHOT_SPEED = 4.5, BOSS_SCALE = 0.6, BOSS_MOVE = 1.6;
   // (the top of whatever is highest at x, for those who walk over everything; half: how wide they are each side)
   const plainTop = (x, half) => plain.obs.reduce((t, o) => x + half > o.x1 && x - half < o.x2 ? Math.min(t, o.top) : t, PLAIN_Y);
@@ -3436,7 +3440,7 @@
     banana = arena = race = dig = hop = null;
     document.body.classList.remove('blackout');
     const spot = PLAIN_SPOTS[Math.floor(Math.random() * PLAIN_SPOTS.length)], x0 = Math.floor(Math.random() * 100000);
-    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300, martians: [], martianT: 420, ships: [], obsCount: 0, shipAt: 25, space: null, shots: [], zaps: [], boss: null, spaceT: 0, nuke: null, hole: null };
+    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300, martians: [], martianT: 420, ships: [], obsCount: 0, shipAt: 25, space: null, shots: [], zaps: [], boss: null, spaceT: 0, nuke: null, hole: null, warp: null };
     const first = kbSlot !== null && joined[kbSlot] ? kbSlot : 0;
     for (let i = 0; i < 4; i++) if (arenaDriven(i) || i === first) plainPug(i);
     try { initAudio(); } catch (e) {}
@@ -3493,8 +3497,8 @@
     g.kbAtk = false;
   }
   // After the nuke, each pug is blown across space, tumbling and shrinking, and spirals into a black hole, stretching out
-  // thin on the way down, one after the other with more players. The hole stays a moment, then it's back to the main
-  // menu. (the user asked)
+  // thin on the way down, one after the other with more players. A moment later they're inside it (stepWarp). (the user
+  // asked)
   function stepHole() {
     const g = plain, h = g.hole;
     h.t++;
@@ -3510,7 +3514,72 @@
     for (const b of g.bits) { b.x += (HOLE_X - b.x) * 0.03; b.y += (HOLE_Y - b.y) * 0.03; b.t--; }
     g.bits = g.bits.filter(b => b.t > 0);
     g.kbAtk = false;
-    if (h.t === HOLE_FLY + (h.pugs.length - 1) * HOLE_GAP + HOLE_HOLD) leavePlain();
+    if (h.t === HOLE_FLY + (h.pugs.length - 1) * HOLE_GAP + HOLE_HOLD) g.warp = { t: 0, pugs: h.pugs.map(warpPug) };
+  }
+  // Inside the black hole, for 4 seconds, over rings of colour that keep changing: each pug appears and goes wavy and
+  // twisted, melts into a puddle, then pulls out into one long wiggling noodle with its head on the end, and then it's
+  // back to the main menu. (the user asked)
+  function stepWarp() {
+    const g = plain, w = g.warp;
+    g.kbAtk = false;
+    if (++w.t === WARP_T) return leavePlain();
+    if (w.t % 22 === 1) tone(180 + Math.random() * 500, 0.22, 'sine', 0.06, (Math.random() - 0.5) * 700);
+    if (w.t === WARP_NOODLE) tone(300, 1.4, 'triangle', 0.05, 900);   // (a slide whistle)
+  }
+  // Cut a pug, in its costume, into little coloured cells that can each be moved on their own. a: how far along the noodle
+  // the cell ends up, with the head (the right of the sprite, u over 0.55) squeezed into the last bit of it. u, v: where
+  // it is in the pug. drip: how late its column melts.
+  function warpPug(id) {
+    const L = looks[id], c = document.createElement('canvas'), x = c.getContext('2d'), N = 48;
+    c.width = c.height = N;
+    const put = (name, sw) => { const b = sprite(name, false, sw); if (b) x.drawImage(b, (N >> 1) - (b.width >> 1), N - b.height); };
+    put('player_stand', LOOK[id].swap);
+    if (L.suit) put(L.suit + '_stand');
+    if (L.hat) put(L.hat + '_stand');
+    const px = x.getImageData(0, 0, N, N).data;
+    let x0 = N, x1 = 0, y0 = N, y1 = 0;
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) if (px[(j * N + i) * 4 + 3] > 128) { x0 = Math.min(x0, i); x1 = Math.max(x1, i); y0 = Math.min(y0, j); y1 = Math.max(y1, j); }
+    const W = x1 - x0 + 1, H = y1 - y0 + 1, drips = Array.from({ length: W }, () => Math.random()), cells = [];
+    for (let k = 0; k <= WARP_U; k++) for (let m = 0; m < WARP_V; m++) {
+      const a = k / WARP_U, u = a < 0.85 ? a / 0.85 * 0.55 : 0.55 + (a - 0.85) / 0.15 * 0.449, v = m / WARP_V;
+      const col = Math.min(W - 1, Math.floor(u * W)), i = ((y0 + Math.floor(v * H)) * N + x0 + col) * 4;
+      if (px[i + 3] > 128) cells.push({ k, a, u, v, drip: drips[col], col: `rgb(${px[i]},${px[i + 1]},${px[i + 2]})` });
+    }
+    return { W, H, cells };
+  }
+  function drawWarp() {
+    const w = plain.warp, t = w.t, n = w.pugs.length, ease = u => { u = clamp(u, 0, 1); return u * u * (3 - 2 * u); };
+    // (the background: rings of colour rushing out from a wandering middle, every colour sliding on round the rainbow)
+    const mx = PW / 2 + Math.sin(t * 0.05) * 20, my = PH / 2 + Math.cos(t * 0.07) * 20;
+    ctx.fillStyle = `hsl(${t * 5},85%,50%)`; ctx.fillRect(0, 0, PW, PH);
+    const rings = Array.from({ length: 10 }, (_, i) => ({ i, r: (i * 40 + t * 2) % 400 })).sort((a, b) => b.r - a.r);
+    for (const { i, r } of rings) { ctx.fillStyle = `hsl(${t * 5 + i * 36},85%,${i % 2 ? 58 : 42}%)`; ctx.beginPath(); ctx.arc(mx, my, r, 0, Math.PI * 2); ctx.fill(); }
+    const grow = ease(t / 25), wavy = ease(t / 50), melt = ease((t - WARP_MELT) / 60), noodle = ease((t - WARP_NOODLE) / 50);
+    const S = n > 2 ? 2.5 : n > 1 ? 3.5 : 5, twist = wavy * 0.8 * Math.sin(t * 0.06);
+    w.pugs.forEach((p, i) => {
+      const cx = PW * (i + 1) / (n + 1), cy = PH / 2, row = (i - (n - 1) / 2) * 40;
+      // (the noodle's line across the screen, its sideways direction, and how thick it is there: fattest at the head)
+      const line = [];
+      for (let k = 0; k <= WARP_U; k++) {
+        const a = k / WARP_U, q = a * 9 + t * 0.14 + i, e = a * 3.5 - t * 0.09;
+        const dx = PW - 16, dy = Math.cos(q) * 450 + Math.cos(e) * 77, len = Math.hypot(dx, dy);
+        line.push({ x: 8 + a * dx, y: PH / 2 + row + Math.sin(q) * 50 + Math.sin(e) * 22, nx: -dy / len, ny: dx / len, th: 9 + 15 * ease((a - 0.75) / 0.2) });
+      }
+      for (const c of p.cells) {
+        const bx = (c.u - 0.5) * p.W * S * grow, by = (c.v - 0.5) * p.H * S * grow;
+        // (warped: wavy, and twisted more towards the top and bottom)
+        const wx = bx + wavy * Math.sin(c.v * 9 + t * 0.2) * 18, wy = by + wavy * Math.sin(c.u * 7 + t * 0.16) * 14;
+        const tw = twist * (c.v - 0.5) * 2, co = Math.cos(tw), si = Math.sin(tw);
+        let x = wx * co - wy * si, y = wx * si + wy * co;
+        // (melted: each column runs down, some sooner than others, into a wide rippling puddle)
+        const m = clamp(melt * 1.5 - c.drip * 0.5, 0, 1);
+        x += (bx * 2.1 + Math.sin(c.v * 6 + t * 0.2) * 6 - x) * m;
+        y += (68 - (1 - c.v) * p.H * S * 0.2 + Math.sin(c.u * 11 + t * 0.25) * 4 - y) * m;
+        // (noodled: drawn out along the line)
+        const l = line[c.k], off = (c.v - 0.5) * l.th, X = cx + x + (l.x + l.nx * off - cx - x) * noodle, Y = cy + y + (l.y + l.ny * off - cy - y) * noodle;
+        ctx.fillStyle = c.col; ctx.fillRect(Math.round(X), Math.round(Y), 4, 4);
+      }
+    });
   }
   // (where pug number i is at frame t: from just off the bottom right corner, round and round into the hole)
   function holePug(i, t) {
@@ -3585,6 +3654,7 @@
   function stepPlainSpace() {
     const g = plain;
     if (g.endT && --g.endT === 0) return leavePlain();
+    if (g.warp) return stepWarp();
     if (g.hole) return stepHole();
     if (g.nuke) return stepNuke();
     if (++g.spaceT === BOSS_AT) {
@@ -3756,6 +3826,7 @@
   }
   function leavePlain() { plain = null; toMainMenu(); }
   function drawPlain() {
+    if (plain.warp) return drawWarp();
     if (plain.hole) return drawHole();
     if (plain.space) {
       // (empty space: only stars, no planets, the user asked)
