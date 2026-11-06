@@ -2915,7 +2915,7 @@
       : view === 'raceOver' ? raceWords().text
       : view === 'digPause' ? 'Mars Dig. Dig for bones and crystals, bark to make the Martians dizzy, then boop them. Look out for falling rocks!'
       : view === 'digOver' ? digWords().text
-      : view === 'plainPause' ? (plain && plain.isle ? 'On an island in space.' : plain && plain.space ? 'Out in space.' : 'Somewhere on Jupiter. Gloop is coming.')
+      : view === 'plainPause' ? (plain && plain.drop ? 'Falling!' : plain && plain.isle ? 'On an island in space.' : plain && plain.space ? 'Out in space.' : 'Somewhere on Jupiter. Gloop is coming.')
       : view === 'hopPause' ? 'Saturn Scramble. Hop across Saturn\'s rings: dodge the rovers and comets, ride the ice over open space, and keep moving, or an alien will beam you up!'
       : view === 'hopOver' ? hopWords().text
       : view === 'arenaOver' ? arenaWords().text
@@ -3405,6 +3405,9 @@
   const ISLE_TAUNT = 'HOW DOES IT FEEL', ISLE_TAUNT_AT = 25, ISLE_TAUNT_T = 240;
   // (what he yells after the last one, for how many frames, and the 16 px squares the island breaks up into)
   const ISLE_YELL = 'HOW!!!!!!!!!!!', ISLE_YELL_T = 120, ISLE_COLS = 14, ISLE_ROWS = 6;
+  // (the fall from there, in frames: the wormhole, the drop to Jupiter, a pug's fall through the shop, the gap between
+  // pugs, and how long the crash lasts from the ceiling breaking; and where in the shop it comes through)
+  const DROP_HOLE = 150, DROP_SKY = 120, DROP_FALL = 14, DROP_GAP = 12, DROP_END = 300, DROP_X = 156;
   let isleArt = null;
   const BOSS_AT = 120, BOSS_HP = 20, SAUCER_HP = 10, BOSS_X = 176, BOSS_SHOOT = 12, SHOT_SPEED = 4.5, BOSS_SCALE = 0.6, BOSS_MOVE = 1.6;
   // (the top of whatever is highest at x, for those who walk over everything; half: how wide they are each side)
@@ -3493,7 +3496,7 @@
     banana = arena = race = dig = hop = null;
     document.body.classList.remove('blackout');
     const spot = PLAIN_SPOTS[Math.floor(Math.random() * PLAIN_SPOTS.length)], x0 = Math.floor(Math.random() * 100000);
-    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300, martians: [], martianT: 420, ships: [], obsCount: 0, shipAt: 25, space: null, shots: [], zaps: [], boss: null, spaceT: 0, nuke: null, hole: null, warp: null, isle: false, isleT: 0, aim: null, thrown: [], isleShot: 0, tauntT: 0, crumble: null };
+    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300, martians: [], martianT: 420, ships: [], obsCount: 0, shipAt: 25, space: null, shots: [], zaps: [], boss: null, spaceT: 0, nuke: null, hole: null, warp: null, isle: false, isleT: 0, aim: null, thrown: [], isleShot: 0, tauntT: 0, crumble: null, drop: null };
     const first = kbSlot !== null && joined[kbSlot] ? kbSlot : 0;
     for (let i = 0; i < 4; i++) if (arenaDriven(i) || i === first) plainPug(i);
     try { initAudio(); } catch (e) {}
@@ -3589,7 +3592,7 @@
   function landOnIsle(ids) {
     plain.isle = true; plain.pugs = [];
     ids.forEach(islePug);
-    plain.isleT = 0; plain.endT = 0; plain.bits = []; plain.aim = null; plain.thrown = []; plain.isleShot = 0; plain.tauntT = 0; plain.crumble = null;
+    plain.isleT = 0; plain.endT = 0; plain.bits = []; plain.aim = null; plain.thrown = []; plain.isleShot = 0; plain.tauntT = 0; plain.crumble = null; plain.drop = null;
     if (unlock('bossIsle')) toast('You can now start Boss Fight from The Island!', '#ffcc3d');
   }
   function islePug(id) {
@@ -3657,7 +3660,7 @@
   }
   // Once the fiftieth burrito has landed with a pug still alive, Gloop yells, the island shakes, and then it crumbles from
   // its ends and its underside inwards, each pug dropping as the ground under it goes. When they have all fallen out of
-  // sight it's back to the main menu. (the user asked)
+  // sight they're on their way through a wormhole (stepDrop). (the user asked)
   function startCrumble() {
     const cells = [];
     for (let r = 0; r < ISLE_ROWS; r++) for (let col = 0; col < ISLE_COLS; col++) {
@@ -3676,7 +3679,109 @@
       if (p.ground && isleGone(p.x)) { p.ground = false; p.vy = 0; }
       if (p.dead && !p.ground) { p.vy += 0.16; p.y += p.vy; }   // (a pug that's alive falls in stepIsle)
     }
-    if (!g.endT && g.pugs.every(p => p.y > PH + 24)) g.endT = 100;
+    if (g.pugs.every(p => p.y > PH + 24)) { g.drop = { t: 0, ids: g.pugs.map(p => p.id), planks: [], shake: 0 }; g.bits = []; }
+  }
+  // Down a wormhole, out over Jupiter, into its red spot (where the shop is) and through the ceiling of Gloop's shop,
+  // landing on his counter among the broken planks. Then it's back to the main menu. (the user asked)
+  function stepDrop() {
+    const g = plain, d = g.drop;
+    g.kbAtk = false;
+    d.t++;
+    const c = d.t - DROP_HOLE - DROP_SKY, n = d.ids.length;
+    if (d.shake > 0) d.shake--;
+    if (d.t === 1) { noise(2.4, 0.09, 300, 1800); tone(180, 2.4, 'sine', 0.06, 1000); }
+    if (d.t === DROP_HOLE) { tone(1500, 2, 'sine', 0.05, -1200); noise(2, 0.08, 700, 200); }
+    if (c < 0 && d.t >= DROP_HOLE) d.ids.forEach((id, i) => {
+      const q = dropSky(i, n, (d.t - DROP_HOLE) / DROP_SKY);
+      g.bits.push({ x: q.x + (Math.random() - 0.5) * 10 * q.size, y: q.y - 4 * q.size, vx: 0, vy: -1.4, t: 20, col: Math.random() < 0.5 ? '#ffcc3d' : '#ff6a50' });
+    });
+    if (c === 0) g.bits = [];
+    if (c === 1) {
+      // (the ceiling goes)
+      d.shake = 24; noise(0.6, 0.3, 2400, 200); sfx.smash();
+      for (let i = 0; i < 18; i++) d.planks.push({ x: DROP_X - 30 + Math.random() * 60, y: Math.random() * 20, vx: (Math.random() - 0.5) * 2.8, vy: Math.random() * 2, a: Math.random() * 6, spin: (Math.random() - 0.5) * 0.4, w: 6 + Math.random() * 14, h: 3 + Math.random() * 2, col: ['#6b4226', '#3e2414', '#8a5a30'][i % 3] });
+    }
+    d.ids.forEach((id, i) => { if (c === DROP_FALL + i * DROP_GAP) { d.shake = 18; tone(70, 0.6, 'sine', 0.25, -40); noise(0.3, 0.2, 700, 100); } });
+    // (the planks come to rest on the counter)
+    for (const k of d.planks) {
+      if (k.rest) continue;
+      k.vy += 0.2; k.x += k.vx; k.y += k.vy; k.a += k.spin;
+      if (k.y >= 187) { k.y = 187; k.rest = true; k.a = Math.round(k.a / Math.PI) * Math.PI; }
+    }
+    for (const b of g.bits) { b.x += b.vx; b.y += b.vy; b.t--; }
+    g.bits = g.bits.filter(b => b.t > 0);
+    if (c === DROP_END) leavePlain();
+  }
+  // (a pug tumbling, its middle at x, y)
+  function tumblePug(id, x, y, size, ang) {
+    const L = looks[id], layer = (name, sw) => { const b = sprite(name, false, sw); if (b) ctx.drawImage(b, -b.width / 2, -b.height / 2); };
+    ctx.save(); ctx.translate(Math.round(x), Math.round(y)); ctx.rotate(ang); ctx.scale(size, size);
+    layer('player_dead', LOOK[id].swap);
+    if (L.suit) layer(L.suit + '_dead');
+    if (L.hat) layer(L.hat + '_dead');
+    if (L.necklace) layer(L.necklace + '_dead');
+    ctx.restore();
+  }
+  // (where pug i of n is on the way down to Jupiter, u from 0 to 1)
+  function dropSky(i, n, u) {
+    return { x: PW / 2 - 70 + 70 * u + (i - (n - 1) / 2) * 26 * (1 - u), y: -24 + (PH / 2 + 24) * u, size: 0.3 + 2.4 * (1 - u) };
+  }
+  function drawDrop() {
+    const d = plain.drop, t = d.t, n = d.ids.length;
+    if (t < DROP_HOLE) {
+      // (the wormhole: rings of blue and violet rushing past, with streaks of light spiralling round a bright middle)
+      const mx = PW / 2 + Math.sin(t * 0.06) * 14, my = PH / 2 + Math.cos(t * 0.08) * 14;
+      ctx.fillStyle = '#02030f'; ctx.fillRect(0, 0, PW, PH);
+      for (let i = 0; i < 14; i++) {
+        const u = (t * 0.012 + i / 14) % 1, r = 4 + u * u * u * 340;
+        ctx.strokeStyle = i % 2 ? '#3a6aff' : '#9a4aff'; ctx.lineWidth = 1 + u * 6;
+        ctx.beginPath(); ctx.ellipse(mx, my, r, r * 0.92, t * 0.02 + i, 0, Math.PI * 2); ctx.stroke();
+      }
+      for (let i = 0; i < 36; i++) {
+        const a = i * 2.4 + t * 0.04, r = 12 + (t * 2 + i * 37) % 170;
+        ctx.fillStyle = ['#ffffff', '#9fe0ff', '#ff9aff'][i % 3]; ctx.fillRect(Math.round(mx + Math.cos(a) * r), Math.round(my + Math.sin(a) * r), 2, 2);
+      }
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(mx, my, 5, 0, Math.PI * 2); ctx.fill();
+      const u = t / DROP_HOLE, near = Math.min(1, u * 3);
+      d.ids.forEach((id, i) => {
+        const a = i * 2 + t * 0.05, wide = n > 1 ? 18 : 0;
+        tumblePug(id, PW / 2 + (mx - PW / 2) * near + Math.cos(a) * wide, -24 + (my + 24) * near + Math.sin(a) * wide, 3.4 - 2.6 * u, t * 0.14);
+      });
+      if (t > DROP_HOLE - 14) { ctx.fillStyle = `rgba(255,255,255,${(t - DROP_HOLE + 14) / 14})`; ctx.fillRect(0, 0, PW, PH); }
+      return;
+    }
+    if (t < DROP_HOLE + DROP_SKY) {
+      // (Jupiter, from the Arcade's picture of space, rushing up round the red spot)
+      if (!spaceBgReady) { buildSpaceBg(); spaceBgReady = true; }
+      const u = (t - DROP_HOLE) / DROP_SKY, e = u * u, k = 3 + (SHOP_ZOOM - 3) * e, cx = 172 + 5.5 * e, cy = 124 + 7.5 * e;
+      ctx.drawImage(spaceBg, cx - PW / 2 / k, cy - PH / 2 / k, PW / k, PH / k, 0, 0, PW, PH);
+      for (const b of plain.bits) { ctx.fillStyle = b.col; ctx.fillRect(Math.round(b.x), Math.round(b.y), 2, 2); }
+      d.ids.forEach((id, i) => { const q = dropSky(i, n, u); tumblePug(id, q.x, q.y, q.size, t * 0.2); });
+      return;
+    }
+    // (in the shop: a hole in the ceiling with Jupiter's storm showing through, the planks and the pugs)
+    const c = t - DROP_HOLE - DROP_SKY, hole = [[-32, 0], [-26, 9], [-30, 15], [-18, 14], [-14, 26], [-3, 20], [5, 32], [15, 19], [24, 24], [30, 11], [38, 13], [34, 0]];
+    ctx.save();
+    if (d.shake > 0) ctx.translate(d.shake % 4 < 2 ? 3 : -3, d.shake % 6 < 3 ? 2 : -2);
+    spaceT++;
+    drawJupiterShop();
+    if (c >= 1) {
+      const path = () => { ctx.beginPath(); hole.forEach(([x, y], i) => i ? ctx.lineTo(DROP_X + x, y) : ctx.moveTo(DROP_X + x, y)); ctx.closePath(); };
+      ctx.save(); path(); ctx.clip();
+      ['#a8341e', '#c8482e', '#e8785a', '#f0a070', '#c8583a'].forEach((col, i) => { ctx.fillStyle = col; ctx.fillRect(DROP_X - 40, i * 7 - 2 + (t >> 4) % 7, 80, 7); });
+      ctx.restore();
+      ctx.strokeStyle = '#2a160a'; ctx.lineWidth = 2; path(); ctx.stroke();
+    }
+    for (const k of d.planks) { ctx.save(); ctx.translate(k.x, k.y); ctx.rotate(k.a); ctx.fillStyle = k.col; ctx.fillRect(-k.w / 2, -k.h / 2, k.w, k.h); ctx.restore(); }
+    d.ids.forEach((id, i) => {
+      if (c <= i * DROP_GAP) return;
+      const u = Math.min(1, (c - i * DROP_GAP) / DROP_FALL);
+      // (twice the size, as the shop is seen close up)
+      ctx.save(); ctx.translate(DROP_X + Math.round((i - (n - 1) / 2) * 34), Math.round(-30 + 220 * u * u)); ctx.scale(2, 2);
+      drawPlainPug({ id, face: 1, dead: true, ground: true, barkT: 0, anim: 0 }, 0, 0, 'gold');
+      ctx.restore();
+    });
+    ctx.restore();
   }
   // (has the ground at this x crumbled away yet? The top row of cells comes first in the list)
   function isleGone(x) {
@@ -3879,6 +3984,7 @@
   function stepPlainSpace() {
     const g = plain;
     if (g.endT && --g.endT === 0) return leavePlain();
+    if (g.drop) return stepDrop();
     if (g.isle) return stepIsle();
     if (g.warp) return stepWarp();
     if (g.hole) return stepHole();
@@ -4052,6 +4158,7 @@
   }
   function leavePlain() { plain = null; toMainMenu(); }
   function drawPlain() {
+    if (plain.drop) return drawDrop();
     if (plain.isle) return drawIsle();
     if (plain.warp) return drawWarp();
     if (plain.hole) return drawHole();
