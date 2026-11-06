@@ -3334,12 +3334,13 @@
   // After the black screen (the user asked 2026-11-05): a random spot on Jupiter, a completely flat plain under the
   // planet's bands that goes on for ever, with obstacles to get past as you run (plainObstacle). The pugs can walk, jump
   // and bark, and Gloop chases them on foot all the time, walking over everything: a pug he catches dies, and so does one
-  // hit by the barrels that sometimes fall from the sky; with none left it's back to the main menu, as is the pause
-  // menu's Main Menu. (plain: the
+  // hit by the barrels that sometimes fall from the sky or the rovers that sometimes drive through, to be jumped; with
+  // none left it's back to the main menu, as is the pause menu's Main Menu. (plain: the
   // state, phase 'mini' like the Arcade's games; PLAIN_Y: the ground on the screen; PLAIN_SPOTS: the spots, each the
   // sky's bands, the ground and what's in the sky; GLOOP_NEAR: how far off he stays at most, however fast they run)
   let plain = null;
   const PLAIN_Y = 238, PLAIN_SKY_W = 480, GLOOP_NEAR = 104, PLAIN_W = 6, PLAIN_H = 13;
+  const PLAIN_ROVERS = [['scout', 16], ['six', 24], ['buggy', 24], ['hauler', 32]];   // (Saturn's rovers, and how wide each is)
   // (the obstacle a pug at x with feet at y is inside, if any: PLAIN_W either side of it, PLAIN_H tall)
   const plainHit = (x, y) => plain.obs.find(o => x + PLAIN_W > o.x1 && x - PLAIN_W < o.x2 && y > o.top && y - PLAIN_H < o.bot);
   // (what feet at y would land on at x: the highest top at or below them, or the ground)
@@ -3396,7 +3397,7 @@
     banana = arena = race = dig = hop = null;
     document.body.classList.remove('blackout');
     const spot = PLAIN_SPOTS[Math.floor(Math.random() * PLAIN_SPOTS.length)], x0 = Math.floor(Math.random() * 100000);
-    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150 };
+    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300 };
     const first = kbSlot !== null && joined[kbSlot] ? kbSlot : 0;
     for (let i = 0; i < 4; i++) if (arenaDriven(i) || i === first) plainPug(i);
     try { initAudio(); } catch (e) {}
@@ -3472,6 +3473,19 @@
       }
     }
     g.drops = g.drops.filter(b => !b.gone);
+    // Rovers now and then drive through along the ground, mostly from ahead, going right through the obstacles. A pug
+    // has to be off the ground above one as it passes: a jump clears any of them.
+    if (--g.roverT <= 0) {
+      g.roverT = 240 + Math.random() * 300;
+      const [kind, w] = PLAIN_ROVERS[Math.floor(Math.random() * PLAIN_ROVERS.length)], dir = Math.random() < 0.7 ? -1 : 1;
+      g.rovers.push({ kind, w, dir, x: dir < 0 ? g.cam + PW + w : g.cam - w, t: 0 });
+      tone(90, 0.5, 'sawtooth', 0.025, 40);
+    }
+    for (const r of g.rovers) {
+      r.x += r.dir * (r.dir < 0 ? 1.8 : 2.7); r.t++;
+      for (const p of alive) if (Math.abs(r.x - p.x) < r.w / 2 + 4 && p.y > PLAIN_Y - 11) kill(p);
+    }
+    g.rovers = g.rovers.filter(r => r.dir < 0 ? r.x > g.cam - 60 : r.x < g.cam + PW + 60);
     for (const b of g.bits) { b.vy += 0.2; b.x += b.vx; b.y += b.vy; b.t--; }
     g.bits = g.bits.filter(b => b.t > 0);
     if (alive.every(q => q.dead)) g.endT = 150;
@@ -3507,6 +3521,7 @@
       ctx.fillRect(Math.round(b.x - g.cam) - 6, plainFloor(b.x, b.y + 5) - 2, 12, 2);
     }
     drawPlainGloop();
+    for (const r of g.rovers) blit(`rover_${r.kind}_${(r.t >> 3) & 1}`, Math.round(r.x - g.cam) - (r.w >> 1), PLAIN_Y - 12, r.dir < 0);
     for (const b of g.drops) blit('barrel_roll' + (Math.floor(b.spin / 6) % 4), Math.round(b.x - g.cam) - 5, Math.round(b.y) - 5);
     ctx.fillStyle = '#8a5630';
     for (const b of g.bits) ctx.fillRect(Math.round(b.x - g.cam), Math.round(b.y), 2, 2);
