@@ -2044,6 +2044,7 @@
   //   YAY!      unlocks every customization there is, mission prizes too (unlockAll)
   //   B0SS      goes straight to Gloop's chase on Jupiter (codeBoss), from any screen
   //   B0SS2     goes straight to the space screen where you steer the alien's saucer (codeSpace), from any screen
+  //   B0SS3     goes straight to the island in space (codeIsle), from any screen
   // A code's first key still does its usual job if it is a game key (B barks, ZER0's Z jumps), but once a
   // code has begun, its next keys only type the code: the coin code's S doesn't also climb down or pick a
   // menu choice, the skip code's X makes no tacos. A key that doesn't fit, or nothing typed for 25 seconds,
@@ -2053,7 +2054,8 @@
     { code: 'ZER0', at: 0, run: () => zeroCoins() }, { code: 'C0/\\/\\E', at: 0, run: () => codeCome() },
     { code: 'EXP', at: 0, run: () => codeExp() }, { code: 'L0CK', at: 0, run: () => relock() },
     { code: 'L0CK2', at: 0, run: () => codeMissions() }, { code: 'YAY!', at: 0, run: () => unlockAll() },
-    { code: 'B0SS', at: 0, run: () => codeBoss() }, { code: 'B0SS2', at: 0, run: () => codeSpace() }];
+    { code: 'B0SS', at: 0, run: () => codeBoss() }, { code: 'B0SS2', at: 0, run: () => codeSpace() },
+    { code: 'B0SS3', at: 0, run: () => codeIsle() }];
   // The zero code (the user asked for one to reset their coins): every pug's coins are set to 0 and saved.
   // Store things already bought are kept.
   // (the lock code, the user asked 2026-10-31: every unlock forgotten, and a pet that is locked again goes home, and a
@@ -3434,6 +3436,16 @@
     if (!plain) codeBoss();
     if (plain && !plain.space) plainSpace(plain.pugs);
   }
+  // (b0ss3: straight to the island in space, whatever part of the fight it's typed in)
+  function codeIsle() {
+    if (!plain) codeBoss();
+    if (!plain || plain.isle) return;
+    if (!plain.space) plainSpace(plain.pugs);
+    boomPic.hidden = true; boomPicT = 0;
+    const ids = plain.pugs.map(p => p.id);
+    plain.isle = true; plain.pugs = [];
+    ids.forEach(islePug);
+  }
   // (the space screen: one saucer for each of these pugs, side by side)
   function plainSpace(pugs) {
     plain.endT = 0; plain.bits = [];
@@ -3581,9 +3593,17 @@
       box('#3fae5a', x, ISLE_Y - 3, 1, 3); box(col, x - 1, ISLE_Y - 5, 3, 3);
     }
   }
+  // (empty space: only stars, no planets, the user asked)
+  function buildPlainStars() {
+    if (plainStars) return;
+    plainStars = document.createElement('canvas'); plainStars.width = PW; plainStars.height = PH;
+    const c = plainStars.getContext('2d');
+    c.fillStyle = '#050614'; c.fillRect(0, 0, PW, PH);
+    for (let i = 0; i < 140; i++) { c.fillStyle = ['#ffffff', '#9fb4ff', '#f4e9a8'][i % 3]; c.fillRect(Math.floor(Math.random() * PW), Math.floor(Math.random() * PH), 1 + (i % 9 === 0), 1); }
+  }
   function drawIsle() {
-    ctx.fillStyle = '#050614'; ctx.fillRect(0, 0, PW, PH);
-    if (plainStars) ctx.drawImage(plainStars, 0, 0);
+    buildPlainStars();
+    ctx.drawImage(plainStars, 0, 0);
     if (!isleArt) buildIsle();
     ctx.drawImage(isleArt, 0, 0);
     for (const p of plain.pugs) drawPlainPug(p, Math.round(p.x), Math.round(p.y), 'gold');
@@ -3893,13 +3913,7 @@
     if (plain.warp) return drawWarp();
     if (plain.hole) return drawHole();
     if (plain.space) {
-      // (empty space: only stars, no planets, the user asked)
-      if (!plainStars) {
-        plainStars = document.createElement('canvas'); plainStars.width = PW; plainStars.height = PH;
-        const c = plainStars.getContext('2d');
-        c.fillStyle = '#050614'; c.fillRect(0, 0, PW, PH);
-        for (let i = 0; i < 140; i++) { c.fillStyle = ['#ffffff', '#9fb4ff', '#f4e9a8'][i % 3]; c.fillRect(Math.floor(Math.random() * PW), Math.floor(Math.random() * PH), 1 + (i % 9 === 0), 1); }
-      }
+      buildPlainStars();
       // (zooming on the nuke: at zoom 0 this is the plain view, at 1 the nuke is in the middle of the screen)
       const nuke = plain.nuke, zoom = nuke ? nukeZoom(nuke) : 0;
       ctx.fillStyle = '#050614'; ctx.fillRect(0, 0, PW, PH);
