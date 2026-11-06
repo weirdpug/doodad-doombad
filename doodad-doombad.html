@@ -3435,8 +3435,9 @@
     const g = plain, pad = padHeld[p.id] || {}, kb = kbSlot !== null ? p.id === kbSlot : p.id === 0 && ownerOf(0) === undefined;
     const held = k => !!pad[k] || (kb && keys[k]);
     const jump = !!pad.jump || (kb && (keys.jump || keys.up)), bark = !!pad.bark || !!pad.toss;
-    const inp = { left: held('left'), right: held('right'), up: held('up'), down: held('down'), jump: jump && !p.prev.jump, bark: (bark && !p.prev.bark) || (kb && g.kbAtk) };
-    p.prev = { jump, bark };
+    const shot = !!pad.jump || (kb && keys.jump);   // (in space Up steers, so only the jump button itself shoots)
+    const inp = { left: held('left'), right: held('right'), up: held('up'), down: held('down'), jump: jump && !p.prev.jump, bark: (bark && !p.prev.bark) || (kb && g.kbAtk), shot: shot && !p.prev.shot };
+    p.prev = { jump, bark, shot };
     return inp;
   }
   // (out in space: each player's saucer goes wherever it is steered, inside the screen, and shoots the way it faces with
@@ -3447,7 +3448,7 @@
       const inp = plainInput(a), dx = (inp.right ? 1 : 0) - (inp.left ? 1 : 0), dy = (inp.down ? 1 : 0) - (inp.up ? 1 : 0);
       if (dx) a.face = dx;
       a.x = clamp(a.x + dx * 1.6, 22, PW - 22); a.y = clamp(a.y + dy * 1.6, 12, PH - 12);
-      if (inp.jump || inp.bark) { g.shots.push({ x: a.x + a.face * 24, y: a.y + 2, dir: a.face }); tone(900, 0.12, 'square', 0.03, -600); }
+      if (inp.shot || inp.bark) { g.shots.push({ x: a.x + a.face * 24, y: a.y + 2, dir: a.face }); tone(900, 0.12, 'square', 0.03, -600); }
     }
     for (const b of g.shots) b.x += b.dir * 4.5;
     g.shots = g.shots.filter(b => b.x > -10 && b.x < PW + 10);
