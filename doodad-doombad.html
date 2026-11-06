@@ -2881,7 +2881,7 @@
       : view === 'raceOver' ? raceWords().text
       : view === 'digPause' ? 'Mars Dig. Dig for bones and crystals, bark to make the Martians dizzy, then boop them. Look out for falling rocks!'
       : view === 'digOver' ? digWords().text
-      : view === 'plainPause' ? 'Somewhere on Jupiter. Gloop is coming.'
+      : view === 'plainPause' ? (plain && plain.space ? 'Out in space.' : 'Somewhere on Jupiter. Gloop is coming.')
       : view === 'hopPause' ? 'Saturn Scramble. Hop across Saturn\'s rings: dodge the rovers and comets, ride the ice over open space, and keep moving, or an alien will beam you up!'
       : view === 'hopOver' ? hopWords().text
       : view === 'arenaOver' ? arenaWords().text
@@ -3332,7 +3332,9 @@
   // and bark, and Gloop chases them on foot all the time, walking over everything: a pug he catches dies, and so does one
   // hit by the barrels that sometimes fall from the sky, the rovers that sometimes drive through, to be jumped, or the
   // Martians that come at them, to be barked at; with none left it's back to the main menu, as is the pause menu's Main
-  // Menu. (plain: the
+  // Menu. Now and then, far along (about 25 obstacles), there is one alien spaceship for each pug still alive: a pug that
+  // jumps on one is carried off, and once everyone still alive has gone, each drives its alien's saucer round space,
+  // with no goal and no danger (plain.space), until Main Menu. (plain: the
   // state, phase 'mini' like the Arcade's games; PLAIN_Y: the ground on the screen; PLAIN_SPOTS: the spots, each the
   // sky's bands, the ground and what's in the sky; GLOOP_NEAR: how far off he stays at most, however fast they run)
   let plain = null;
@@ -3359,6 +3361,15 @@
     else if (r < 0.8) { w = 40; solid(x, x + 20, 26); solid(x + 20, x + 40, 54); }
     else { w = 46; solid(x, x + 28, 26, 20); solid(x + 28, x + 46, 54); }
     g.nextObs = x + w + 150 + Math.random() * 110;
+    // (every so often after the 25th obstacle, and not always, the spaceships wait in the gap after this one)
+    if (++g.obsCount >= g.shipAt) {
+      g.shipAt = g.obsCount + 12;
+      if (!g.ships.length && Math.random() < 0.6) {
+        const n = g.pugs.filter(p => !p.dead && !p.aboard).length;
+        for (let i = 0; i < n; i++) g.ships.push({ x: x + w + 70 + i * 60, y: PLAIN_Y - 34, pug: null, v: 0 });
+        g.nextObs = Math.max(g.nextObs, x + w + 130 + n * 60);
+      }
+    }
   }
   const PLAIN_SPOTS = [
     { bands: ['#a8541e', '#c8742f', '#8a4220', '#d89a5a', '#a8541e', '#c8742f'], ground: ['#d8a878', '#a86f3e', '#7a4a26'], sky: 'swirls' },
@@ -3398,7 +3409,7 @@
     banana = arena = race = dig = hop = null;
     document.body.classList.remove('blackout');
     const spot = PLAIN_SPOTS[Math.floor(Math.random() * PLAIN_SPOTS.length)], x0 = Math.floor(Math.random() * 100000);
-    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300, martians: [], martianT: 420 };
+    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300, martians: [], martianT: 420, ships: [], obsCount: 0, shipAt: 25, space: null };
     const first = kbSlot !== null && joined[kbSlot] ? kbSlot : 0;
     for (let i = 0; i < 4; i++) if (arenaDriven(i) || i === first) plainPug(i);
     try { initAudio(); } catch (e) {}
@@ -3413,19 +3424,29 @@
     const g = plain, pad = padHeld[p.id] || {}, kb = kbSlot !== null ? p.id === kbSlot : p.id === 0 && ownerOf(0) === undefined;
     const held = k => !!pad[k] || (kb && keys[k]);
     const jump = !!pad.jump || (kb && (keys.jump || keys.up)), bark = !!pad.bark || !!pad.toss;
-    const inp = { left: held('left'), right: held('right'), jump: jump && !p.prev.jump, bark: (bark && !p.prev.bark) || (kb && g.kbAtk) };
+    const inp = { left: held('left'), right: held('right'), up: held('up'), down: held('down'), jump: jump && !p.prev.jump, bark: (bark && !p.prev.bark) || (kb && g.kbAtk) };
     p.prev = { jump, bark };
     return inp;
+  }
+  // (out in space: each player's saucer goes wherever it is steered, inside the screen)
+  function stepPlainSpace() {
+    for (const a of plain.space) {
+      const inp = plainInput(a), dx = (inp.right ? 1 : 0) - (inp.left ? 1 : 0), dy = (inp.down ? 1 : 0) - (inp.up ? 1 : 0);
+      if (dx) a.face = dx;
+      a.x = clamp(a.x + dx * 1.6, 22, PW - 22); a.y = clamp(a.y + dy * 1.6, 12, PH - 12);
+    }
+    plain.kbAtk = false;
   }
   function stepPlain() {
     const g = plain;
     g.t++;
+    if (g.space) return stepPlainSpace();
     if (g.endT && --g.endT === 0) return leavePlain();
     if (!g.endT) for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.pugs.some(p => p.id === i)) plainPug(i);
     g.pugs = g.pugs.filter(p => arenaDriven(p.id));   // (one nobody drives any more goes, so it can't hold the view back)
-    const leftNow = g.pugs.reduce((n, p) => p.dead ? n : Math.min(n, p.x), Infinity);
+    const leftNow = g.pugs.reduce((n, p) => p.dead || p.aboard ? n : Math.min(n, p.x), Infinity);
     for (const p of g.pugs) {
-      if (p.dead) continue;
+      if (p.dead || p.aboard) continue;
       const inp = plainInput(p), dx = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
       p.moving = false;
       if (dx) {
@@ -3453,8 +3474,21 @@
     }
     g.kbAtk = false;
     // (the view stays on the pugs still alive)
-    const alive = g.pugs.filter(p => !p.dead);
-    if (!alive.length && !g.endT) g.endT = 150;
+    const alive = g.pugs.filter(p => !p.dead && !p.aboard), carried = g.pugs.filter(p => p.aboard);
+    if (!alive.length && !carried.length && !g.endT) g.endT = 150;
+    // A pug landing on a free spaceship is carried off up out of the sky; once nobody is left down here, it's off to space
+    for (const s of g.ships) {
+      if (!s.pug) for (const p of alive) if (!s.pug && !p.ground && p.vy >= 0 && Math.abs(p.x - s.x) < 20 && p.y >= s.y + 10 && p.y <= s.y + 19) {
+        s.pug = p; p.aboard = s; alive.splice(alive.indexOf(p), 1); carried.push(p);
+        tone(500, 0.8, 'sine', 0.05, 700);
+      }
+      if (s.pug) { s.v += 0.04; s.y -= s.v; s.pug.x = s.x; s.pug.y = s.y + 10; }
+    }
+    g.ships = g.ships.filter(s => s.pug || s.x > g.gloopX - 200);
+    if (!alive.length && carried.length && carried.every(p => p.aboard.y < -40)) {
+      g.space = carried.map((p, i) => ({ id: p.id, x: PW / 2 + (i - (carried.length - 1) / 2) * 50, y: PH / 2, face: 1, prev: { jump: true, bark: true } }));
+      return;
+    }
     if (alive.length) {
       const xs = alive.map(p => p.x);
       g.cam += ((Math.min(...xs) + Math.max(...xs)) / 2 - PW / 2 - g.cam) * 0.1;
@@ -3512,7 +3546,7 @@
     g.martians = g.martians.filter(m => !m.gone && m.x > g.gloopX - 40);
     for (const b of g.bits) { b.vy += 0.2; b.x += b.vx; b.y += b.vy; b.t--; }
     g.bits = g.bits.filter(b => b.t > 0);
-    if (!g.endT && alive.every(q => q.dead)) g.endT = 150;
+    if (!g.endT && !carried.length && alive.every(q => q.dead)) g.endT = 150;
   }
   function pausePlain(note) {
     if (phase !== 'mini' || !plain) return;
@@ -3520,6 +3554,16 @@
   }
   function leavePlain() { plain = null; toMainMenu(); }
   function drawPlain() {
+    if (plain.space) {
+      if (!spaceBgReady) { buildSpaceBg(); spaceBgReady = true; }
+      ctx.drawImage(spaceBg, 0, 0);
+      for (const a of plain.space) {
+        const pic = sprite('ufo_' + ((plain.t >> 3) & 1), a.face < 0);
+        if (pic) ctx.drawImage(pic, Math.round(a.x) - 22, Math.round(a.y) - 11, 44, 22);
+        if (plain.space.length > 1) drawText('P' + (a.id + 1), Math.round(a.x), Math.round(a.y) - 20, LOOK[a.id].tag, 'center');
+      }
+      return;
+    }
     const g = plain, off = (((g.cam * 0.25 + g.t * 0.1) % PLAIN_SKY_W) + PLAIN_SKY_W) % PLAIN_SKY_W;
     ctx.drawImage(g.sky, -off, 0); ctx.drawImage(g.sky, PLAIN_SKY_W - off, 0);
     // the ground: perfectly flat, with little marks that pass by to show the pugs are moving
@@ -3545,6 +3589,10 @@
       ctx.fillRect(Math.round(b.x - g.cam) - 6, plainFloor(b.x, b.y + 5) - 2, 12, 2);
     }
     drawPlainGloop();
+    for (const s of g.ships) {
+      const pic = sprite('ufo_' + ((g.t >> 3) & 1));
+      if (pic) ctx.drawImage(pic, Math.round(s.x - g.cam) - 22, Math.round(s.y), 44, 22);
+    }
     for (const r of g.rovers) blit(`rover_${r.kind}_${(r.t >> 3) & 1}`, Math.round(r.x - g.cam) - (r.w >> 1), PLAIN_Y - 12, r.dir < 0);
     for (const m of g.martians) {
       const pic = sprite(m.pop ? 'dg_blob_dizzy' : (m.t >> 3) & 1 ? 'dg_blob2' : 'dg_blob1');
