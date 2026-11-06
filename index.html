@@ -3384,6 +3384,7 @@
     { bands: ['#8a8e9e', '#a8a2a0', '#6e7488', '#b8b0a8', '#8a8e9e', '#6e7488'], ground: ['#c0c4d0', '#8a8e9e', '#5e6274'], sky: 'none' },
     { bands: ['#c8583a', '#e8785a', '#a8341e', '#f0a070', '#c8583a', '#e8c9a0'], ground: ['#f0a070', '#c8583a', '#8a2c1a'], sky: 'swirls' },
   ];
+  let plainStars = null;
   // (the sky, built once for each visit: wavy bands that join up at the edges, so it can scroll round for ever)
   function buildPlainSky(spot) {
     const c = document.createElement('canvas'); c.width = PLAIN_SKY_W; c.height = PLAIN_Y;
@@ -3569,8 +3570,14 @@
   function leavePlain() { plain = null; toMainMenu(); }
   function drawPlain() {
     if (plain.space) {
-      if (!spaceBgReady) { buildSpaceBg(); spaceBgReady = true; }
-      ctx.drawImage(spaceBg, 0, 0);
+      // (empty space: only stars, no planets, the user asked)
+      if (!plainStars) {
+        plainStars = document.createElement('canvas'); plainStars.width = PW; plainStars.height = PH;
+        const c = plainStars.getContext('2d');
+        c.fillStyle = '#050614'; c.fillRect(0, 0, PW, PH);
+        for (let i = 0; i < 140; i++) { c.fillStyle = ['#ffffff', '#9fb4ff', '#f4e9a8'][i % 3]; c.fillRect(Math.floor(Math.random() * PW), Math.floor(Math.random() * PH), 1 + (i % 9 === 0), 1); }
+      }
+      ctx.drawImage(plainStars, 0, 0);
       for (const a of plain.space) {
         const pic = sprite('ufo_' + ((plain.t >> 3) & 1), a.face < 0);
         if (pic) ctx.drawImage(pic, Math.round(a.x) - 22, Math.round(a.y) - 11, 44, 22);
