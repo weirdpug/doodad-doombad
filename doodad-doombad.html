@@ -3420,7 +3420,7 @@
     banana = arena = race = dig = hop = null;
     document.body.classList.remove('blackout');
     const spot = PLAIN_SPOTS[Math.floor(Math.random() * PLAIN_SPOTS.length)], x0 = Math.floor(Math.random() * 100000);
-    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300, martians: [], martianT: 420, ships: [], obsCount: 0, shipAt: 25, space: null };
+    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300, martians: [], martianT: 420, ships: [], obsCount: 0, shipAt: 25, space: null, shots: [] };
     const first = kbSlot !== null && joined[kbSlot] ? kbSlot : 0;
     for (let i = 0; i < 4; i++) if (arenaDriven(i) || i === first) plainPug(i);
     try { initAudio(); } catch (e) {}
@@ -3439,13 +3439,18 @@
     p.prev = { jump, bark };
     return inp;
   }
-  // (out in space: each player's saucer goes wherever it is steered, inside the screen)
+  // (out in space: each player's saucer goes wherever it is steered, inside the screen, and shoots the way it faces with
+  // a press of the jump or bark button)
   function stepPlainSpace() {
+    const g = plain;
     for (const a of plain.space) {
       const inp = plainInput(a), dx = (inp.right ? 1 : 0) - (inp.left ? 1 : 0), dy = (inp.down ? 1 : 0) - (inp.up ? 1 : 0);
       if (dx) a.face = dx;
       a.x = clamp(a.x + dx * 1.6, 22, PW - 22); a.y = clamp(a.y + dy * 1.6, 12, PH - 12);
+      if (inp.jump || inp.bark) { g.shots.push({ x: a.x + a.face * 24, y: a.y + 2, dir: a.face }); tone(900, 0.12, 'square', 0.03, -600); }
     }
+    for (const b of g.shots) b.x += b.dir * 4.5;
+    g.shots = g.shots.filter(b => b.x > -10 && b.x < PW + 10);
     plain.kbAtk = false;
   }
   function stepPlain() {
@@ -3574,6 +3579,7 @@
         for (let i = 0; i < 140; i++) { c.fillStyle = ['#ffffff', '#9fb4ff', '#f4e9a8'][i % 3]; c.fillRect(Math.floor(Math.random() * PW), Math.floor(Math.random() * PH), 1 + (i % 9 === 0), 1); }
       }
       ctx.drawImage(plainStars, 0, 0);
+      for (const b of plain.shots) { ctx.fillStyle = '#5fd068'; ctx.fillRect(Math.round(b.x) - 5, Math.round(b.y) - 1, 10, 3); ctx.fillStyle = '#eef0f6'; ctx.fillRect(Math.round(b.x) - 3, Math.round(b.y), 6, 1); }
       for (const a of plain.space) {
         const pic = sprite('ufo_' + ((plain.t >> 3) & 1), a.face < 0);
         if (pic) ctx.drawImage(pic, Math.round(a.x) - 22, Math.round(a.y) - 11, 44, 22);
