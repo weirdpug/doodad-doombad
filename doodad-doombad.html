@@ -3398,6 +3398,9 @@
   const ISLE_Y = 176, ISLE_L = 22, ISLE_R = PW - 22;
   // (what Gloop says once a pug has landed there: each line's frame, counted from the landing, and when the bubble goes)
   const ISLE_WORDS = [[120, 'HOW ARE YOU STILL ALIVE'], [240, 'WELL...'], [360, "YOU WON'T SURVIVE BURRITOS"]], ISLE_WORDS_END = 540;
+  // (then the burritos: how many, the frames a target shows before its burrito is thrown, the burrito's flight, and how
+  // near it must land to a pug to hit)
+  const ISLE_BURRITOS = 50, ISLE_AIM = 60, ISLE_FLY = 16, ISLE_HIT = 14;
   let isleArt = null;
   const BOSS_AT = 120, BOSS_HP = 20, SAUCER_HP = 10, BOSS_X = 176, BOSS_SHOOT = 12, SHOT_SPEED = 4.5, BOSS_SCALE = 0.6, BOSS_MOVE = 1.6;
   // (the top of whatever is highest at x, for those who walk over everything; half: how wide they are each side)
@@ -3486,7 +3489,7 @@
     banana = arena = race = dig = hop = null;
     document.body.classList.remove('blackout');
     const spot = PLAIN_SPOTS[Math.floor(Math.random() * PLAIN_SPOTS.length)], x0 = Math.floor(Math.random() * 100000);
-    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300, martians: [], martianT: 420, ships: [], obsCount: 0, shipAt: 25, space: null, shots: [], zaps: [], boss: null, spaceT: 0, nuke: null, hole: null, warp: null, isle: false, isleT: 0 };
+    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300, martians: [], martianT: 420, ships: [], obsCount: 0, shipAt: 25, space: null, shots: [], zaps: [], boss: null, spaceT: 0, nuke: null, hole: null, warp: null, isle: false, isleT: 0, aim: null, thrown: [], isleShot: 0 };
     const first = kbSlot !== null && joined[kbSlot] ? kbSlot : 0;
     for (let i = 0; i < 4; i++) if (arenaDriven(i) || i === first) plainPug(i);
     try { initAudio(); } catch (e) {}
@@ -3582,7 +3585,7 @@
   function landOnIsle(ids) {
     plain.isle = true; plain.pugs = [];
     ids.forEach(islePug);
-    plain.isleT = 0;
+    plain.isleT = 0; plain.endT = 0; plain.bits = []; plain.aim = null; plain.thrown = []; plain.isleShot = 0;
     if (unlock('bossIsle')) toast('You can now start Boss Fight from The Island!', '#ffcc3d');
   }
   function islePug(id) {
@@ -3593,6 +3596,7 @@
     for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.pugs.some(p => p.id === i)) islePug(i);
     g.pugs = g.pugs.filter(p => arenaDriven(p.id));
     for (const p of g.pugs) {
+      if (p.dead) continue;
       const inp = plainInput(p), dx = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
       p.moving = false;
       if (dx) {
@@ -3611,6 +3615,33 @@
     g.kbAtk = false;
     // (the words are timed from the first pug to land)
     if (g.isleT || g.pugs.some(p => p.ground)) g.isleT++;
+    stepIsleBurritos();
+  }
+  // Three seconds after his last word Gloop starts on the burritos: a target shows at a random spot over the island for a
+  // second, a burrito is thrown there, the next target shows, and so on for 50. One that lands on a pug kills it; if none
+  // are left it's back to the main menu. After the fiftieth nothing more happens. (the user asked)
+  function stepIsleBurritos() {
+    const g = plain;
+    if (g.isleT >= ISLE_WORDS_END && g.isleShot < ISLE_BURRITOS && g.pugs.some(p => !p.dead)) {
+      if (!g.aim) { g.aim = { x: ISLE_L + Math.random() * (ISLE_R - ISLE_L), y: ISLE_Y - 36 + Math.random() * 30, t: 0 }; tone(1100, 0.08, 'square', 0.03, 0); }
+      if (++g.aim.t === ISLE_AIM) {
+        g.thrown.push({ x: g.aim.x, y: g.aim.y, from: g.aim.x + (Math.random() < 0.5 ? -80 : 80), t: 0 });
+        g.aim = null; g.isleShot++;
+        tone(500, 0.2, 'square', 0.03, -320);
+      }
+    } else g.aim = null;
+    for (const b of g.thrown) {
+      if (++b.t < ISLE_FLY) continue;
+      noise(0.18, 0.12, 1200, 200);
+      for (let i = 0; i < 12; i++) g.bits.push({ x: b.x, y: b.y, vx: (Math.random() - 0.5) * 3, vy: -1 - Math.random() * 2, t: 30, col: BURRITO_BITS[i % BURRITO_BITS.length] });
+      for (const p of g.pugs) if (!p.dead && Math.abs(p.x - b.x) < ISLE_HIT && Math.abs(p.y - 7 - b.y) < ISLE_HIT) {
+        p.dead = true; p.barkT = 0; p.moving = false; p.ground = true; p.y = ISLE_Y; sfx.die();
+        if (!g.endT && g.pugs.every(q => q.dead)) g.endT = 150;
+      }
+    }
+    g.thrown = g.thrown.filter(b => b.t < ISLE_FLY);
+    for (const b of g.bits) { b.x += b.vx; b.y += b.vy; b.vy += 0.12; b.t--; }
+    g.bits = g.bits.filter(b => b.t > 0);
   }
   // (a floating lump of land: grass on top with a few flowers, dirt under it, and rock tapering away at the bottom)
   function buildIsle() {
@@ -3649,6 +3680,22 @@
     // (Gloop's words: just yellow text, no bubble, the user asked)
     const said = plain.isleT < ISLE_WORDS_END && ISLE_WORDS.filter(w => plain.isleT >= w[0]).pop();
     if (said) drawText(said[1], PW / 2, 40, 'gold', 'center');
+    // (the target: a blinking red and white ring with cross hairs)
+    const aim = plain.aim;
+    if (aim) {
+      const x = Math.round(aim.x), y = Math.round(aim.y);
+      ctx.fillStyle = (aim.t >> 3) & 1 ? '#ffffff' : '#ff3e30';
+      for (let i = 0; i < 28; i++) ctx.fillRect(Math.round(x + Math.cos(i / 28 * Math.PI * 2) * 9), Math.round(y + Math.sin(i / 28 * Math.PI * 2) * 9), 2, 2);
+      for (const [dx, dy, w, h] of [[-14, 0, 7, 2], [8, 0, 7, 2], [0, -14, 2, 7], [0, 8, 2, 7], [0, 0, 2, 2]]) ctx.fillRect(x + dx, y + dy, w, h);
+    }
+    for (const b of plain.bits) { ctx.fillStyle = b.col; ctx.fillRect(Math.round(b.x), Math.round(b.y), 2, 2); }
+    // (the burritos, flying in from above the screen in an arc, spinning)
+    const pic = sprite('thrown_burrito');
+    for (const b of plain.thrown) {
+      const u = b.t / ISLE_FLY, x = b.from + (b.x - b.from) * u, y = -16 + (b.y + 16) * u - Math.sin(u * Math.PI) * 14;
+      if (!pic) continue;
+      ctx.save(); ctx.translate(Math.round(x), Math.round(y)); ctx.rotate(b.t * 0.7); ctx.scale(1.6, 1.6); ctx.drawImage(pic, -pic.width / 2, -pic.height / 2); ctx.restore();
+    }
   }
   // Cut a pug, in its costume, into little coloured cells that can each be moved on their own. a: how far along the noodle
   // the cell ends up, with the head (the right of the sprite, u over 0.55) squeezed into the last bit of it. u, v: where
