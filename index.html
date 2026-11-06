@@ -3967,9 +3967,9 @@
       if (h.t <= i * HOLE_GAP || h.t >= HOLE_FLY + i * HOLE_GAP) return;
       const q = holePug(i, h.t), L = looks[id], layer = (name, sw) => { const b = sprite(name, false, sw); if (b) ctx.drawImage(b, -b.width / 2, -b.height / 2); };
       ctx.save(); ctx.translate(Math.round(q.x), Math.round(q.y)); ctx.rotate(q.a); ctx.scale(q.size * q.stretch, q.size / q.stretch); ctx.rotate(q.ang);
-      layer('player_dead', LOOK[id].swap);
-      if (L.suit) layer(L.suit + '_dead');
-      if (L.hat) layer(L.hat + '_dead');
+      layer('player_jump', LOOK[id].swap);
+      if (L.suit) layer(L.suit + '_jump');
+      if (L.hat) layer(L.hat + '_jump');
       ctx.restore();
     });
   }
