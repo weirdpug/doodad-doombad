@@ -3498,8 +3498,8 @@
       for (const p of alive) if (Math.abs(r.x - p.x) < r.w / 2 + 4 && p.y > PLAIN_Y - 11) kill(p);
     }
     g.rovers = g.rovers.filter(r => r.dir < 0 ? r.x > g.cam - 60 : r.x < g.cam + PW + 60);
-    // Martians from Mars Dig now and then come along from ahead, walking over everything. Jumping doesn't save a pug: one
-    // that reaches it kills it, however high up, so it has to be barked at (the user asked).
+    // Martians from Mars Dig now and then come along from ahead, walking over everything. One that touches a pug kills
+    // it, so it has to be barked at or jumped over (the user asked for both).
     if (alive.length && --g.martianT <= 0) { g.martianT = 260 + Math.random() * 320; g.martians.push({ x: g.cam + PW + 16, y: PLAIN_Y, t: 0, pop: 0 }); }
     for (const m of g.martians) {
       m.t++;
@@ -3511,7 +3511,7 @@
         continue;
       }
       m.x -= 0.8; m.y += (plainTop(m.x, 6) - m.y) * 0.2;
-      for (const p of alive) if (Math.abs(m.x - p.x) < 11) kill(p);
+      for (const p of alive) if (Math.abs(m.x - p.x) < 11 && p.y > m.y - 14) kill(p);   // (its 16 pixels, less a little)
     }
     g.martians = g.martians.filter(m => !m.gone && m.x > g.gloopX - 40);
     for (const b of g.bits) { b.vy += 0.2; b.x += b.vx; b.y += b.vy; b.t--; }
