@@ -3617,13 +3617,16 @@
     if (g.isleT || g.pugs.some(p => p.ground)) g.isleT++;
     stepIsleBurritos();
   }
-  // Three seconds after his last word Gloop starts on the burritos: a target shows at a random spot over the island for a
-  // second, a burrito is thrown there, the next target shows, and so on for 50. One that lands on a pug kills it; if none
-  // are left it's back to the main menu. After the fiftieth nothing more happens. (the user asked)
+  // Three seconds after his last word Gloop starts on the burritos: a target follows one of the pugs around for a second,
+  // a burrito is thrown at the spot it has got to, the next target shows, and so on for 50. A pug that keeps moving gets
+  // away; one that lands on a pug kills it; if none are left it's back to the main menu. After the fiftieth nothing more
+  // happens. (the user asked)
   function stepIsleBurritos() {
-    const g = plain;
-    if (g.isleT >= ISLE_WORDS_END && g.isleShot < ISLE_BURRITOS && g.pugs.some(p => !p.dead)) {
-      if (!g.aim) { g.aim = { x: ISLE_L + Math.random() * (ISLE_R - ISLE_L), y: ISLE_Y - 36 + Math.random() * 30, t: 0 }; tone(1100, 0.08, 'square', 0.03, 0); }
+    const g = plain, alive = g.pugs.filter(p => !p.dead);
+    if (g.isleT >= ISLE_WORDS_END && g.isleShot < ISLE_BURRITOS && alive.length) {
+      if (!g.aim) { g.aim = { pug: null, x: 0, y: 0, t: 0 }; tone(1100, 0.08, 'square', 0.03, 0); }
+      if (!alive.includes(g.aim.pug)) g.aim.pug = alive[Math.floor(Math.random() * alive.length)];
+      g.aim.x = g.aim.pug.x; g.aim.y = g.aim.pug.y - 7;
       if (++g.aim.t === ISLE_AIM) {
         g.thrown.push({ x: g.aim.x, y: g.aim.y, from: g.aim.x + (Math.random() < 0.5 ? -80 : 80), t: 0 });
         g.aim = null; g.isleShot++;
