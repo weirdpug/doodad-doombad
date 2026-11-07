@@ -3739,30 +3739,31 @@
       if (!g.endT && g.pugs.every(q => q.dead)) g.endT = 150;
     }
   }
-  // Walking off the right of the shop leads out of its door onto Jupiter: the same flat ground as the chase, with nothing
-  // on it but the shop and no Gloop, to walk about on for as long as you like. Walking left back into the shop goes back
-  // in. (the user asked)
-  function leaveShop() {
+  // Walking off either side of the shop (side: 1 right, -1 left) leads out of the door on that side onto Jupiter: the same
+  // flat ground as the chase, with nothing on it but the shop and no Gloop, to walk about on for as long as you like.
+  // Walking back into the shop on that side goes back in. (the user asked)
+  function leaveShop(side) {
     const g = plain, d = g.drop;
-    if (d.hutX === undefined) d.hutX = g.cam + PW / 2 - 60;
-    const x0 = d.hutX + 60;
-    g.stroll = { hutX: d.hutX, drop: d, space: g.space }; g.cam = x0 - PW / 2;
+    if (d.hutX === undefined) d.hutX = g.cam + PW / 2;
+    const x0 = d.hutX + 60 * side;
+    g.stroll = { hutX: d.hutX, drop: d, space: g.space, side }; g.cam = x0 - PW / 2;
     g.drop = null; g.isle = false; g.space = null; g.crumble = null; g.hole = null; g.warp = null; g.boss = null; g.nuke = null;
     g.obs = []; g.drops = []; g.rovers = []; g.martians = []; g.ships = []; g.bits = []; g.endT = 0;
-    g.pugs = g.pugs.filter(p => !p.dead).map((p, i) => Object.assign(shopPug(p.id, x0 + i * 16 - 8, PLAIN_Y), { ground: true }));
+    g.pugs = g.pugs.filter(p => !p.dead).map((p, i) => Object.assign(shopPug(p.id, x0 + (i * 16 - 8) * side, PLAIN_Y), { ground: true, face: side }));
   }
   function backInShop() {
     const g = plain, s = g.stroll;
     g.stroll = false; g.drop = s.drop; g.space = s.space; g.isle = true; g.bits = [];
-    g.pugs = g.pugs.map((p, i) => Object.assign(shopPug(p.id, SHOP_R - 12 - i * 34, SHOP_Y), { face: -1 }));
+    g.pugs = g.pugs.map((p, i) => Object.assign(shopPug(p.id, s.side > 0 ? SHOP_R - 12 - i * 34 : SHOP_L + 12 + i * 34, SHOP_Y), { face: -s.side }));
   }
   function stepStroll() {
-    const g = plain, door = g.stroll.hutX + 44;
+    const g = plain, s = g.stroll, door = s.hutX + 44 * s.side;
     for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.pugs.some(p => p.id === i)) g.pugs.push(Object.assign(shopPug(i, g.cam + PW / 2, PLAIN_Y), { ground: true }));
     g.pugs = g.pugs.filter(p => arenaDriven(p.id));
     for (const p of g.pugs) {
-      const dx = floorPug(p, Math.max(g.cam + 8, door), g.cam + PW - 8, PLAIN_Y, 1.25, -3.4);
-      if (dx < 0 && p.ground && p.x <= door) { backInShop(); g.kbAtk = false; return; }
+      // (the shop bars the way on the side it is on: walking into it there goes back in)
+      const L = g.cam + 8, R = g.cam + PW - 8, dx = s.side > 0 ? floorPug(p, Math.max(L, door), R, PLAIN_Y, 1.25, -3.4) : floorPug(p, L, Math.min(R, door), PLAIN_Y, 1.25, -3.4);
+      if (dx === -s.side && p.ground && (s.side > 0 ? p.x <= door : p.x >= door)) { backInShop(); g.kbAtk = false; return; }
     }
     g.kbAtk = false;
     if (g.pugs.length) {
@@ -3770,8 +3771,8 @@
       g.cam += ((Math.min(...xs) + Math.max(...xs)) / 2 - PW / 2 - g.cam) * 0.1;
     }
   }
-  // Gloop's shop from outside, at screen x: a plank hut with its name up, a porthole, a door on the right, and the hole in
-  // its roof that the pugs came through
+  // Gloop's shop from outside, at screen x: a plank hut with its name up, a porthole, a door each side, and the hole in its
+  // roof that the pugs came through
   function drawHut(x) {
     const box = (col, a, b, w, h) => { ctx.fillStyle = col; ctx.fillRect(x + a, PLAIN_Y + b, w, h); };
     for (let i = 0; i < 14; i++) box(i % 2 ? '#61391f' : '#6b4226', -42 + i * 6, -56, 6, 56);
@@ -3780,11 +3781,11 @@
     box('#3e2414', -39, -53, 78, 12); box('#fff6e0', -38, -52, 76, 10);
     drawText(SHOP_NAME, x, PLAIN_Y - 51, 'black', 'center');
     // (the porthole, with a storm in it)
-    ctx.fillStyle = '#c8a040'; ctx.beginPath(); ctx.arc(x - 20, PLAIN_Y - 22, 11, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#c8482e'; ctx.beginPath(); ctx.arc(x - 20, PLAIN_Y - 22, 8, 0, Math.PI * 2); ctx.fill();
-    box('#f0a070', -27, -24, 14, 3);
-    // (the door, standing open)
-    box('#c8a040', 16, -38, 24, 38); box('#2a160a', 18, -36, 20, 36);
+    ctx.fillStyle = '#c8a040'; ctx.beginPath(); ctx.arc(x, PLAIN_Y - 22, 10, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#c8482e'; ctx.beginPath(); ctx.arc(x, PLAIN_Y - 22, 7, 0, Math.PI * 2); ctx.fill();
+    box('#f0a070', -6, -24, 12, 3);
+    // (the doors, standing open)
+    for (const a of [-40, 16]) { box('#c8a040', a, -38, 24, 38); box('#2a160a', a + 2, -36, 20, 36); }
     // (the hole)
     ctx.fillStyle = '#2a160a'; ctx.beginPath();
     [[-14, -62], [-11, -68], [-6, -60], [-1, -69], [4, -59], [9, -67], [14, -62], [10, -56], [-10, -56]].forEach(([a, b], i) => i ? ctx.lineTo(x + a, PLAIN_Y + b) : ctx.moveTo(x + a, PLAIN_Y + b));
@@ -3833,8 +3834,8 @@
         const onTill = p.x >= TILL_L && p.x <= TILL_R;
         if (onTill && !p.ground && p.vy > 0 && was <= TILL_Y && p.y >= TILL_Y) { p.y = TILL_Y; p.vy = 0; p.ground = true; tone(160, 0.08, 'square', 0.04, 60); }
         else if (!onTill && p.ground && p.y < SHOP_Y) { p.ground = false; p.vy = 0; }
-        // (the way out, on the right, once the last burrito has landed)
-        if (dx > 0 && p.x >= SHOP_R && d.fired && !d.burrito) { leaveShop(); g.kbAtk = false; return; }
+        // (the ways out, one each side, once the last burrito has landed)
+        if ((dx > 0 ? p.x >= SHOP_R : dx < 0 && p.x <= SHOP_L) && d.fired && !d.burrito) { leaveShop(dx); g.kbAtk = false; return; }
       }
       shopBurrito();
     }
