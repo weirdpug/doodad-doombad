@@ -3936,7 +3936,7 @@
   function enterPlanet() {
     const g = plain, ids = g.fin.ids;
     g.fin = null; g.stroll = false; g.drop = null; g.space = null; g.isle = false; g.crumble = null; g.hole = null; g.warp = null; g.boss = null; g.nuke = null;
-    g.obs = []; g.drops = []; g.rovers = []; g.martians = []; g.ships = []; g.bits = []; g.endT = 0; g.cam = -PW / 2; g.planet = true; g.room = null; g.roomOn = {};
+    g.obs = []; g.drops = []; g.rovers = []; g.martians = []; g.ships = []; g.bits = []; g.endT = 0; g.cam = -PW / 2; g.planet = true; g.room = null; g.roomOn = {}; g.shipAt = {};
     g.pugs = ids.map((id, i) => shopPug(id, i * 16 - 8, -20));
     tone(600, 0.4, 'sine', 0.06, 300);
   }
@@ -4099,7 +4099,7 @@
       { x: 110, say: 'YOU CAN SEE EARTH FROM HERE', s: [880, 'sine', -300], draw: (b, r, on) => { b('#55556a', -1, -24, 3, 24); b('#55556a', -8, -2, 18, 2); ctx.save(); ctx.translate(ctxX(b), PLAIN_Y - 26); ctx.rotate(-0.6); ctx.fillStyle = '#c8a040'; ctx.fillRect(-16, -3, 32, 6); ctx.fillStyle = on ? '#7ae0ff' : '#14122a'; ctx.fillRect(16, -4, 3, 8); ctx.restore(); } },
       { x: 190, say: 'PLINK PLONK', s: [523, 'triangle', 262], draw: (b, r, on, t) => { b('#14122a', -22, -26, 44, 18); b('#14122a', -20, -8, 4, 8); b('#14122a', 16, -8, 4, 8); for (let i = 0; i < 7; i++) b(on && ((t >> 3) & 7) === i ? '#ffcc3d' : '#ffffff', -20 + i * 6, -20, 5, 12); } }] },
     { wall: '#6a6e80', floor: '#3a3a4a', window: true, things: [
-      { x: 110, say: 'VWOOOOM', s: [90, 'sawtooth', 300], draw: (b, r, on, t) => { b('#3a3a4a', -14, -10, 28, 10); b('#8d90a0', -2, on ? -14 : -30, 4, on ? 8 : 20); r(on ? '#5fd068' : '#e8282f', 0, on ? -16 : -32, 5); if (on) for (let i = 0; i < 6; i++) b((i + (t >> 3)) % 6 < 2 ? '#7ae0ff' : '#2a4aa8', -14 + i * 5, -6, 4, 3); } },
+      { x: 110, pilot: true, say: 'VWOOOOM', s: [90, 'sawtooth', 300], draw: (b, r, on, t) => { b('#3a3a4a', -14, -10, 28, 10); b('#8d90a0', -2, on ? -14 : -30, 4, on ? 8 : 20); r(on ? '#5fd068' : '#e8282f', 0, on ? -16 : -32, 5); if (on) for (let i = 0; i < 6; i++) b((i + (t >> 3)) % 6 < 2 ? '#7ae0ff' : '#2a4aa8', -14 + i * 5, -6, 4, 3); } },
       { x: 185, say: 'DO NOT PRESS THAT AGAIN', s: [440, 'square', 440], draw: (b, r, on, t) => { b('#55556a', -10, -24, 20, 24); r(on && (t >> 3) & 1 ? '#ffcc3d' : '#e8282f', 0, -30, 8); if (on && (t >> 3) & 1) { ctx.fillStyle = 'rgba(232,40,47,0.18)'; ctx.fillRect(0, 100, PW, 138); } } }] },
     { wall: '#e8dcc0', floor: '#8a5a34', things: [
       { x: 110, say: 'ACHOO!', s: [1200, 'sine', -900], draw: (b, r, on, t) => { b('#a8743a', -10, -14, 20, 14); r('#e8282f', 0, -22, 12); r('#ffffff', -4, -24, 2); r('#ffffff', 4, -20, 2); if (on) for (let i = 0; i < 7; i++) b('#ffe08a', -14 + i * 5, -36 - ((t + i * 13) >> 1) % 44, 2, 2); } },
@@ -4131,15 +4131,18 @@
       { x: 190, say: 'NICE VIEW', s: [1100, 'sine', 200], draw: (b, r, on, t) => { r('#8d90a0', 0, -38, 18); r(on ? '#050614' : '#55556a', 0, -38, 14); if (on) { b('#ffffff', -6, -44, 2, 2); b('#ffffff', 5, -34, 2, 2); b('#9fe0ff', -2 + ((t >> 4) & 3), -30, 2, 2); r('#6ae0c8', 7, -45, 4); } } }] }];
   const ctxX = b => b.x;
   const ROOM_DOOR = 22, ROOM_REACH = 20;
+  // (where building n stands: its own spot, or where its saucer has been parked)
+  const buildingX = n => plain.shipAt[n] !== undefined ? plain.shipAt[n] : n * 170 + planetHash(n + 0.25) * 70;
   // (the building whose door a pug at x is in front of, as its number, or null)
   function planetDoor(x) {
+    for (const n of Object.keys(plain.shipAt)) if (Math.abs(x - plain.shipAt[n]) < 20) return +n;
     const n0 = Math.round((x - 35) / 170);
-    for (const n of [n0 - 1, n0, n0 + 1]) if (Math.abs(x - (n * 170 + planetHash(n + 0.25) * 70)) < 20) return n;
+    for (const n of [n0 - 1, n0, n0 + 1]) if (plain.shipAt[n] === undefined && Math.abs(x - buildingX(n)) < 20) return n;
     return null;
   }
   function enterRoom(n) {
     const g = plain;
-    g.room = { n, kind: Math.floor(planetHash(n + 0.5) * 13), sayT: 0, say: '', on: g.roomOn[n] || (g.roomOn[n] = [false, false]) };
+    g.room = { n, kind: Math.floor(planetHash(n + 0.5) * 13), sayT: 0, say: '', alt: 0, pilot: null, on: g.roomOn[n] || (g.roomOn[n] = [false, false]) };
     g.pugs = g.pugs.map((p, i) => Object.assign(shopPug(p.id, ROOM_DOOR + 16 + i * 16, PLAIN_Y), { ground: true, upWas: true }));
     tone(420, 0.12, 'sine', 0.05, 200);
   }
@@ -4152,6 +4155,8 @@
     g.bits = g.bits.filter(b => b.t > 0);
     if (r.eat) { stepEat(); g.kbAtk = false; return; }
     if (r.pick) { stepPick(); g.kbAtk = false; return; }
+    if (r.pilot) { stepPilot(); g.kbAtk = false; return; }
+    if (r.alt > 0) r.alt = Math.max(0, r.alt - 2);   // (settling back down once it's stopped)
     for (const p of g.pugs) {
       // (sitting: any way of moving gets up again, and a pug can still bark from there)
       if (p.sitting) {
@@ -4169,12 +4174,17 @@
       if (at === 2) { r.pick = { sel: 0, id: p.id, held: { left: false, right: false, up: true, down: false }, msg: 0 }; p.moving = false; sfx.tick(); break; }
       if (at < 0) {
         // (back out of the door, in front of the building)
-        const x = r.n * 170 + planetHash(r.n + 0.25) * 70;
+        const x = buildingX(r.n);
         g.pugs = g.pugs.map((q, i) => Object.assign(shopPug(q.id, x + i * 8, PLAIN_Y), { ground: true, upWas: true }));
         g.cam = x - PW / 2; g.room = null; tone(420, 0.12, 'sine', 0.05, -200); g.kbAtk = false;
         return;
       }
       const thing = things[at];
+      if (thing.pilot) {
+        p.moving = false; r.pilot = { id: p.id }; r.on[at] = true; r.say = thing.say; r.sayT = 90;
+        tone(thing.s[0], 0.35, thing.s[1], 0.06, thing.s[2]);
+        break;
+      }
       if (thing.sit) {
         // (sits down facing the TV, the first pug at one end of the couch and the next one along)
         p.sitting = true; p.x = thing.x - 14 + g.pugs.filter(q => q.sitting && q !== p).length * 14; p.y = PLAIN_Y - 12; p.face = -1; p.moving = false;
@@ -4188,6 +4198,19 @@
       tone(thing.s[0], 0.35, thing.s[1], 0.06, thing.s[2]);
     }
     g.kbAtk = false;
+  }
+  // Pulling the lever in a parked saucer flies it: the arrows or stick steer it left, right, up and down, with the planet
+  // going by in the window, and everyone aboard stays put. Only the jump button (Space) stops it; then it settles to the
+  // ground wherever it has got to, and that's where it's parked. (the user asked)
+  function stepPilot() {
+    const g = plain, r = g.room, p = g.pugs.find(q => q.id === r.pilot.id);
+    if (!p) { r.pilot = null; r.on[0] = false; return; }
+    p.upDoor = true;
+    const inp = plainInput(p), dx = (inp.right ? 1 : 0) - (inp.left ? 1 : 0), dy = (inp.down ? 1 : 0) - (inp.up ? 1 : 0);
+    if (dx) g.shipAt[r.n] = buildingX(r.n) + dx * 3;
+    r.alt = clamp(r.alt - dy * 2, 0, 130);
+    if ((dx || dy) && g.t % 10 === 0) tone(110 + r.alt, 0.1, 'sawtooth', 0.02, dx * 20);
+    if (inp.jump) { r.pilot = null; r.on[0] = false; r.say = 'PARKED'; r.sayT = 90; tone(300, 0.3, 'sawtooth', 0.04, -200); }
   }
   // (what Up does for a pug in a room: -1 the door, 0 or 1 a thing, 2 the alien at a counter, or null)
   function roomSpot(p) {
@@ -4338,12 +4361,13 @@
         ctx.restore();
       } else drawPlainPug(p, Math.round(p.x), Math.round(p.y), 'black');
       const at = roomSpot(p);
-      if (at !== null && !r.pick && !r.eat) drawUpArrow(at < 0 ? ROOM_DOOR : at === 2 ? 150 : R.things[at].x, PLAIN_Y - (at < 0 ? 52 : at === 2 ? 56 : 66));
+      if (at !== null && !r.pick && !r.eat && !r.pilot) drawUpArrow(at < 0 ? ROOM_DOOR : at === 2 ? 150 : R.things[at].x, PLAIN_Y - (at < 0 ? 52 : at === 2 ? 56 : 66));
     }
     for (const b of g.bits) { ctx.fillStyle = b.col; ctx.fillRect(Math.round(b.x), Math.round(b.y), 2, 2); }
     if (r.eat) drawEat();
     if (r.pick) drawPick();
     if (r.sayT > 0) drawText(r.say, PW / 2, 84, 'gold', 'center');
+    if (r.pilot) drawText('ARROWS FLY  SPACE STOPS', PW / 2, 72, 'cyan', 'center');
   }
   function drawPlanet() {
     const g = plain, cam = g.cam;
@@ -4368,7 +4392,8 @@
     ctx.fillStyle = '#7af0c0'; ctx.fillRect(0, PLAIN_Y, PW, 2);
     ctx.fillStyle = '#2fb88a';
     for (let n = Math.floor(cam / 19) - 1; n * 19 < cam + PW + 19; n++) { const h = planetHash(n); ctx.fillRect(Math.round(n * 19 + h * 12 - cam), PLAIN_Y + 10 + Math.floor(h * (PH - PLAIN_Y - 14)), 3 + Math.floor(h * 6), 1); }
-    for (let n = Math.floor((cam - 80) / 170); n * 170 < cam + PW + 80; n++) if (n !== skip) drawAlienHome(Math.round(n * 170 + planetHash(n + 0.25) * 70 - cam), planetHash(n + 0.5));
+    for (let n = Math.floor((cam - 80) / 170); n * 170 < cam + PW + 80; n++) if (n !== skip && plain.shipAt[n] === undefined) drawAlienHome(Math.round(buildingX(n) - cam), planetHash(n + 0.5));
+    for (const n of Object.keys(plain.shipAt)) if (+n !== skip) drawAlienHome(Math.round(plain.shipAt[n] - cam), planetHash(+n + 0.5));   // (parked somewhere else)
     // (a few saucers going over)
     for (let n = Math.floor((cam - 60) / 260); n * 260 < cam + PW + 60; n++) {
       const pic = sprite('ufo_' + ((t >> 3) & 1)), h = planetHash(n + 0.75);
@@ -4385,11 +4410,12 @@
   // (a big oval window in a room's wall, looking out on the real planet around this building: the same aliens and
   // buildings, moving as they do outside)
   function drawRoomWindow(n) {
-    const cx = 128, cy = 150, rx = 62, ry = 36, s = 0.55, x = n * 170 + planetHash(n + 0.25) * 70;
+    const cx = 128, cy = 150, rx = 62, ry = 36, s = 0.55, x = buildingX(n), alt = plain.room.alt;
     const oval = (col, grow) => { ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(cx, cy, rx + grow, ry + grow, 0, 0, Math.PI * 2); ctx.fill(); };
     oval('#3a3a4a', 6); oval('#a8acbc', 4); oval('#55556a', 1);
     ctx.save(); ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); ctx.clip();
-    ctx.translate(cx, cy); ctx.scale(s, s); ctx.translate(-PW / 2, 44 - PLAIN_Y);
+    ctx.fillStyle = '#160a33'; ctx.fillRect(cx - rx, cy - ry, rx * 2, ry * 2);
+    ctx.translate(cx, cy); ctx.scale(s, s); ctx.translate(-PW / 2, 44 - PLAIN_Y + alt);
     drawPlanetScene(x - PW / 2, n);
     ctx.restore();
     // (a shine on the glass, and the bolts round the frame)
