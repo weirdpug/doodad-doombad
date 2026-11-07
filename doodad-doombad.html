@@ -3965,23 +3965,84 @@
     c.fillStyle = '#ff9ac0'; c.beginPath(); c.arc(52, 34, 11, 0, Math.PI * 2); c.fill();
     c.fillStyle = '#ffc4dc'; c.beginPath(); c.arc(49, 31, 7, 0, Math.PI * 2); c.fill();
   }
-  // (a home at screen x: h picks a round house, a tower or a parked saucer)
+  // (one of the 13 kinds of building at screen x, picked by h, from 0 to 1)
   function drawAlienHome(x, h) {
-    const box = (col, a, b, w, b2) => { ctx.fillStyle = col; ctx.fillRect(x + a, PLAIN_Y + b, w, b2); };
-    if (h < 0.4) {
-      ctx.fillStyle = '#6a58b8'; ctx.beginPath(); ctx.arc(x, PLAIN_Y, 36, Math.PI, 0); ctx.fill();
-      ctx.fillStyle = '#b8a8e8'; ctx.beginPath(); ctx.arc(x, PLAIN_Y, 33, Math.PI, 0); ctx.fill();
-      box('#3a2a78', -8, -20, 16, 20); box('#7ae0ff', -24, -18, 9, 7); box('#7ae0ff', 15, -18, 9, 7);
-      box('#6a58b8', -1, -46, 2, 12); box('#ffcc3d', -2, -48, 4, 3);
-    } else if (h < 0.75) {
-      box('#4a3a98', -15, -78, 30, 78); box('#7a6ac8', -13, -78, 26, 78);
-      for (let r = 0; r < 4; r++) for (const a of [-9, 3]) box('#ffe08a', a, -70 + r * 16, 6, 8);
-      box('#3a2a78', -6, -16, 12, 16);
-      ctx.fillStyle = '#ff9ac0'; ctx.beginPath(); ctx.arc(x, PLAIN_Y - 80, 12, Math.PI, 0); ctx.fill();
-    } else {
-      const pic = sprite('ufo_' + ((plain.t >> 4) & 1));
-      box('#55556a', -16, -8, 3, 8); box('#55556a', 13, -8, 3, 8);
-      if (pic) ctx.drawImage(pic, x - 22, PLAIN_Y - 28, 44, 22);
+    const box = (col, a, b, w, h2) => { ctx.fillStyle = col; ctx.fillRect(x + a, PLAIN_Y + b, w, h2); };
+    const round = (col, a, b, r, half) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x + a, PLAIN_Y + b, r, half ? Math.PI : 0, half ? 0 : Math.PI * 2); ctx.fill(); };
+    const blink = (plain.t >> 4) & 1;
+    switch (Math.floor(h * 13)) {
+      case 0:   // (a round house)
+        round('#6a58b8', 0, 0, 36, true); round('#b8a8e8', 0, 0, 33, true);
+        box('#3a2a78', -8, -20, 16, 20); box('#7ae0ff', -24, -18, 9, 7); box('#7ae0ff', 15, -18, 9, 7);
+        box('#6a58b8', -1, -46, 2, 12); box('#ffcc3d', -2, -48, 4, 3);
+        break;
+      case 1:   // (a tower)
+        box('#4a3a98', -15, -78, 30, 78); box('#7a6ac8', -13, -78, 26, 78);
+        for (let r = 0; r < 4; r++) for (const a of [-9, 3]) box('#ffe08a', a, -70 + r * 16, 6, 8);
+        box('#3a2a78', -6, -16, 12, 16); round('#ff9ac0', 0, -80, 12, true);
+        break;
+      case 2: {   // (a parked saucer)
+        const pic = sprite('ufo_' + blink);
+        box('#55556a', -16, -8, 3, 8); box('#55556a', 13, -8, 3, 8);
+        if (pic) ctx.drawImage(pic, x - 22, PLAIN_Y - 28, 44, 22);
+        break;
+      }
+      case 3:   // (a mushroom house)
+        box('#e8dcc0', -9, -34, 18, 34); box('#6a4a2a', -4, -14, 8, 14);
+        round('#c81f2a', 0, -32, 30, true); round('#ffffff', -13, -42, 4); round('#ffffff', 7, -50, 5); round('#ffffff', 17, -38, 3); round('#ffe08a', 0, -24, 3);
+        break;
+      case 4:   // (a stepped pyramid with an eye)
+        for (let i = 0; i < 8; i++) box(i % 2 ? '#c8a040' : '#e8c060', -44 + i * 5, -(i + 1) * 8, 88 - i * 10, 8);
+        box('#6a4a10', -5, -12, 10, 12); round('#ffffff', 0, -40, 7); round('#3fbfae', 0, -40, 4); round('#14122a', 0, -40, 2);
+        break;
+      case 5:   // (twin towers with a bridge)
+        for (const a of [-34, 14]) {
+          box('#3a4ea8', a, -74, 20, 74); box('#4f6ad0', a + 2, -74, 16, 74); round('#9fe0ff', a + 10, -74, 10, true);
+          for (let r = 0; r < 5; r++) box('#ffe08a', a + 7, -66 + r * 13, 6, 7);
+        }
+        box('#7a8ee0', -14, -50, 28, 5); box('#3a4ea8', -14, -45, 28, 1);
+        break;
+      case 6:   // (a glass greenhouse full of plants)
+        for (const [a, t] of [[-20, 24], [-8, 34], [6, 28], [18, 20]]) { box('#2fb88a', a, -t, 3, t); round('#5fd068', a + 1, -t, 6); }
+        round('rgba(159,224,255,0.45)', 0, -3, 36, true);
+        ctx.strokeStyle = '#d8f4ff'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, PLAIN_Y - 3, 36, Math.PI, 0); ctx.stroke();
+        box('#d8f4ff', -1, -38, 1, 36); box('#55556a', -38, -4, 76, 4);
+        break;
+      case 7:   // (a radar dish, listening)
+        box('#55556a', -14, -6, 28, 6); box('#8d90a0', -3, -44, 6, 40);
+        ctx.save(); ctx.translate(x, PLAIN_Y - 46); ctx.rotate(-0.5 + Math.sin(plain.t * 0.01) * 0.25);
+        ctx.fillStyle = '#d8dbe4'; ctx.beginPath(); ctx.ellipse(0, 0, 30, 15, 0, Math.PI, 0); ctx.fill();
+        ctx.fillStyle = '#8d90a0'; ctx.fillRect(-1, -22, 2, 22); ctx.fillStyle = blink ? '#ff3e30' : '#6a1f1a'; ctx.fillRect(-2, -25, 4, 4);
+        ctx.restore();
+        break;
+      case 8:   // (flats of coloured blocks)
+        for (const [a, b, w, h2, col] of [[-32, -26, 32, 26, '#ff9ac0'], [0, -26, 32, 26, '#ffd060'], [-22, -52, 36, 26, '#6ae0c8'], [-14, -74, 26, 22, '#b48ae0']]) {
+          box(col, a, b, w, h2); box('#2a1760', a, b, w, 1);
+          for (let i = 0; i < Math.floor(w / 12); i++) box('#3a2a78', a + 4 + i * 12, b + 7, 6, 9);
+        }
+        break;
+      case 9:   // (a tall shell of rings)
+        for (let i = 0; i < 7; i++) box(i % 2 ? '#6ae0c8' : '#3fbfae', -32 + i * 4, -(i + 1) * 12, 64 - i * 8, 12);
+        round('#ffcc3d', 0, -88, 5); box('#176a5a', -6, -16, 12, 16);
+        break;
+      case 10:   // (an egg-shaped pod on legs)
+        for (const a of [-16, 13]) box('#55556a', a, -26, 3, 26);
+        box('#8d90a0', -2, -24, 4, 24);
+        ctx.fillStyle = '#ffb060'; ctx.beginPath(); ctx.ellipse(x, PLAIN_Y - 46, 24, 26, 0, 0, Math.PI * 2); ctx.fill();
+        box('#c8742f', -24, -38, 48, 3); round('#7ae0ff', 0, -52, 9); round('#d8f4ff', -3, -55, 3);
+        break;
+      case 11:   // (a diner under a striped awning)
+        box('#2fb88a', -38, -36, 76, 36); box('#7af0c0', -36, -34, 72, 32);
+        for (let i = 0; i < 8; i++) box(i % 2 ? '#ffffff' : '#e8282f', -42 + i * 11, -42, 11, 9);
+        box('#14122a', -23, -60, 46, 15); drawText('EATS', x, PLAIN_Y - 57, 'gold', 'center');
+        box('#3a2a78', -6, -22, 12, 22); box('#7ae0ff', -30, -24, 16, 12); box('#7ae0ff', 14, -24, 16, 12);
+        break;
+      default:   // (a rocket on its pad)
+        box('#55556a', -28, -6, 56, 6); box('#8d90a0', 18, -70, 3, 64); box('#8d90a0', 10, -60, 10, 2);
+        ctx.fillStyle = '#b0242c'; ctx.beginPath(); ctx.moveTo(x - 10, PLAIN_Y - 68); ctx.lineTo(x, PLAIN_Y - 88); ctx.lineTo(x + 10, PLAIN_Y - 68); ctx.closePath(); ctx.fill();
+        box('#eef0f6', -10, -68, 20, 58); box('#b0242c', -10, -28, 20, 4); round('#7ae0ff', 0, -52, 5);
+        ctx.fillStyle = '#b0242c';
+        for (const d of [-1, 1]) { ctx.beginPath(); ctx.moveTo(x + d * 10, PLAIN_Y - 26); ctx.lineTo(x + d * 20, PLAIN_Y - 6); ctx.lineTo(x + d * 10, PLAIN_Y - 8); ctx.closePath(); ctx.fill(); }
     }
   }
   // (an alien with its feet on the ground at screen x)
