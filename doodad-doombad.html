@@ -3938,7 +3938,7 @@
   function enterPlanet() {
     const g = plain, ids = g.fin.ids;
     g.fin = null; g.stroll = false; g.drop = null; g.space = null; g.isle = false; g.crumble = null; g.hole = null; g.warp = null; g.boss = null; g.nuke = null;
-    g.obs = []; g.drops = []; g.rovers = []; g.martians = []; g.cops = []; g.copShip = null; g.copShots = []; g.alienPop = {}; g.wrecked = {}; g.sky = { bolts: [], copBolts: [], booms: [], heat: {}, flash: {}, cop: null, hp: SHIP_HP, hitT: 0, fireT: 0, dead: 0 }; g.ships = []; g.bits = []; g.endT = 0; g.cam = -PW / 2; g.planet = true; g.room = null; g.roomOn = {}; g.statues = []; g.shipAt = {};
+    g.obs = []; g.drops = []; g.rovers = []; g.martians = []; g.cops = []; g.copShip = null; g.copShots = []; g.alienPop = {}; g.wrecked = {}; g.robbed = {}; g.sky = { bolts: [], copBolts: [], booms: [], heat: {}, flash: {}, cop: null, hp: SHIP_HP, hitT: 0, fireT: 0, dead: 0 }; g.ships = []; g.bits = []; g.endT = 0; g.cam = -PW / 2; g.planet = true; g.room = null; g.roomOn = {}; g.statues = []; g.shipAt = {};
     g.pcData = { paint: {}, blob: 0, bars: [3, 5, 2, 6, 4, 7, 3, 5], notes: [false, false, false, false] };
     g.pugs = ids.map((id, i) => shopPug(id, i * 16 - 8, -20));
     tone(600, 0.4, 'sine', 0.06, 300);
@@ -4177,12 +4177,12 @@
     { wall: '#c8a040', floor: '#6a4a10', things: [
       { x: 110, say: "IT'S LOCKED", s: [150, 'square', -60], draw: b => { b('#6a4a2a', -16, -16, 32, 16); b('#c8a040', -3, -12, 6, 6); b('#8a5a34', -17, -22, 34, 8); } },
       { x: 190, watch: true, say: 'IT BLINKED', s: [110, 'sawtooth', -40], draw: (b, r, on, t) => drawStatueStep(b, on, t) }] },
-    // (5: the bank (the twin towers were; the user asked): Up at the vault opens it, and shuts it again; Up at the bell on
-    // the counter rings it, and the teller says something)
+    // (5: the bank (the twin towers were; the user asked): Up at the vault opens it, and shuts it again; Up at the teller
+    // rings the bell on the counter and asks what you want: rob the bank, or give the teller 5 coins)
     { wall: '#e3d9c0', floor: '#8a8e9e', scene: drawBank, things: [
       { x: 72, names: ['LOCKED UP TIGHT', 'SO MUCH GOLD'], s: [90, 'square', -40], draw: (b, r, on, t) => drawVault(b, r, +on, t) },
-      { x: 170, names: ['NEXT PLEASE', 'WELCOME TO THE BANK', 'NO LOANS FOR PUGS', 'PLEASE WIPE YOUR PAWS'], s: [1568, 'triangle', 0], draw: b => {
-        b('#8a6a20', -5, -26, 10, 2); b('#ffcc3d', -4, -31, 8, 5); b('#ffcc3d', -3, -33, 6, 2); b('#c8a040', -1, -35, 2, 2); b('#fff6c8', -2, -31, 1, 2); } }] },
+      { x: 182, teller: true, draw: b => {
+        b('#8a6a20', -17, -26, 10, 2); b('#ffcc3d', -16, -31, 8, 5); b('#ffcc3d', -15, -33, 6, 2); b('#c8a040', -13, -35, 2, 2); b('#fff6c8', -14, -31, 1, 2); } }] },
     { wall: '#bfeee0', floor: '#2fb88a', things: [
       { x: 110, say: 'IT GREW!', s: [330, 'sine', 700], draw: (b, r, on) => { const h = on ? 58 : 18; b('#a8743a', -8, -10, 16, 10); b('#2f9f92', -1, -10 - h, 3, h); r('#ff9ac0', 0, -12 - h, on ? 10 : 5); r('#ffcc3d', 0, -12 - h, on ? 4 : 2); } },
       { x: 190, say: 'SNAP!', s: [200, 'square', -120], draw: (b, r, on, t) => { const gap = on && (t >> 3) & 1 ? 2 : 10; b('#a8743a', -8, -10, 16, 10); b('#2f9f92', -1, -22, 3, 12); b('#c81f2a', -12, -30 - gap, 24, 6); b('#c81f2a', -12, -30 + gap - 4, 24, 6); for (let i = 0; i < 4; i++) { b('#ffffff', -11 + i * 7, -24 - gap, 3, 3); b('#ffffff', -11 + i * 7, -27 + gap - 4, 3, 3); } } }] },
@@ -4424,7 +4424,9 @@
     if (r.eat) { stepEat(); g.kbAtk = false; return; }
     if (r.drink) { stepDrink(); g.kbAtk = false; return; }
     if (r.plaque) { stepPlaque(); g.kbAtk = false; return; }
+    if (r.cops) stepRoomCops();
     if (r.pick) { stepPick(); g.kbAtk = false; return; }
+    if (r.teller) { stepTeller(); g.kbAtk = false; return; }
     if (ROOMS[r.kind].window) stepSky();
     if (r.pilot) { stepPilot(); g.kbAtk = false; return; }
     if (r.pc) { stepPc(); g.kbAtk = false; return; }
@@ -4443,14 +4445,18 @@
       }
       const at = roomSpot(p);
       p.upDoor = at !== null || p.upWas;   // (holding Up after a smash must not hop)
+      const barked = p.barkT;
       floorPug(p, 14, PW - 14, PLAIN_Y, 1.25, -3.4);
+      if (r.cops && p.barkT > barked) for (const c of r.cops) { const d = (c.x - p.x) * p.face; if (!c.pop && d > -8 && d < PLAIN_BARK) { c.pop = 20; sfx.stun(); } }
       if (!p.upFresh || at === null) continue;
       if (at === -2) { r.pick = { sel: 0, id: p.id, held: { left: false, right: false, up: true, down: false }, msg: 0 }; p.moving = false; sfx.tick(); break; }
       if (at < 0) {
         // (back out of the door, in front of the building)
         const x = buildingX(r.n);
         g.pugs = g.pugs.map((q, i) => Object.assign(shopPug(q.id, x + i * 8, PLAIN_Y), { ground: true, upWas: true }));
+        const chased = r.cops && (r.copsLeft > 0 || r.cops.some(c => !c.pop));
         g.cam = x - PW / 2; g.room = null; tone(420, 0.12, 'sine', 0.05, -200); g.kbAtk = false;
+        if (chased) callCops();
         return;
       }
       const thing = things[at];
@@ -4471,6 +4477,7 @@
         tone(thing.s[0], 0.35, thing.s[1], 0.06, thing.s[2]);
         break;
       }
+      if (thing.teller) { p.moving = false; r.teller = { id: p.id, sel: 0, held: { left: false, right: false, up: true, down: false }, msg: 0 }; r.sayT = 0; tone(1568, 0.4, 'triangle', 0.05); break; }
       if (thing.lift) { p.moving = false; r.lift = { id: p.id, sel: r.floor, held: { left: false, right: false, up: true, down: false }, ride: 0, to: 0 }; r.sayT = 0; sfx.tick(); break; }
       if (thing.pc) { p.moving = false; r.on[at] = true; openPc(p); break; }
       if (thing.pilot) {
@@ -4684,6 +4691,67 @@
     if (coins[p.id] < b.price) { k.msg = 100; sfx.nope(); return; }
     coins[p.id] -= b.price; saveCoins(); updateHud(true); sfx.coin();
     r.pick = null; r.eat = { t: 0, i: k.sel, id: p.id };
+  }
+  // Up at the bank's teller: rob the bank, or give the teller 5 coins (the user asked). The arrows or stick choose, jump
+  // does it, bark goes back. Robbing swings the vault open and the pug gets 3 coins, but the alarm goes and the cops come
+  // in at the door; each bank can be robbed once a trip. Giving needs 5 coins.
+  const BANK_PICKS = ['ROB THE BANK', 'GIVE 5 COINS'], BANK_GIFT = 5, BANK_TAKE = 3, BANK_COPS_IN = 70, BANK_COP_GAP = 40;
+  function stepTeller() {
+    const g = plain, r = g.room, k = r.teller, p = g.pugs.find(q => q.id === k.id);
+    if (!p || p.dead) { r.teller = null; return; }
+    p.upDoor = true;
+    const inp = plainInput(p), fresh = d => inp[d] && !k.held[d];
+    if (fresh('left') || fresh('right') || fresh('up') || fresh('down')) { k.sel = 1 - k.sel; sfx.tick(); }
+    k.held = { left: inp.left, right: inp.right, up: inp.up, down: inp.down };
+    if (k.msg > 0) k.msg--;
+    if (inp.bark) { r.teller = null; sfx.tick(); return; }
+    if (!inp.jump) return;
+    if (k.sel === 1) {
+      if (coins[p.id] < BANK_GIFT) { k.msg = 100; sfx.nope(); return; }
+      coins[p.id] -= BANK_GIFT; saveCoins(); updateHud(true); sfx.coin();
+      r.teller = null; r.say = 'THANK YOU SO MUCH!'; r.sayT = 120; tone(660, 0.12, 'sine', 0.05, 300);
+      return;
+    }
+    r.teller = null;
+    if (g.robbed[r.n]) { r.say = 'WE WERE JUST ROBBED'; r.sayT = 120; sfx.nope(); return; }
+    g.robbed[r.n] = true;
+    const vault = ROOMS[r.kind].things[0];
+    r.on[0] = 1; tone(90, 0.5, 'square', 0.06, -40);
+    coins[p.id] += BANK_TAKE; saveCoins(); updateHud(true); sfx.coin();
+    for (let i = 0; i < BANK_TAKE; i++) g.bits.push({ x: vault.x - 4 + i * 4, y: PLAIN_Y - 28, vx: (p.x - vault.x) / 36, vy: -3 - i * 0.3, g: 0.2, t: 36, col: '#ffcc3d' });
+    r.say = 'THE COPS ARE COMING!'; r.sayT = 150;
+    r.cops = r.cops || []; r.copShots = r.copShots || []; r.copsLeft = COP_COUNT; r.copT = BANK_COPS_IN;
+  }
+  function drawTeller() {
+    const k = plain.room.teller, p = plain.pugs.find(q => q.id === k.id), c = 'COINS ' + (p ? coins[p.id] : 0);
+    drawText('HOW CAN I HELP YOU?', 6, 4, 'gold');
+    drawText(c, 234 - c.length * 6, 4, 'cyan');
+    BANK_PICKS.forEach((label, i) => {
+      const y = 24 + i * 16;
+      if (i === k.sel) { ctx.fillStyle = '#ffcc3d'; ctx.fillRect(50, y - 3, 140, 13); ctx.fillStyle = '#14122a'; ctx.fillRect(51, y - 2, 138, 11); }
+      drawText(label, PW / 2, y, i === k.sel ? 'gold' : 'cyan', 'center');
+    });
+    if (k.msg > 0) drawText('NOT ENOUGH COINS', PW / 2, 62, 'red', 'center');
+    drawText('JUMP PICKS  BARK LEAVES', PW / 2, 76, 'pink', 'center');
+  }
+  // (the cops in the bank, the same cops as outside: they walk in at the door one at a time with the alarm going, and walk
+  // after the pugs and shoot, and a bark pops them. They're stepped and drawn by the same code as outside, with the
+  // bank's own list of them swapped in and the view held still)
+  function roomCops(fn) {
+    const g = plain, r = g.room, was = [g.cam, g.cops, g.copShots, g.copShip, g.obs];
+    g.cam = 0; g.cops = r.cops; g.copShots = r.copShots; g.copShip = null; g.obs = [];
+    try { fn(); } finally { r.cops = g.cops; r.copShots = g.copShots; [g.cam, g.cops, g.copShots, g.copShip, g.obs] = was; }
+  }
+  function stepRoomCops() {
+    const g = plain, r = g.room;
+    if (r.copsLeft > 0 && --r.copT <= 0) {
+      r.copsLeft--; r.copT = BANK_COP_GAP; tone(300, 0.2, 'sine', 0.04, -180);
+      r.cops.push({ x: ROOM_DOOR, y: PLAIN_Y, vy: 0, ground: true, t: 0, shotT: 50, face: 1, flash: 0, walk: false });
+    }
+    if ((r.copsLeft > 0 || r.cops.length) && g.t % 24 === 1) tone(g.t % 48 === 1 ? 940 : 660, 0.2, 'square', 0.02);   // (the alarm)
+    const alive = g.pugs.filter(p => !p.dead);
+    roomCops(() => stepCops(alive, p => { if (p.dead) return; p.dead = true; p.sitting = false; p.y = PLAIN_Y; p.ground = true; p.barkT = 0; sfx.die(); }));
+    if (!g.endT && g.pugs.length && g.pugs.every(p => p.dead)) g.endT = 150;
   }
   // Up at the break room's coffee machine or water cooler pours a cup, then the pug takes it, leans back with it up to
   // its mouth, and drinks it down in three gulps, then AHH. (the user asked)
@@ -5210,6 +5278,7 @@
       k.draw(b, ball, r.on[i], t);
     });
     drawStatues(0);
+    if (r.cops) roomCops(drawCops);
     for (const p of g.pugs) {
       if (r.eat && r.eat.id === p.id) {
         // (the eating: squashing and stretching as it chews, leaning in for each bite)
@@ -5222,12 +5291,13 @@
         ctx.save(); ctx.translate(Math.round(p.x), Math.round(p.y)); ctx.rotate(-p.face * 0.22); drawPlainPug(p, 0, 0, 'black'); ctx.restore();
       } else drawPlainPug(p, Math.round(p.x), Math.round(p.y), 'black');
       const at = roomSpot(p);
-      if (at !== null && !r.pick && !r.eat && !r.drink && !r.plaque && !r.pilot && !r.lift) drawUpArrow(at === -2 ? 150 : at < 0 ? ROOM_DOOR : thingX(R.things[at]), PLAIN_Y - (at === -2 ? 56 : at < 0 ? 52 : 66));
+      if (at !== null && !r.pick && !r.teller && !r.eat && !r.drink && !r.plaque && !r.pilot && !r.lift) drawUpArrow(at === -2 ? 150 : at < 0 ? ROOM_DOOR : thingX(R.things[at]), PLAIN_Y - (at === -2 ? 56 : at < 0 ? 52 : 66));
     }
     for (const b of g.bits) { ctx.fillStyle = b.col; ctx.fillRect(Math.round(b.x), Math.round(b.y), 2, 2); }
     if (r.eat) drawEat();
     if (r.drink) drawDrink();
     if (r.pick) drawPick();
+    if (r.teller) drawTeller();
     if (r.sayT > 0) drawText(r.say, PW / 2, 84, 'gold', 'center');
     if (r.pilot) { drawText('ARROWS FLY  SPACE STOPS', PW / 2, 62, 'cyan', 'center'); drawText('M OR A TRIGGER SHOOTS', PW / 2, 73, 'cyan', 'center'); }
     if (R.window && g.sky && (g.sky.cop || g.sky.hp < SHIP_HP)) {
