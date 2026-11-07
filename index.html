@@ -4127,8 +4127,11 @@
   // goes, bark leaves it. Everyone rides up together, and each floor is its own office room with two things to use.
   // Only the ground floor has the door out. (ROOMS 13 to 16 are the floors above; no building is ever one of them.)
   const LIFT_X = 54, LIFT_SWAP = 30, LIFT_RIDE = 62;
-  const LIFT_FLOORS = ['OFFICE', 'MEETING ROOM', 'BREAK ROOM', 'SERVER ROOM', "BOSS'S OFFICE"], LIFT_KINDS = [1, 13, 14, 15, 16];
-  const LIFT = { x: LIFT_X, lift: true, draw: b => drawLift(b) };
+  // (each building with a lift, by its kind: the name of each floor and the room that floor is, from the ground up. The
+  // museum got one too (the user asked), with a second floor, 18)
+  const LIFTS = { 1: { names: ['OFFICE', 'MEETING ROOM', 'BREAK ROOM', 'SERVER ROOM', "BOSS'S OFFICE"], kinds: [1, 13, 14, 15, 16] }, [MUSEUM]: { names: ['OUR HISTORY', 'ANCIENT TIMES'], kinds: [MUSEUM, 18] } };
+  const liftAt = x => ({ x, lift: true, draw: b => drawLift(b) });
+  const LIFT = liftAt(LIFT_X);
   const ROOMS = [
     { wall: '#8a78d0', floor: '#4a3a98', things: [
       { x: 110, names: ['CHANNEL 1: CARTOONS', 'CHANNEL 2: ALIEN NEWS', 'CHANNEL 3: SPACE SHOW', 'CHANNEL 4: ALIEN SOCCER'], s: [660, 'square', 120], draw: (b, r, on, t) => {
@@ -4255,27 +4258,50 @@
     // (17: the museum of the planet's history: four famous things, each on a stand with a little metal plaque. Up at one
     // zooms in on its plaque, which says what it is and why it's famous. (the user asked))
     { wall: '#efe6d2', floor: '#7a5a3a', scene: drawMuseum, things: [
-      { x: 70, s: [300, 'sine', 400], plaque: ['THE FIRST SAUCER', 'BUILT BY GRANDMA ZIBB IN HER GARAGE. IT WAS THE FIRST SHIP EVER TO LEAVE THE PLANET. IT COULD ONLY FLY BACKWARDS SO SHE FLEW ALL THE WAY TO THE MOONS LOOKING OVER HER SHOULDER.'], draw: (b, r, on, t) => {
+      { x: 64, s: [300, 'sine', 400], plaque: ['THE FIRST SAUCER', 'BUILT BY GRANDMA ZIBB IN HER GARAGE. IT WAS THE FIRST SHIP EVER TO LEAVE THE PLANET. IT COULD ONLY FLY BACKWARDS SO SHE FLEW ALL THE WAY TO THE MOONS LOOKING OVER HER SHOULDER.'], draw: (b, r, on, t) => {
         museumStand(b);
         b('#55556a', -1, -30, 2, 6); b('#8a5a2a', -9, -31, 18, 2); b('#a8743a', -12, -34, 24, 4); b('#7ae0ff', -5, -39, 10, 5); b('#c8eeff', -4, -38, 2, 2);
         b('#6a3e1e', -8, -33, 2, 1); b('#6a3e1e', 6, -32, 2, 1); b((t >> 4) & 1 ? '#ffcc3d' : '#8a6a20', -11, -32, 2, 1); b((t >> 4) & 1 ? '#8a6a20' : '#ffcc3d', 9, -32, 2, 1);
       } },
-      { x: 115, s: [300, 'sine', 400], plaque: ["KING ZORP'S CROWN", 'WORN BY THE VERY FIRST KING OF THE PLANET. IT HAS TWO HOLES FOR HIS ANTENNAE. HE WAS KING FOR THREE DAYS. THEN HE TRIPPED OVER A BLOB AND EVERYONE VOTED FOR THE BLOB INSTEAD.'], draw: (b, r, on, t) => {
+      { x: 104, s: [300, 'sine', 400], plaque: ["KING ZORP'S CROWN", 'WORN BY THE VERY FIRST KING OF THE PLANET. IT HAS TWO HOLES FOR HIS ANTENNAE. HE WAS KING FOR THREE DAYS. THEN HE TRIPPED OVER A BLOB AND EVERYONE VOTED FOR THE BLOB INSTEAD.'], draw: (b, r, on, t) => {
         museumStand(b);
         b('#8a1f2a', -11, -28, 22, 4); b('#b0242c', -11, -28, 22, 1); b('#ffcc3d', -12, -26, 1, 3); b('#ffcc3d', 11, -26, 1, 3);
         b('#ffcc3d', -8, -33, 16, 5); b('#ffcc3d', -8, -37, 3, 4); b('#ffcc3d', -2, -38, 4, 5); b('#ffcc3d', 5, -37, 3, 4);
         b('#14122a', -6, -32, 2, 2); b('#14122a', 4, -32, 2, 2); b('#e8282f', -1, -32, 2, 2); b('#fff6c8', -7, -33, 1, 1);
       } },
-      { x: 160, s: [300, 'sine', 400], plaque: ['THE FIRST SLIME', 'THE OLDEST SLIME ON THE PLANET. ALL THE SLIME THERE HAS EVER BEEN CAME FROM THIS ONE JAR. IT IS ONE MILLION YEARS OLD AND IT STILL WIGGLES. PLEASE DO NOT DRINK IT AGAIN.'], draw: (b, r, on, t) => {
+      { x: 144, s: [300, 'sine', 400], plaque: ['THE FIRST SLIME', 'THE OLDEST SLIME ON THE PLANET. ALL THE SLIME THERE HAS EVER BEEN CAME FROM THIS ONE JAR. IT IS ONE MILLION YEARS OLD AND IT STILL WIGGLES. PLEASE DO NOT DRINK IT AGAIN.'], draw: (b, r, on, t) => {
         museumStand(b);
         b('#d8f4ff', -6, -39, 12, 15); b('#5fd068', -5, -32, 10, 7); b('#7af0a0', -5 + ((t >> 3) % 3) * 2, -33, 4, 1); b('#b4f5c8', -3 + ((t >> 4) % 4) * 2, -30 - ((t >> 2) % 3), 1, 1);
         b('#ffffff', -5, -38, 1, 10); b('#8d90a0', -7, -42, 14, 3); b('#55556a', -7, -40, 14, 1);
       } },
-      { x: 205, s: [300, 'sine', 400], plaque: ['THE PINK MOON ROCK', 'LONG AGO A GIANT METEOR HIT THE PLANET. IT KNOCKED OFF A BIG PIECE THAT FLEW UP INTO THE SKY AND BECAME THE LITTLE PINK MOON. THIS ROCK FELL BACK DOWN. IT IS STILL A LITTLE BIT WARM.'], draw: (b, r, on, t) => {
+      { x: 184, s: [300, 'sine', 400], plaque: ['THE PINK MOON ROCK', 'LONG AGO A GIANT METEOR HIT THE PLANET. IT KNOCKED OFF A BIG PIECE THAT FLEW UP INTO THE SKY AND BECAME THE LITTLE PINK MOON. THIS ROCK FELL BACK DOWN. IT IS STILL A LITTLE BIT WARM.'], draw: (b, r, on, t) => {
         museumStand(b);
         r('#ff9ac0', 0, -32, 8); r('#d86a90', 3, -29, 4); r('#d86a90', -4, -35, 2); r('#d86a90', 4, -36, 1.5); r('#ffd0e0', -3, -37, 2);
         if ((t >> 4) & 1) { b('rgba(255,140,140,0.6)', -3, -46, 1, 3); b('rgba(255,140,140,0.6)', 2, -48, 1, 3); }   // (still warm)
-      } }] }];
+      } }, liftAt(222)] },
+    // (18: the museum's second floor, ancient times: cave paintings on the walls and four more famous things with plaques)
+    { wall: '#d8c8a8', floor: '#6a5a4a', upstairs: true, scene: drawAncient, things: [
+      { x: 64, s: [300, 'sine', 400], plaque: ['THE GIANT BLOB FOSSIL', 'THE BIGGEST BLOB THAT EVER LIVED. THIS IS ONLY ITS HEAD. IT WAS AS TALL AS A HOUSE AND IT ATE A WHOLE MOUNTAIN FOR BREAKFAST. SCIENTISTS THINK IT WAS VERY NICE.'], draw: (b, r) => {
+        museumStand(b);
+        r('#f4f0e0', 0, -33, 9); b('#f4f0e0', -9, -33, 18, 9); r('#3a3020', 0, -34, 4); r('#14122a', 1, -34, 1.5);
+        b('#f4f0e0', -1, -47, 2, 6); r('#f4f0e0', 0, -48, 2); b('#c8c0a0', 4, -39, 1, 4); b('#c8c0a0', 5, -36, 1, 3);
+        for (const a of [-6, -2, 2]) b('#c8c0a0', a, -27, 2, 2);
+      } },
+      { x: 104, s: [300, 'sine', 400], plaque: ['THE STONE TV', 'BEFORE ELECTRICITY ALIENS CARVED THEIR TV SHOWS INTO ROCK. THIS ONE ONLY HAS ONE CHANNEL. THE SHOW IS A PICTURE OF A ROCK. IT RAN FOR TWO HUNDRED YEARS.'], draw: b => {
+        museumStand(b);
+        b('#8d8a80', -5, -45, 1, 6); b('#8d8a80', 4, -45, 1, 6); b('#8d8a80', -11, -40, 22, 16); b('#a8a498', -11, -40, 22, 2);
+        b('#6a675e', -8, -37, 16, 10); b('#8d8a80', -3, -32, 6, 4); b('#a8a498', -2, -32, 3, 1); b('#6a675e', 6, -26, 3, 1);
+      } },
+      { x: 144, s: [300, 'sine', 400], plaque: ['THE MAP OF THE SKY', 'THE FIRST MAP OF THE SKY EVER MADE. IT SHOWS FIVE MOONS BUT THE PLANET ONLY HAS TWO. THE ARTIST SAID THE OTHER THREE WERE HIDING. NOBODY HAS SEEN THEM SINCE.'], draw: (b, r) => {
+        museumStand(b);
+        b('#e8d8a8', -10, -40, 20, 14); b('#c8b080', -12, -41, 3, 16); b('#c8b080', 9, -41, 3, 16);
+        r('#6ae0c8', -5, -35, 2); r('#ff9ac0', 0, -36, 1.5); r('#ffcc3d', 5, -34, 2); r('#b48ae0', -3, -30, 1.5); r('#e8282f', 4, -30, 1.5);
+      } },
+      { x: 184, s: [300, 'sine', 400], plaque: ['THE OLDEST BURRITO', 'THE OLDEST BURRITO IN THE GALAXY. IT WAS FOUND FROZEN IN A BLOCK OF ICE ON THE PINK MOON. A SHOPKEEPER NAMED GLOOP HAS ASKED TO BUY IT FORTY TIMES. THE ANSWER IS STILL NO.'], draw: b => {
+        museumStand(b);
+        b('#bfeaff', -9, -41, 18, 17); b('#e8c070', -6, -35, 12, 6); b('#c8904a', -6, -35, 2, 6); b('#5fd068', 3, -34, 2, 2); b('#e8282f', 3, -31, 2, 1);
+        b('rgba(255,255,255,0.75)', -8, -40, 2, 7); b('rgba(255,255,255,0.75)', 5, -40, 3, 1); b('#9fd8f0', -9, -41, 18, 1);
+      } }, liftAt(222)] }];
   const ctxX = b => b.x;
   // (Gloop carved in stone for the temple: his own picture in grey, plus one with glowing eyes for when it wakes up)
   const STATUE_COLS = { p: '#b0adb8', r: '#d8d6de', q: '#86838f', o: '#4a4754', v: '#9a97a3', W: '#e8e6ee', K: '#4a4754', Y: '#c8c5d0', R: '#86838f', D: '#6e6b78', N: '#6e6b78', n: '#a09daa', I: '#7a7784', E: '#ff3e30' };
@@ -4373,7 +4399,7 @@
     const g = plain;
     const kind = homeKind(n);
     if (ROOMS[kind].refill) g.roomOn[n] = [];   // (the potions are back)
-    g.room = { n, kind, floor: 0, lift: null, sayT: 0, say: '', alt: 0, pilot: null, on: g.roomOn[n] || (g.roomOn[n] = [false, false]) };
+    g.room = { n, kind, home: kind, floor: 0, lift: null, sayT: 0, say: '', alt: 0, pilot: null, on: g.roomOn[n] || (g.roomOn[n] = [false, false]) };
     g.pugs = g.pugs.map((p, i) => Object.assign(shopPug(p.id, ROOM_DOOR + 16 + i * 16, PLAIN_Y), { ground: true, upWas: true }));
     tone(420, 0.12, 'sine', 0.05, 200);
   }
@@ -4643,6 +4669,22 @@
     drawAlien(gx, '#5fd068', (t >> 4) & 1, face);
     box('#1d2f8c', gx - 6, -22, 12, 2); box('#1d2f8c', gx - 4, -24, 8, 2); box('#ffcc3d', gx - 1, -24, 2, 2); box('#1d2f8c', gx - 3, -10, 6, 5);
   }
+  // (the museum's second floor: a banner, a torch, and old cave paintings: aliens, a blob, the moons and a saucer)
+  function drawAncient(t) {
+    const box = (col, x, y, w, h) => { ctx.fillStyle = col; ctx.fillRect(x, PLAIN_Y + y, w, h); }, ink = '#a0522d';
+    box('#5a3a1a', 78, -134, 84, 13); drawText('ANCIENT TIMES', 120, PLAIN_Y - 131, 'gold', 'center');
+    box('#6a3e1e', 16, -64, 4, 12); box('#3a1f10', 14, -66, 8, 3);
+    const flick = (t >> 2) & 1; bb('#ff6a30', 18, PLAIN_Y - 69, 3); bb('#ffcc3d', 18, PLAIN_Y - 71 - flick, 2);
+    for (const [x, y] of [[40, -104], [52, -100], [196, -106]]) {   // (stick aliens with their antennae)
+      box(ink, x, y, 4, 4); box(ink, x + 1, y + 4, 2, 7); box(ink, x - 2, y + 6, 8, 1); box(ink, x, y + 11, 1, 4); box(ink, x + 3, y + 11, 1, 4);
+      box(ink, x, y - 3, 1, 3); box(ink, x + 3, y - 3, 1, 3);
+    }
+    bb(ink, 88, PLAIN_Y - 96, 9); box('#d8c8a8', 79, -96, 18, 9); bb('#d8c8a8', 88, PLAIN_Y - 99, 3); bb(ink, 88, PLAIN_Y - 99, 1.5);   // (a big blob)
+    bb('#c8904a', 130, PLAIN_Y - 108, 5); bb('#c8904a', 145, PLAIN_Y - 112, 3);   // (the two moons)
+    box(ink, 160, -96, 18, 3); box(ink, 165, -100, 8, 4); for (let i = 0; i < 3; i++) box(ink, 160 + i * 7, -90 + (i & 1) * 2, 1, 4);   // (a saucer)
+    box(ink, 218, -98, 3, 6); box(ink, 216, -103, 1, 5); box(ink, 219, -104, 1, 6); box(ink, 222, -103, 1, 5);   // (a three-fingered hand)
+    drawPlant(36);
+  }
   // (a museum stand: a white block with a little metal plaque on its front)
   function museumStand(b) {
     b('#eef0f6', -10, -22, 20, 22); b('#d8d6de', 6, -22, 4, 22); b('#c8ccd8', -12, -24, 24, 3);
@@ -4754,7 +4796,7 @@
     const p = g.pugs.find(q => q.id === k.id);
     if (!p) { r.lift = null; return; }
     p.upDoor = true;
-    const inp = plainInput(p), fresh = d => inp[d] && !k.held[d], n = LIFT_FLOORS.length;
+    const inp = plainInput(p), fresh = d => inp[d] && !k.held[d], n = LIFTS[r.home].names.length;
     if (fresh('up') || fresh('right')) { k.sel = (k.sel + 1) % n; sfx.tick(); }
     if (fresh('down') || fresh('left')) { k.sel = (k.sel + n - 1) % n; sfx.tick(); }
     k.held = { left: inp.left, right: inp.right, up: inp.up, down: inp.down };
@@ -4766,12 +4808,14 @@
   // (everyone gets out of the lift on floor f; each floor keeps what's been done there, building by building)
   function goFloor(f) {
     const g = plain, r = g.room, key = f ? r.n + '/' + f : r.n;
-    r.floor = f; r.kind = LIFT_KINDS[f]; r.on = g.roomOn[key] || (g.roomOn[key] = [false, false, false]);
-    g.pugs.forEach((p, i) => Object.assign(p, { x: LIFT_X + 22 + i * 14, y: PLAIN_Y, vy: 0, ground: true, sitting: false, face: 1, moving: false }));
-    g.bits = []; r.say = LIFT_FLOORS[f]; r.sayT = 110;
+    r.floor = f; r.kind = LIFTS[r.home].kinds[f]; r.on = g.roomOn[key] || (g.roomOn[key] = [false, false, false, false, false]);
+    // (out of the lift on whichever side has more room)
+    const lx = ROOMS[r.kind].things.find(k => k.lift).x, side = lx > PW / 2 ? -1 : 1;
+    g.pugs.forEach((p, i) => Object.assign(p, { x: lx + side * (22 + i * 14), y: PLAIN_Y, vy: 0, ground: true, sitting: false, face: side, moving: false }));
+    g.bits = []; r.say = LIFTS[r.home].names[f]; r.sayT = 110;
   }
   function drawLiftPanel() {
-    const r = plain.room, k = r.lift, n = LIFT_FLOORS.length;
+    const r = plain.room, k = r.lift, names = LIFTS[r.home].names, n = names.length;
     if (k.ride) {
       const a = k.ride < LIFT_SWAP ? k.ride / LIFT_SWAP : Math.max(0, (LIFT_RIDE - 16 - k.ride) / (LIFT_RIDE - 16 - LIFT_SWAP));
       ctx.fillStyle = `rgba(10,10,22,${Math.min(1, a).toFixed(2)})`; ctx.fillRect(0, 0, PW, PH);
@@ -4780,7 +4824,7 @@
     }
     drawText('WHICH FLOOR?', PW / 2, 4, 'gold', 'center');
     for (let f = n - 1; f >= 0; f--) {
-      const y = 16 + (n - 1 - f) * 12, label = `${f + 1}  ${LIFT_FLOORS[f]}${f === r.floor ? ' - HERE' : ''}`;
+      const y = 16 + (n - 1 - f) * 12, label = `${f + 1}  ${names[f]}${f === r.floor ? ' - HERE' : ''}`;
       if (f === k.sel) { ctx.fillStyle = '#ffcc3d'; ctx.fillRect(40, y - 2, 160, 10); ctx.fillStyle = '#14122a'; ctx.fillRect(41, y - 1, 158, 8); }
       drawText(label, 46, y, f === k.sel ? 'gold' : 'cyan');
     }
