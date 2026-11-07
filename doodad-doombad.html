@@ -2946,7 +2946,7 @@
       : view === 'raceOver' ? raceWords().text
       : view === 'digPause' ? 'Mars Dig. Dig for bones and crystals, bark to make the Martians dizzy, then boop them. Look out for falling rocks!'
       : view === 'digOver' ? digWords().text
-      : view === 'plainPause' ? (plain && plain.stroll ? 'Out on Jupiter.' : plain && plain.drop ? (plain.drop.walk ? "In Gloop's shop. Nobody's here." : 'Falling!') : plain && plain.isle ? 'On an island in space.' : plain && plain.space ? 'Out in space.' : 'Somewhere on Jupiter. Gloop is coming.')
+      : view === 'plainPause' ? (plain && plain.planet ? 'On the aliens\' planet.' : plain && plain.stroll ? 'Out on Jupiter.' : plain && plain.drop ? (plain.drop.walk ? "In Gloop's shop. Nobody's here." : 'Falling!') : plain && plain.isle ? 'On an island in space.' : plain && plain.space ? 'Out in space.' : 'Somewhere on Jupiter. Gloop is coming.')
       : view === 'hopPause' ? 'Saturn Scramble. Hop across Saturn\'s rings: dodge the rovers and comets, ride the ice over open space, and keep moving, or an alien will beam you up!'
       : view === 'hopOver' ? hopWords().text
       : view === 'arenaOver' ? arenaWords().text
@@ -3582,14 +3582,14 @@
   }
   // (the space screen: one saucer for each of these pugs, side by side)
   function plainSpace(pugs) {
-    plain.endT = 0; plain.bits = []; plain.stroll = false; plain.fin = null;
+    plain.endT = 0; plain.bits = []; plain.stroll = false; plain.fin = null; plain.planet = false;
     plain.space = pugs.map((p, i) => ({ id: p.id, x: 50, y: PH / 2 + (i - (pugs.length - 1) / 2) * 40, face: 1, aimY: 0, hp: SAUCER_HP, hit: 0, prev: { jump: true, bark: true } }));
   }
   function startPlain() {
     banana = arena = race = dig = hop = null;
     document.body.classList.remove('blackout');
     const spot = PLAIN_SPOTS[Math.floor(Math.random() * PLAIN_SPOTS.length)], x0 = Math.floor(Math.random() * 100000);
-    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300, martians: [], martianT: 420, ships: [], obsCount: 0, shipAt: 25, space: null, shots: [], zaps: [], boss: null, spaceT: 0, nuke: null, hole: null, warp: null, isle: false, isleT: 0, aim: null, thrown: [], isleShot: 0, tauntT: 0, crumble: null, drop: null, stroll: false, fin: null };
+    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300, martians: [], martianT: 420, ships: [], obsCount: 0, shipAt: 25, space: null, shots: [], zaps: [], boss: null, spaceT: 0, nuke: null, hole: null, warp: null, isle: false, isleT: 0, aim: null, thrown: [], isleShot: 0, tauntT: 0, crumble: null, drop: null, stroll: false, fin: null, planet: false };
     const first = kbSlot !== null && joined[kbSlot] ? kbSlot : 0;
     for (let i = 0; i < 4; i++) if (arenaDriven(i) || i === first) plainPug(i);
     try { initAudio(); } catch (e) {}
@@ -3870,7 +3870,7 @@
   }
   // The pugs get inside with Gloop still after them, so he fires a nuke at the shop itself and blows it up, with them in it.
   // Then the view zooms in on him crying, and then it's the pugs being blown across space into Saturn, which cracks, cracks
-  // a little more and explodes, and then the main menu. (the user asked)
+  // a little more and explodes, and that lands them on the planet where all the aliens live (enterPlanet). (the user asked)
   function startFin() {
     const g = plain;
     g.fin = { scene: 1, t: 0, shake: 0, flash: 0, balls: [], ids: g.pugs.filter(p => !p.dead).map(p => p.id) };
@@ -3926,8 +3926,100 @@
       }
       for (const o of f.balls) o.t++;
       f.balls = f.balls.filter(o => o.t < o.life);
-      if (a === FIN_OVER) leavePlain();
+      if (a === FIN_OVER) enterPlanet();
     }
+  }
+  // The aliens' planet, which isn't in The Arcade: the pugs drop out of the sky and walk about on it, either way for as far
+  // as they like, past the aliens' homes and parked saucers with the aliens strolling about. Nothing here is a danger, and
+  // the pause menu is the way back to the main menu. (the user asked)
+  function enterPlanet() {
+    const g = plain, ids = g.fin.ids;
+    g.fin = null; g.stroll = false; g.drop = null; g.space = null; g.isle = false; g.crumble = null; g.hole = null; g.warp = null; g.boss = null; g.nuke = null;
+    g.obs = []; g.drops = []; g.rovers = []; g.martians = []; g.ships = []; g.bits = []; g.endT = 0; g.cam = -PW / 2; g.planet = true;
+    g.pugs = ids.map((id, i) => shopPug(id, i * 16 - 8, -20));
+    tone(600, 0.4, 'sine', 0.06, 300);
+  }
+  function stepPlanet() {
+    const g = plain;
+    for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.pugs.some(p => p.id === i)) g.pugs.push(shopPug(i, g.cam + PW / 2, -20));
+    g.pugs = g.pugs.filter(p => arenaDriven(p.id));
+    for (const p of g.pugs) floorPug(p, g.cam + 8, g.cam + PW - 8, PLAIN_Y, 1.25, -3.4);
+    g.kbAtk = false;
+    if (g.pugs.length) {
+      const xs = g.pugs.map(p => p.x);
+      g.cam += ((Math.min(...xs) + Math.max(...xs)) / 2 - PW / 2 - g.cam) * 0.1;
+    }
+  }
+  // (the same each time for the same number, so the planet stays put as you walk)
+  const planetHash = n => Math.abs(Math.sin(n * 12.9898) * 43758.5453) % 1;
+  let alienSky = null;
+  // (a violet sky with stars, a big teal moon and a small pink one)
+  function buildAlienSky() {
+    alienSky = document.createElement('canvas'); alienSky.width = PW; alienSky.height = PLAIN_Y;
+    const c = alienSky.getContext('2d'), bands = ['#160a33', '#1f0e46', '#2b1460', '#3a1b78', '#4c2490', '#6230a4'];
+    bands.forEach((col, i) => { c.fillStyle = col; c.fillRect(0, Math.floor(i * PLAIN_Y / bands.length), PW, Math.ceil(PLAIN_Y / bands.length) + 1); });
+    for (let i = 0; i < 90; i++) { c.fillStyle = i % 3 ? '#ffffff' : '#9fe0ff'; c.fillRect(Math.floor(planetHash(i) * PW), Math.floor(planetHash(i + 0.5) * 130), 1, 1); }
+    c.fillStyle = '#3fbfae'; c.beginPath(); c.arc(176, 62, 30, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#6ae0c8'; c.beginPath(); c.arc(170, 56, 22, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#2f9f92'; for (const [x, y, r] of [[160, 50, 5], [184, 66, 7], [172, 76, 4]]) { c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill(); }
+    c.fillStyle = '#ff9ac0'; c.beginPath(); c.arc(52, 34, 11, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#ffc4dc'; c.beginPath(); c.arc(49, 31, 7, 0, Math.PI * 2); c.fill();
+  }
+  // (a home at screen x: h picks a round house, a tower or a parked saucer)
+  function drawAlienHome(x, h) {
+    const box = (col, a, b, w, b2) => { ctx.fillStyle = col; ctx.fillRect(x + a, PLAIN_Y + b, w, b2); };
+    if (h < 0.4) {
+      ctx.fillStyle = '#6a58b8'; ctx.beginPath(); ctx.arc(x, PLAIN_Y, 36, Math.PI, 0); ctx.fill();
+      ctx.fillStyle = '#b8a8e8'; ctx.beginPath(); ctx.arc(x, PLAIN_Y, 33, Math.PI, 0); ctx.fill();
+      box('#3a2a78', -8, -20, 16, 20); box('#7ae0ff', -24, -18, 9, 7); box('#7ae0ff', 15, -18, 9, 7);
+      box('#6a58b8', -1, -46, 2, 12); box('#ffcc3d', -2, -48, 4, 3);
+    } else if (h < 0.75) {
+      box('#4a3a98', -15, -78, 30, 78); box('#7a6ac8', -13, -78, 26, 78);
+      for (let r = 0; r < 4; r++) for (const a of [-9, 3]) box('#ffe08a', a, -70 + r * 16, 6, 8);
+      box('#3a2a78', -6, -16, 12, 16);
+      ctx.fillStyle = '#ff9ac0'; ctx.beginPath(); ctx.arc(x, PLAIN_Y - 80, 12, Math.PI, 0); ctx.fill();
+    } else {
+      const pic = sprite('ufo_' + ((plain.t >> 4) & 1));
+      box('#55556a', -16, -8, 3, 8); box('#55556a', 13, -8, 3, 8);
+      if (pic) ctx.drawImage(pic, x - 22, PLAIN_Y - 28, 44, 22);
+    }
+  }
+  // (an alien with its feet on the ground at screen x)
+  function drawAlien(x, col, walk, face) {
+    const box = (c, a, b, w, h) => { ctx.fillStyle = c; ctx.fillRect(x + a * face - (face < 0 ? w : 0), PLAIN_Y + b, w, h); };
+    box(col, -3, -4 + (walk ? 0 : 1), 2, 4 - (walk ? 0 : 1)); box(col, 1, -4 + (walk ? 1 : 0), 2, 4 - (walk ? 1 : 0));
+    box(col, -3, -10, 6, 6);
+    box(col, -6, -18, 12, 8); box(col, -5, -20, 10, 2); box(col, -4, -10, 8, 1);
+    box('#14122a', -4, -16, 3, 4); box('#14122a', 1, -16, 3, 4); box('#ffffff', -3, -16, 1, 1); box('#ffffff', 2, -16, 1, 1);
+    box(col, -3, -23, 1, 3); box(col, 2, -23, 1, 3); box('#ffcc3d', -4, -24, 2, 2); box('#ffcc3d', 2, -24, 2, 2);
+  }
+  function drawPlanet() {
+    const g = plain, cam = g.cam, t = g.t;
+    if (!alienSky) buildAlienSky();
+    ctx.drawImage(alienSky, 0, 0);
+    // (far hills, sliding by slowly)
+    ctx.fillStyle = '#2a1760';
+    for (let x = 0; x < PW; x += 2) { const w = x + cam * 0.35, h = 26 + Math.sin(w * 0.021) * 12 + Math.sin(w * 0.057) * 6; ctx.fillRect(x, PLAIN_Y - h, 2, h); }
+    // (the ground, teal with bright marks)
+    ctx.fillStyle = '#176a5a'; ctx.fillRect(0, PLAIN_Y, PW, PH - PLAIN_Y);
+    ctx.fillStyle = '#2fb88a'; ctx.fillRect(0, PLAIN_Y, PW, 6);
+    ctx.fillStyle = '#7af0c0'; ctx.fillRect(0, PLAIN_Y, PW, 2);
+    ctx.fillStyle = '#2fb88a';
+    for (let n = Math.floor(cam / 19) - 1; n * 19 < cam + PW + 19; n++) { const h = planetHash(n); ctx.fillRect(Math.round(n * 19 + h * 12 - cam), PLAIN_Y + 10 + Math.floor(h * (PH - PLAIN_Y - 14)), 3 + Math.floor(h * 6), 1); }
+    for (let n = Math.floor((cam - 80) / 170); n * 170 < cam + PW + 80; n++) drawAlienHome(Math.round(n * 170 + planetHash(n + 0.25) * 70 - cam), planetHash(n + 0.5));
+    // (a few saucers going over)
+    for (let n = Math.floor((cam - 60) / 260); n * 260 < cam + PW + 60; n++) {
+      const pic = sprite('ufo_' + ((t >> 3) & 1)), h = planetHash(n + 0.75);
+      if (pic) ctx.drawImage(pic, Math.round(n * 260 + Math.sin(t * 0.012 + h * 6) * 60 - cam) - 11, Math.round(70 + h * 70 + Math.sin(t * 0.03 + h * 6) * 6), 22, 11);
+    }
+    // (the aliens, each strolling up and down near its spot)
+    for (let n = Math.floor((cam - 90) / 58); n * 58 < cam + PW + 90; n++) {
+      const h = planetHash(n + 0.1), rate = 0.008 + h * 0.012, a = t * rate + h * 6, x = n * 58 + h * 30 + Math.sin(a) * 34;
+      const kind = planetHash(n + 0.3), cols = ['#5fd068', '#5fd068', '#5fd068', '#6ae0c8', '#b48ae0', '#ffd060'];
+      if (kind > 0.85) { const pic = sprite((t >> 3) & 1 ? 'dg_blob2' : 'dg_blob1'); if (pic) ctx.drawImage(pic, Math.round(x - cam) - (pic.width >> 1), PLAIN_Y - pic.height); }
+      else drawAlien(Math.round(x - cam), cols[Math.floor(kind * cols.length)], (t >> 3) & 1, Math.cos(a) < 0 ? -1 : 1);
+    }
+    for (const p of g.pugs) drawPlainPug(p, Math.round(p.x - cam), Math.round(p.y), 'gold');
   }
   // (on to Saturn; reaching it puts it on Boss Fight's list)
   function saturnScene() {
@@ -4573,6 +4665,7 @@
   function stepPlain() {
     const g = plain;
     g.t++;
+    if (g.planet) return stepPlanet();
     if (g.fin) return stepFin();
     if (g.stroll) return stepStroll();
     if (g.space) return stepPlainSpace();
@@ -4689,6 +4782,7 @@
   }
   function leavePlain() { plain = null; toMainMenu(); }
   function drawPlain() {
+    if (plain.planet) return drawPlanet();
     if (plain.fin && plain.fin.scene > 1) return drawFin();
     if (plain.stroll && plain.stroll.shot) return drawStationShot();
     if (plain.drop) return drawDrop();
