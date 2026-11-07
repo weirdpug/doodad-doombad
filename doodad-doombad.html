@@ -3999,7 +3999,11 @@
       }
       case 3:   // (a mushroom house)
         box('#e8dcc0', -9, -34, 18, 34); box('#6a4a2a', -4, -14, 8, 14);
-        round('#c81f2a', 0, -32, 30, true); round('#ffffff', -13, -42, 4); round('#ffffff', 7, -50, 5); round('#ffffff', 17, -38, 3); round('#ffe08a', 0, -24, 3);
+        round('#c81f2a', 0, -32, 30, true); round('#ffffff', -13, -42, 4); round('#ffffff', 7, -50, 5); round('#ffffff', 17, -38, 3);
+        // (it's a science lab now: a sign, a chimney and green bubbles going up)
+        box('#14122a', -11, -26, 22, 9); drawText('LAB', x, PLAIN_Y - 25, 'gold', 'center');
+        box('#8d90a0', 12, -70, 7, 14);
+        for (let i = 0; i < 4; i++) { const u = ((plain.t + i * 22) % 88) / 88; round('#7af0a0', 15 + Math.sin(u * 9 + i) * 4, -72 - u * 40, 1 + (1 - u) * 2); }
         break;
       case 4:   // (a stepped pyramid with an eye)
         for (let i = 0; i < 8; i++) box(i % 2 ? '#c8a040' : '#e8c060', -44 + i * 5, -(i + 1) * 8, 88 - i * 10, 8);
@@ -4101,9 +4105,8 @@
       { x: 92, pc: true, draw: (b, r, on, t) => { b('#8a5a34', -20, -16, 40, 4); b('#6a3e1e', -18, -12, 3, 12); b('#6a3e1e', 15, -12, 3, 12); b('#22222c', -10, -36, 20, 16); b('#55556a', -2, -20, 4, 4); b('#8d90a0', -8, -19, 16, 3); b(on ? '#0a1f14' : '#2a2a3a', -8, -34, 16, 12); if (on) for (let i = 0; i < 5; i++) b('#5fd068', -7 + i * 3, -24 - (i + ((t >> 4) % 3)) * 1.6, 2, (i + ((t >> 4) % 3)) * 1.6 + 1); } }] },
     { wall: '#6a6e80', floor: '#3a3a4a', window: true, things: [
       { x: 110, pilot: true, say: 'VWOOOOM', s: [90, 'sawtooth', 300], draw: (b, r, on, t) => { b('#3a3a4a', -14, -10, 28, 10); b('#8d90a0', -2, on ? -14 : -30, 4, on ? 8 : 20); r(on ? '#5fd068' : '#e8282f', 0, on ? -16 : -32, 5); if (on) for (let i = 0; i < 6; i++) b((i + (t >> 3)) % 6 < 2 ? '#7ae0ff' : '#2a4aa8', -14 + i * 5, -6, 4, 3); } }] },
-    { wall: '#e8dcc0', floor: '#8a5a34', things: [
-      { x: 110, say: 'ACHOO!', s: [1200, 'sine', -900], draw: (b, r, on, t) => { b('#a8743a', -10, -14, 20, 14); r('#e8282f', 0, -22, 12); r('#ffffff', -4, -24, 2); r('#ffffff', 4, -20, 2); if (on) for (let i = 0; i < 7; i++) b('#ffe08a', -14 + i * 5, -36 - ((t + i * 13) >> 1) % 44, 2, 2); } },
-      { x: 185, say: 'SMELLS LIKE SOCKS', s: [160, 'sine', 120], draw: (b, r, on, t) => { b('#3a3a4a', -14, -20, 28, 20); b('#5fd068', -12, -24, 24, 4); if (on) { r('#c8ffb0', -6 + (t >> 4) % 12, -28, 3); for (let i = 0; i < 3; i++) b('#e8282f', -10 + i * 9, -4, 5, 4); } } }] },
+    { wall: '#d8f0e0', floor: '#8a9aa8', scene: drawLab, refill: true, things: [
+      labPotion(72, '#e8282f', 0), labPotion(102, '#5fd068', 1), labPotion(132, '#b48ae0', 2), labPotion(162, '#ffcc3d', 0), labPotion(192, '#7ae0ff', 1), labPotion(222, '#ff9ac0', 2)] },
     { wall: '#c8a040', floor: '#6a4a10', things: [
       { x: 110, say: 'ALIEN MONEY IS ALL ROCKS', s: [988, 'square', 500], draw: (b, r, on) => { b('#6a4a2a', -16, -16, 32, 16); b('#c8a040', -3, -12, 6, 6); if (on) { b('#8a5a34', -16, -30, 32, 6); for (const a of [-10, 0, 9]) r('#ffe08a', a, -18, 5); } else b('#8a5a34', -17, -22, 34, 8); } },
       { x: 190, say: 'IT BLINKED', s: [110, 'sawtooth', -40], draw: (b, r, on, t) => { b('#8a6a20', -12, -56, 24, 56); b('#6a4a10', -16, -6, 32, 6); const eye = on && (t >> 5) & 1 ? '#6a4a10' : on ? '#ff3e30' : '#ffffff'; b(eye, -8, -46, 6, 5); b(eye, 2, -46, 6, 5); b('#6a4a10', -6, -34, 12, 2); } }] },
@@ -4142,7 +4145,9 @@
   }
   function enterRoom(n) {
     const g = plain;
-    g.room = { n, kind: Math.floor(planetHash(n + 0.5) * 13), sayT: 0, say: '', alt: 0, pilot: null, on: g.roomOn[n] || (g.roomOn[n] = [false, false]) };
+    const kind = Math.floor(planetHash(n + 0.5) * 13);
+    if (ROOMS[kind].refill) g.roomOn[n] = [];   // (the potions are back)
+    g.room = { n, kind, sayT: 0, say: '', alt: 0, pilot: null, on: g.roomOn[n] || (g.roomOn[n] = [false, false]) };
     g.pugs = g.pugs.map((p, i) => Object.assign(shopPug(p.id, ROOM_DOOR + 16 + i * 16, PLAIN_Y), { ground: true, upWas: true }));
     tone(420, 0.12, 'sine', 0.05, 200);
   }
@@ -4181,6 +4186,13 @@
         return;
       }
       const thing = things[at];
+      if (thing.breaks) {
+        // (smash: glass, drops of it everywhere, and a crash)
+        r.on[at] = true; r.say = 'CRASH!'; r.sayT = 50;
+        noise(0.25, 0.14, 5000, 1500); tone(1800, 0.12, 'square', 0.04, -900); tone(900, 0.16, 'sine', 0.05, -500, 0.05);
+        for (let i = 0; i < 26; i++) g.bits.push({ x: thing.x, y: PLAIN_Y - 36, vx: (Math.random() - 0.5) * 3.4, vy: -1 - Math.random() * 2.6, g: 0.14, t: 34 + Math.random() * 14, col: i % 3 ? thing.col : '#d8f4ff' });
+        continue;
+      }
       if (thing.pc) { p.moving = false; r.on[at] = true; openPc(p); break; }
       if (thing.pilot) {
         p.moving = false; r.pilot = { id: p.id }; r.on[at] = true; r.say = thing.say; r.sayT = 90;
@@ -4219,7 +4231,7 @@
     if (!p.ground || p.sitting) return null;
     if (p.x < ROOM_DOOR + 12) return -1;
     if (ROOMS[plain.room.kind].counter && Math.abs(p.x - 150) < 50) return 2;   // (at the counter)
-    const i = ROOMS[plain.room.kind].things.findIndex(k => Math.abs(p.x - k.x) < ROOM_REACH);
+    const i = ROOMS[plain.room.kind].things.findIndex((k, n) => Math.abs(p.x - k.x) < (k.breaks ? 15 : ROOM_REACH) && !(k.breaks && plain.room.on[n]));
     return i < 0 ? null : i;
   }
   // (what EATS sells: a name, a price in coins and how it's drawn, sitting on y and with its middle at x)
@@ -4478,6 +4490,39 @@
       d.bars.forEach((b, i) => bk('#5fd068', 26 + i * 24, 212 - b * 10, 18, b * 10));
       drawText('NUMBERS GO UP', PW / 2, 232, 'black', 'center');
     }
+  }
+  // The science lab in the mushroom house: a long bench of six potions, a scientist in a white coat, a chalkboard and jars.
+  // Up in front of a potion smashes it: glass and colour everywhere, and it runs down the bench to the floor. They're all
+  // back the next time you come in. (the user asked)
+  function labPotion(x, col, shape) {
+    return { x, col, breaks: true, draw: (b, r, on, t) => {
+      if (on) {
+        b('#d8f4ff', -7, -28, 3, 2); b('#d8f4ff', 3, -29, 4, 3); b('#d8f4ff', -2, -28, 2, 2);
+        b(col, -12, -27, 24, 1); b(col, -13, -1, 26, 2); b(col, -9, 0, 18, 2);
+        b(col, -5, -24 + ((t + x) % 23), 2, 3); b(col, 4, -24 + ((t + x * 3) % 23), 2, 3);
+        return;
+      }
+      if (shape === 0) { r('#d8f4ff', 0, -34, 8); r(col, 0, -33, 6.5); b('#d8f4ff', -2, -48, 4, 8); b('#8a5a34', -2, -50, 4, 2); }
+      else if (shape === 1) { for (let i = 0; i < 7; i++) { b('#d8f4ff', -i - 2, -40 + i * 2, i * 2 + 4, 2); if (i > 1) b(col, -i - 1, -40 + i * 2, i * 2 + 2, 2); } b('#d8f4ff', -2, -48, 4, 8); b('#8a5a34', -2, -50, 4, 2); }
+      else { b('#d8f4ff', -4, -50, 8, 24); b(col, -3, -42, 6, 15); b('#8a5a34', -4, -52, 8, 2); }
+      b('#ffffff', -2 + ((t + x) >> 4) % 4, -32 - ((t + x) >> 2) % 7, 1, 1);
+    } };
+  }
+  function drawLab(t) {
+    const box = (col, x, y, w, h) => { ctx.fillStyle = col; ctx.fillRect(x, PLAIN_Y + y, w, h); };
+    // (a chalkboard and a shelf of jars)
+    box('#8a5a34', 62, -128, 86, 44); box('#1f3a2c', 64, -126, 82, 40);
+    drawText('ADD SLIME', 105, PLAIN_Y - 120, 'cyan', 'center'); drawText('GET BOOM', 105, PLAIN_Y - 106, 'gold', 'center');
+    box('#8a5a34', 160, -96, 70, 3);
+    [['#ff9ac0', 166], ['#7ae0ff', 180], ['#5fd068', 194], ['#ffcc3d', 208]].forEach(([col, x]) => { box('#d8f4ff', x, -112, 10, 16); box(col, x + 1, -106, 8, 10); box('#8a5a34', x + 2, -114, 6, 2); });
+    // (the scientist behind the bench, in a white coat and goggles, wandering up and down)
+    const a = t * 0.01, x = Math.round(150 + Math.sin(a) * 70), face = Math.cos(a) < 0 ? -1 : 1;
+    ctx.save(); ctx.translate(0, -26); drawAlien(x, '#5fd068', (t >> 3) & 1, face);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(x - 5, PLAIN_Y - 10, 10, 11); ctx.fillStyle = '#c8ccd8'; ctx.fillRect(x, PLAIN_Y - 10, 1, 11);
+    ctx.fillStyle = '#7ae0ff'; ctx.fillRect(x - 5, PLAIN_Y - 17, 5, 6); ctx.fillRect(x + 1, PLAIN_Y - 17, 5, 6); ctx.fillStyle = '#14122a'; ctx.fillRect(x - 6, PLAIN_Y - 14, 13, 1);
+    ctx.restore();
+    // (the bench)
+    box('#55647a', 50, -26, 186, 4); box('#7a8a98', 50, -26, 186, 1); box('#6a7886', 56, -22, 6, 22); box('#6a7886', 224, -22, 6, 22); box('#6a7886', 140, -22, 6, 22);
   }
   // (a little arrow, bobbing, to show Up will do something here)
   function drawUpArrow(x, y) {
