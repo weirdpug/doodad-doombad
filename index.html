@@ -4128,11 +4128,16 @@
     for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.pugs.some(p => p.id === i)) g.pugs.push(Object.assign(shopPug(i, ROOM_DOOR + 16, PLAIN_Y), { ground: true, upWas: true }));
     g.pugs = g.pugs.filter(p => arenaDriven(p.id));
     if (r.sayT > 0) r.sayT--;
+    for (const b of g.bits) { b.x += b.vx; b.y += b.vy; b.vy += b.g || 0; b.t--; }
+    g.bits = g.bits.filter(b => b.t > 0);
+    if (r.eat) { stepEat(); g.kbAtk = false; return; }
+    if (r.pick) { stepPick(); g.kbAtk = false; return; }
     for (const p of g.pugs) {
       const at = roomSpot(p);
       p.upDoor = at !== null;
       floorPug(p, 14, PW - 14, PLAIN_Y, 1.25, -3.4);
       if (!p.upFresh || at === null) continue;
+      if (at === 2) { r.pick = { sel: 0, id: p.id, held: { left: false, right: false, up: true, down: false }, msg: 0 }; p.moving = false; sfx.tick(); break; }
       if (at < 0) {
         // (back out of the door, in front of the building)
         const x = r.n * 170 + planetHash(r.n + 0.25) * 70;
@@ -4146,19 +4151,93 @@
     }
     g.kbAtk = false;
   }
-  // (what Up does for a pug in a room: -1 the door, 0 or 1 a thing, or null)
+  // (what Up does for a pug in a room: -1 the door, 0 or 1 a thing, 2 the alien at a counter, or null)
   function roomSpot(p) {
     if (!p.ground) return null;
     if (p.x < ROOM_DOOR + 12) return -1;
+    if (ROOMS[plain.room.kind].scene && Math.abs(p.x - 150) < 50) return 2;   // (at the counter)
     const i = ROOMS[plain.room.kind].things.findIndex(k => Math.abs(p.x - k.x) < ROOM_REACH);
     return i < 0 ? null : i;
+  }
+  // (what EATS sells: a name, a price in coins and how it's drawn, sitting on y and with its middle at x)
+  const bk = (col, x, y, w, h) => { ctx.fillStyle = col; ctx.fillRect(x, y, w, h); };
+  const bb = (col, x, y, r) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); };
+  const BAKES = [
+    { name: 'CUPCAKE', price: 3, draw: (x, y) => { bk('#c8742f', x - 5, y - 6, 10, 6); bk('#a8541f', x - 3, y - 6, 2, 6); bk('#a8541f', x + 2, y - 6, 2, 6); bb('#ff9ac0', x, y - 9, 6); bb('#e8282f', x, y - 15, 2); } },
+    { name: 'DONUT', price: 2, draw: (x, y) => { bb('#d89a5a', x, y - 7, 7); bb('#ff9ac0', x, y - 8, 6); bb('#fff6e0', x, y - 8, 2); bk('#7ae0ff', x - 4, y - 11, 2, 1); bk('#ffcc3d', x + 3, y - 6, 2, 1); bk('#5fd068', x + 2, y - 12, 1, 2); } },
+    { name: 'COOKIE', price: 1, draw: (x, y) => { bb('#c8904a', x, y - 7, 7); for (const [a, b] of [[-3, -9], [2, -10], [3, -5], [-2, -4], [0, -7]]) bk('#4a2a18', x + a, y + b, 2, 2); } },
+    { name: 'ECLAIR', price: 4, draw: (x, y) => { bk('#e8c080', x - 9, y - 7, 18, 7); bk('#4a2a18', x - 9, y - 8, 18, 4); bk('#fff6e0', x - 5, y - 8, 2, 1); bk('#fff6e0', x + 2, y - 7, 2, 1); } },
+    { name: 'CROISSANT', price: 3, draw: (x, y) => { for (const [a, b, r] of [[-7, -3, 3], [-4, -6, 4], [0, -7, 5], [4, -6, 4], [7, -3, 3]]) bb('#e0a050', x + a, y + b, r); for (const a of [-4, 0, 4]) bk('#b87a30', x + a, y - 10, 1, 7); } },
+    { name: 'CAKE SLICE', price: 5, draw: (x, y) => { bk('#fff6e0', x - 8, y - 12, 16, 3); bk('#ff9ac0', x - 8, y - 9, 16, 3); bk('#fff6e0', x - 8, y - 6, 16, 2); bk('#ff9ac0', x - 8, y - 4, 16, 4); bb('#e8282f', x, y - 14, 2); } },
+    { name: 'BERRY PIE', price: 6, draw: (x, y) => { bk('#c8904a', x - 10, y - 4, 20, 4); bk('#7a2a6a', x - 9, y - 7, 18, 3); for (let i = 0; i < 4; i++) bk('#e0a050', x - 9 + i * 6, y - 8, 3, 2); } },
+    { name: 'BREAD LOAF', price: 4, draw: (x, y) => { bk('#b87a30', x - 10, y - 8, 20, 8); bb('#c8904a', x - 5, y - 8, 5); bb('#c8904a', x + 5, y - 8, 5); for (const a of [-5, 0, 5]) bk('#8a5a24', x + a, y - 11, 1, 5); } },
+    { name: 'FRUIT TART', price: 5, draw: (x, y) => { bk('#c8904a', x - 8, y - 4, 16, 4); bk('#ffe08a', x - 7, y - 6, 14, 2); bb('#e8282f', x - 3, y - 7, 2); bb('#e8282f', x + 3, y - 7, 2); bk('#5fd068', x - 1, y - 10, 2, 2); } },
+    { name: 'MACARON', price: 3, draw: (x, y) => { bk('#7af0a0', x - 7, y - 4, 14, 4); bk('#fff6e0', x - 6, y - 6, 12, 2); bk('#7af0a0', x - 7, y - 10, 14, 4); } },
+    { name: 'MUFFIN', price: 2, draw: (x, y) => { bk('#e8e0d0', x - 5, y - 6, 10, 6); bb('#e0a050', x, y - 9, 7); for (const [a, b] of [[-3, -11], [2, -12], [1, -8]]) bk('#3a4ea8', x + a, y + b, 2, 2); } },
+    { name: 'CINNAMON ROLL', price: 4, draw: (x, y) => { bb('#c8904a', x, y - 7, 7); bb('#e8c080', x, y - 7, 5); bb('#c8904a', x + 1, y - 7, 3); bb('#fff6e0', x, y - 7, 1); } }];
+  // Up at the EATS counter: the alien asks what you'd like and the treats come up at the top of the screen. The arrows or
+  // stick choose, jump buys it with the pug's own coins, bark goes back. Then the pug eats it, in three bites, on the spot.
+  // (the user asked)
+  function stepPick() {
+    const g = plain, r = g.room, k = r.pick, p = g.pugs.find(q => q.id === k.id);
+    if (!p) { r.pick = null; return; }
+    p.upDoor = true;
+    const inp = plainInput(p), fresh = d => inp[d] && !k.held[d], n = BAKES.length;
+    if (fresh('left')) { k.sel = (k.sel + n - 1) % n; sfx.tick(); }
+    if (fresh('right')) { k.sel = (k.sel + 1) % n; sfx.tick(); }
+    if (fresh('up') || fresh('down')) { k.sel = (k.sel + 6) % n; sfx.tick(); }
+    k.held = { left: inp.left, right: inp.right, up: inp.up, down: inp.down };
+    if (k.msg > 0) k.msg--;
+    if (inp.bark) { r.pick = null; sfx.tick(); return; }
+    if (!inp.jump) return;
+    const b = BAKES[k.sel];
+    if (coins[p.id] < b.price) { k.msg = 100; sfx.nope(); return; }
+    coins[p.id] -= b.price; saveCoins(); updateHud(true); sfx.coin();
+    r.pick = null; r.eat = { t: 0, i: k.sel, id: p.id };
+  }
+  function stepEat() {
+    const g = plain, r = g.room, e = r.eat, p = g.pugs.find(q => q.id === e.id);
+    e.t++;
+    if (p && (e.t === 40 || e.t === 80 || e.t === 120)) {
+      tone(180, 0.09, 'square', 0.05, -60); noise(0.1, 0.06, 1800, 500);
+      for (let i = 0; i < 6; i++) g.bits.push({ x: p.x + p.face * 14, y: PLAIN_Y - 10, vx: (Math.random() - 0.5) * 1.6, vy: -1 - Math.random(), g: 0.1, t: 24, col: ['#c8904a', '#e0a050', '#fff6e0'][i % 3] });
+    }
+    if (e.t >= 140) {
+      r.eat = null; r.say = 'YUM!'; r.sayT = 110; tone(660, 0.12, 'sine', 0.05, 300);
+      if (p) { p.ground = false; p.vy = -2.4; }   // (a happy hop)
+    }
+  }
+  function drawPick() {
+    const k = plain.room.pick, b = BAKES[k.sel], p = plain.pugs.find(q => q.id === k.id), x0 = 25, gap = 38;
+    drawText('WHAT WOULD YOU LIKE?', 6, 4, 'gold');
+    drawText('COINS ' + (p ? coins[p.id] : 0), 234 - ('COINS ' + (p ? coins[p.id] : 0)).length * 6, 4, 'cyan');
+    BAKES.forEach((t, i) => {
+      const x = x0 + (i % 6) * gap, y = 34 + Math.floor(i / 6) * 30;
+      if (i === k.sel) { ctx.fillStyle = '#ffcc3d'; ctx.fillRect(x - 15, y - 19, 30, 29); ctx.fillStyle = '#14122a'; ctx.fillRect(x - 14, y - 18, 28, 27); }
+      t.draw(x, y);
+      drawText(String(t.price), x, y + 2, 'gold', 'center');
+    });
+    drawText(k.msg > 0 ? 'NOT ENOUGH COINS' : `${b.name} ${b.price} COIN${b.price > 1 ? 'S' : ''}`, PW / 2, 78, k.msg > 0 ? 'red' : 'cyan', 'center');
+    drawText('JUMP BUYS  BARK LEAVES', PW / 2, 90, 'pink', 'center');
+  }
+  // (the treat held up by the pug, going in three bites)
+  function drawEat() {
+    const g = plain, e = g.room.eat, p = g.pugs.find(q => q.id === e.id);
+    if (!p) return;
+    const bites = Math.floor(e.t / 40), x = Math.round(p.x) + p.face * 16, y = PLAIN_Y - 3;
+    // (NOM at each bite, floating up)
+    if (e.t >= 40 && e.t % 40 < 26) drawText('NOM', Math.round(p.x), PLAIN_Y - 26 - (e.t % 40 >> 1), 'black', 'center');
+    if (bites >= 3) return;
+    ctx.save(); ctx.beginPath();
+    if (p.face > 0) ctx.rect(x - 14 + bites * 9, 0, 30, PH); else ctx.rect(x - 16, 0, 30 - bites * 9, PH);
+    ctx.clip(); BAKES[e.i].draw(x, y); ctx.restore();
   }
   // Inside EATS: a bakery counter with a glass case full of treats and bakes, and an alien in a restaurant uniform behind
   // it. (the user asked)
   function drawBakery(t) {
     const box = (col, x, y, w, h) => { ctx.fillStyle = col; ctx.fillRect(x, PLAIN_Y + y, w, h); };
     const ball = (col, x, y, r) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, PLAIN_Y + y, r, 0, Math.PI * 2); ctx.fill(); };
-    box('#14122a', 118, -134, 64, 15); drawText('EATS', 150, 107, 'gold', 'center');
+    box('#14122a', 118, -94, 64, 15); drawText('EATS', 150, PLAIN_Y - 90, 'gold', 'center');
     // (the alien, the same size as the ones outside, standing up behind the counter in a white hat, shirt and bow tie and a
     // red apron, nodding a little)
     const bob = (t >> 5) & 1, cx = 150;
@@ -4180,20 +4259,7 @@
     box('#c8ccd8', L + 3, -41, W - 6, 2);
     // (the bakes, two shelves of them)
     const top = -44, low = -27, at = i => L + 19 + i * 27;
-    const cupcake = (x, y) => { box('#c8742f', x - 5, y - 6, 10, 6); box('#a8541f', x - 3, y - 6, 2, 6); box('#a8541f', x + 2, y - 6, 2, 6); ball('#ff9ac0', x, y - 9, 6); ball('#e8282f', x, y - 15, 2); };
-    const donut = (x, y) => { ball('#d89a5a', x, y - 7, 7); ball('#ff9ac0', x, y - 8, 6); ball('#fff6e0', x, y - 8, 2); box('#7ae0ff', x - 4, y - 11, 2, 1); box('#ffcc3d', x + 3, y - 6, 2, 1); box('#5fd068', x + 2, y - 12, 1, 2); };
-    const cookie = (x, y) => { ball('#c8904a', x, y - 7, 7); for (const [a, b] of [[-3, -9], [2, -10], [3, -5], [-2, -4], [0, -7]]) box('#4a2a18', x + a, y + b, 2, 2); };
-    const eclair = (x, y) => { box('#e8c080', x - 9, y - 7, 18, 7); box('#4a2a18', x - 9, y - 8, 18, 4); box('#fff6e0', x - 5, y - 8, 2, 1); box('#fff6e0', x + 2, y - 7, 2, 1); };
-    const croissant = (x, y) => { for (const [a, b, r] of [[-7, -3, 3], [-4, -6, 4], [0, -7, 5], [4, -6, 4], [7, -3, 3]]) ball('#e0a050', x + a, y + b, r); for (const a of [-4, 0, 4]) box('#b87a30', x + a, y - 10, 1, 7); };
-    const slice = (x, y) => { box('#fff6e0', x - 8, y - 12, 16, 3); box('#ff9ac0', x - 8, y - 9, 16, 3); box('#fff6e0', x - 8, y - 6, 16, 2); box('#ff9ac0', x - 8, y - 4, 16, 4); ball('#e8282f', x, y - 14, 2); };
-    const pie = (x, y) => { box('#c8904a', x - 10, y - 4, 20, 4); box('#7a2a6a', x - 9, y - 7, 18, 3); for (let i = 0; i < 4; i++) box('#e0a050', x - 9 + i * 6, y - 8, 3, 2); };
-    const loaf = (x, y) => { box('#b87a30', x - 10, y - 8, 20, 8); ball('#c8904a', x - 5, y - 8, 5); ball('#c8904a', x + 5, y - 8, 5); for (const a of [-5, 0, 5]) box('#8a5a24', x + a, y - 11, 1, 5); };
-    const tart = (x, y) => { box('#c8904a', x - 8, y - 4, 16, 4); box('#ffe08a', x - 7, y - 6, 14, 2); ball('#e8282f', x - 3, y - 7, 2); ball('#e8282f', x + 3, y - 7, 2); box('#5fd068', x - 1, y - 10, 2, 2); };
-    const macaron = (x, y) => { box('#7af0a0', x - 7, y - 4, 14, 4); box('#fff6e0', x - 6, y - 6, 12, 2); box('#7af0a0', x - 7, y - 10, 14, 4); };
-    const muffin = (x, y) => { box('#e8e0d0', x - 5, y - 6, 10, 6); ball('#e0a050', x, y - 9, 7); for (const [a, b] of [[-3, -11], [2, -12], [1, -8]]) box('#3a4ea8', x + a, y + b, 2, 2); };
-    const roll = (x, y) => { ball('#c8904a', x, y - 7, 7); ball('#e8c080', x, y - 7, 5); ball('#c8904a', x + 1, y - 7, 3); ball('#fff6e0', x, y - 7, 1); };
-    [cupcake, donut, cookie, eclair, croissant, slice].forEach((f, i) => f(at(i), top));
-    [pie, loaf, tart, macaron, muffin, roll].forEach((f, i) => f(at(i), low));
+    BAKES.forEach((k, i) => k.draw(at(i % 6), PLAIN_Y + (i < 6 ? top : low)));
     // (the glass, with a shine going across it)
     box('rgba(190,235,255,0.22)', L + 3, -56, W - 6, 32);
     ctx.fillStyle = 'rgba(255,255,255,0.22)';
@@ -4225,10 +4291,19 @@
       k.draw(b, ball, r.on[i], t);
     });
     for (const p of g.pugs) {
-      drawPlainPug(p, Math.round(p.x), Math.round(p.y), 'black');
+      if (r.eat && r.eat.id === p.id) {
+        // (the eating: squashing and stretching as it chews, leaning in for each bite)
+        const e = r.eat, chew = (e.t >> 3) & 1, lean = e.t % 40 > 30 ? p.face * 4 : 0;
+        ctx.save(); ctx.translate(Math.round(p.x) + lean, Math.round(p.y)); ctx.scale(chew ? 1.12 : 0.94, chew ? 0.86 : 1.06);
+        drawPlainPug(p, 0, 0, 'black');
+        ctx.restore();
+      } else drawPlainPug(p, Math.round(p.x), Math.round(p.y), 'black');
       const at = roomSpot(p);
-      if (at !== null) drawUpArrow(at < 0 ? ROOM_DOOR : R.things[at].x, PLAIN_Y - (at < 0 ? 52 : 66));
+      if (at !== null && !r.pick && !r.eat) drawUpArrow(at < 0 ? ROOM_DOOR : at === 2 ? 150 : R.things[at].x, PLAIN_Y - (at < 0 ? 52 : at === 2 ? 56 : 66));
     }
+    for (const b of g.bits) { ctx.fillStyle = b.col; ctx.fillRect(Math.round(b.x), Math.round(b.y), 2, 2); }
+    if (r.eat) drawEat();
+    if (r.pick) drawPick();
     if (r.sayT > 0) drawText(r.say, PW / 2, 84, 'gold', 'center');
   }
   function drawPlanet() {
