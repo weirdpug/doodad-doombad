@@ -4190,17 +4190,24 @@
       } }] },
     // (14: the break room: a coffee machine on the counter, and a water cooler)
     { wall: '#c8eedc', floor: '#b08a5a', upstairs: true, scene: drawBreakRoom, things: [LIFT,
-      { x: 122, say: 'SLIME COFFEE!', s: [300, 'sawtooth', -100], draw: (b, r, on, t) => {
+      { x: 122, drink: 'coffee', say: 'SLIME COFFEE!', s: [300, 'sawtooth', -100], draw: (b, r, on, t) => {
         b('#22222c', -9, -56, 18, 24); b('#3a3a4a', -9, -56, 18, 4); b(on ? '#e8282f' : '#5fd068', 4, -53, 2, 2);
-        b('#14122a', -6, -44, 12, 12); b('#55556a', -2, -44, 4, 3); b('#ffffff', -4, -38, 8, 6); b('#ffffff', 4, -37, 2, 3);
+        b('#14122a', -6, -44, 12, 12); b('#55556a', -2, -44, 4, 3);
+        if (!drinkHeld('coffee')) { b('#ffffff', -4, -38, 8, 6); b('#ffffff', 4, -37, 2, 3); }   // (the mug, until the pug takes it)
         if (on) {
           b('#5fc88f', -3, -37, 6, 2); b('#5fc88f', -1, -41 + ((t >> 2) % 3), 2, 2);
           for (let i = 0; i < 3; i++) b('rgba(255,255,255,0.7)', -3 + i * 3, -58 - ((t >> 3) + i * 3) % 8, 1, 2);
         }
       } },
-      { x: 190, say: 'GLUG GLUG', s: [180, 'sine', -60], draw: (b, r, on, t) => {
+      { x: 190, drink: 'water', say: 'GLUG GLUG', s: [180, 'sine', -60], draw: (b, r, on, t) => {
         b('#c8ccd8', -8, -30, 16, 30); b('#a8acbc', -8, -30, 16, 2); b('#2f5bff', -10, -22, 2, 3); b('#e8282f', 8, -22, 2, 3);
         b('#9fe0ff', -7, -50, 14, 18); b('#5fc0ff', -7, -44, 14, 12); b('#d8f4ff', -5, -48, 2, 14); b('#9fe0ff', -2, -32, 4, 2);
+        b('#8d90a0', -15, -12, 8, 2);
+        const d = plain.room.drink;
+        if (on && d && d.kind === 'water') {   // (a paper cup on the ledge under the tap, filling up)
+          const fill = Math.min(5, Math.floor(d.t / 6));
+          b('#5fc0ff', -10, -19, 1, 7 - fill); b('#eef6ff', -14, -18, 6, 6); b('#5fc0ff', -13, -13 - fill, 4, fill);
+        }
         if (on) for (let i = 0; i < 3; i++) { const u = ((t >> 1) + i * 6) % 14; b('#ffffff', -4 + i * 3, -33 - u, 2, 2); }
       } }] },
     // (15: the server room. Up at the big switch turns all the servers off, and on again; the screen uploads, if there's power)
@@ -4343,6 +4350,7 @@
     for (const b of g.bits) { b.x += b.vx; b.y += b.vy; b.vy += b.g || 0; b.t--; }
     g.bits = g.bits.filter(b => b.t > 0);
     if (r.eat) { stepEat(); g.kbAtk = false; return; }
+    if (r.drink) { stepDrink(); g.kbAtk = false; return; }
     if (r.pick) { stepPick(); g.kbAtk = false; return; }
     if (r.pilot) { stepPilot(); g.kbAtk = false; return; }
     if (r.pc) { stepPc(); g.kbAtk = false; return; }
@@ -4377,6 +4385,11 @@
         noise(0.25, 0.14, 5000, 1500); tone(1800, 0.12, 'square', 0.04, -900); tone(900, 0.16, 'sine', 0.05, -500, 0.05);
         for (let i = 0; i < 26; i++) g.bits.push({ x: thing.x, y: PLAIN_Y - 36, vx: (Math.random() - 0.5) * 3.4, vy: -1 - Math.random() * 2.6, g: 0.14, t: 34 + Math.random() * 14, col: i % 3 ? thing.col : '#d8f4ff' });
         continue;
+      }
+      if (thing.drink) {
+        p.moving = false; r.on[at] = true; r.say = thing.say; r.sayT = 90; r.drink = { t: 0, id: p.id, kind: thing.drink, at };
+        tone(thing.s[0], 0.35, thing.s[1], 0.06, thing.s[2]);
+        break;
       }
       if (thing.lift) { p.moving = false; r.lift = { id: p.id, sel: r.floor, held: { left: false, right: false, up: true, down: false }, ride: 0, to: 0 }; r.sayT = 0; sfx.tick(); break; }
       if (thing.pc) { p.moving = false; r.on[at] = true; openPc(p); break; }
@@ -4456,6 +4469,33 @@
     if (coins[p.id] < b.price) { k.msg = 100; sfx.nope(); return; }
     coins[p.id] -= b.price; saveCoins(); updateHud(true); sfx.coin();
     r.pick = null; r.eat = { t: 0, i: k.sel, id: p.id };
+  }
+  // Up at the break room's coffee machine or water cooler pours a cup, then the pug takes it, leans back with it up to
+  // its mouth, and drinks it down in three gulps, then AHH. (the user asked)
+  const DRINK_POUR = 34, DRINK_GULPS = [58, 82, 106], DRINK_AHH = 122, DRINK_END = 146;
+  const drinkHeld = kind => { const d = plain.room.drink; return !!d && d.kind === kind && d.t >= DRINK_POUR; };
+  function stepDrink() {
+    const g = plain, r = g.room, d = r.drink;
+    d.t++;
+    if (d.t === DRINK_POUR) { r.on[d.at] = false; tone(700, 0.08, 'square', 0.03, 200); }
+    if (DRINK_GULPS.includes(d.t)) { tone(220, 0.12, 'sine', 0.07, -120); tone(150, 0.1, 'sine', 0.05, -50, 0.07); }
+    if (d.t === DRINK_AHH) tone(520, 0.4, 'triangle', 0.04, -200);
+    if (d.t >= DRINK_END) r.drink = null;
+  }
+  // (the cup at the pug's mouth, tipped up more with each gulp and emptier, with GULP floating up at each one, then AHH)
+  function drawDrink() {
+    const g = plain, d = g.room.drink, p = g.pugs.find(q => q.id === d.id);
+    if (!p) return;
+    const gulps = DRINK_GULPS.filter(u => d.t >= u).length, last = DRINK_GULPS[gulps - 1];
+    if (gulps && d.t - last < 22 && d.t < DRINK_AHH) drawText('GULP', Math.round(p.x), PLAIN_Y - 28 - (d.t - last >> 1), 'black', 'center');
+    if (d.t >= DRINK_AHH) drawText('AHH', Math.round(p.x), PLAIN_Y - 30, 'black', 'center');
+    if (d.t < DRINK_POUR || d.t >= DRINK_AHH) return;
+    const coffee = d.kind === 'coffee', fill = 5 - Math.round(gulps * 5 / 3);
+    ctx.save(); ctx.translate(Math.round(p.x) + p.face * 9, Math.round(p.y) - 9); ctx.rotate(-p.face * (0.5 + gulps * 0.35));
+    ctx.fillStyle = coffee ? '#ffffff' : '#eef6ff'; ctx.fillRect(-3, -4, 6, 7);
+    if (coffee) ctx.fillRect(p.face > 0 ? 3 : -5, -2, 2, 3);
+    ctx.fillStyle = coffee ? '#5fc88f' : '#5fc0ff'; if (fill > 0) ctx.fillRect(-2, 2 - fill, 4, fill);
+    ctx.restore();
   }
   function stepEat() {
     const g = plain, r = g.room, e = r.eat, p = g.pugs.find(q => q.id === e.id);
@@ -4848,12 +4888,16 @@
         ctx.save(); ctx.translate(Math.round(p.x) + lean, Math.round(p.y)); ctx.scale(chew ? 1.12 : 0.94, chew ? 0.86 : 1.06);
         drawPlainPug(p, 0, 0, 'black');
         ctx.restore();
+      } else if (r.drink && r.drink.id === p.id && r.drink.t >= DRINK_POUR && r.drink.t < DRINK_AHH) {
+        // (leaning back to drink)
+        ctx.save(); ctx.translate(Math.round(p.x), Math.round(p.y)); ctx.rotate(-p.face * 0.22); drawPlainPug(p, 0, 0, 'black'); ctx.restore();
       } else drawPlainPug(p, Math.round(p.x), Math.round(p.y), 'black');
       const at = roomSpot(p);
-      if (at !== null && !r.pick && !r.eat && !r.pilot && !r.lift) drawUpArrow(at === -2 ? 150 : at < 0 ? ROOM_DOOR : thingX(R.things[at]), PLAIN_Y - (at === -2 ? 56 : at < 0 ? 52 : 66));
+      if (at !== null && !r.pick && !r.eat && !r.drink && !r.pilot && !r.lift) drawUpArrow(at === -2 ? 150 : at < 0 ? ROOM_DOOR : thingX(R.things[at]), PLAIN_Y - (at === -2 ? 56 : at < 0 ? 52 : 66));
     }
     for (const b of g.bits) { ctx.fillStyle = b.col; ctx.fillRect(Math.round(b.x), Math.round(b.y), 2, 2); }
     if (r.eat) drawEat();
+    if (r.drink) drawDrink();
     if (r.pick) drawPick();
     if (r.sayT > 0) drawText(r.say, PW / 2, 84, 'gold', 'center');
     if (r.pilot) drawText('ARROWS FLY  SPACE STOPS', PW / 2, 72, 'cyan', 'center');
