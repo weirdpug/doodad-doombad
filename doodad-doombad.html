@@ -3974,11 +3974,10 @@
     const h = planetHash(n + 0.1), a = t * (0.008 + h * 0.012) + h * 6, kind = planetHash(n + 0.3);
     return { x: n * 58 + h * 30 + Math.sin(a) * 34, face: Math.cos(a) < 0 ? -1 : 1, blob: kind > 0.85, col: CITY_COLS[Math.floor(kind * CITY_COLS.length)] };
   }
-  // (a bark in the city: every alien and space cop within reach in front of the pug goes dizzy, then pops. g.alienPop is
+  // (a bark in the city: every alien within reach in front of the pug goes dizzy, then pops; the cops don't. g.alienPop is
   // the aliens barked at, by number: { t: frames left of being dizzy, 0 once dead, x: the spot it stopped at })
   function barkCity(p) {
     const g = plain;
-    for (const c of g.cops) { const d = (c.x - p.x) * p.face; if (!c.pop && d > -8 && d < PLAIN_BARK) { c.pop = 20; sfx.stun(); } }
     for (let n = Math.floor((p.x - 200) / 58); n * 58 < p.x + 140; n++) {
       if (g.alienPop[n]) continue;
       const x = cityAlien(n, g.t).x, d = (x - p.x) * p.face;
@@ -4445,16 +4444,14 @@
       }
       const at = roomSpot(p);
       p.upDoor = at !== null || p.upWas;   // (holding Up after a smash must not hop)
-      const barked = p.barkT;
       floorPug(p, 14, PW - 14, PLAIN_Y, 1.25, -3.4);
-      if (r.cops && p.barkT > barked) for (const c of r.cops) { const d = (c.x - p.x) * p.face; if (!c.pop && d > -8 && d < PLAIN_BARK) { c.pop = 20; sfx.stun(); } }
       if (!p.upFresh || at === null) continue;
       if (at === -2) { r.pick = { sel: 0, id: p.id, held: { left: false, right: false, up: true, down: false }, msg: 0 }; p.moving = false; sfx.tick(); break; }
       if (at < 0) {
         // (back out of the door, in front of the building)
         const x = buildingX(r.n);
         g.pugs = g.pugs.map((q, i) => Object.assign(shopPug(q.id, x + i * 8, PLAIN_Y), { ground: true, upWas: true }));
-        const chased = r.cops && (r.copsLeft > 0 || r.cops.some(c => !c.pop));
+        const chased = r.cops && (r.copsLeft > 0 || r.cops.length > 0);
         g.cam = x - PW / 2; g.room = null; tone(420, 0.12, 'sine', 0.05, -200); g.kbAtk = false;
         if (chased) callCops();
         return;
@@ -4524,7 +4521,8 @@
   const flyingSaucer = () => phase === 'mini' && !!plain && !!plain.room && !!plain.room.pilot;
   // Flying a saucer, the trigger or M shoots (the user asked). Two seconds of hits blows a building up, leaving rubble,
   // and one hit kills an alien; either brings a cop ship, which stays near the saucer and shoots at it. The saucer takes
-  // 15 hits and then explodes, with everyone in it; the cop ship takes one. Each is { x, y } on the planet, as outside.
+  // 15 hits and then explodes, with everyone in it; shots just bounce off the cop ship (the user asked). Each is { x, y }
+  // on the planet, as outside.
   const SHIP_HP = 15, SKY_FIRE = 7, SKY_HEAT = 120, SKY_COP_SHOT = 2.6;
   // (a shot takes SKY_BOLT frames from a gun, at the bottom corners of the window, to the dot in its middle; SKY_LOW is
   // how far below where it parks the saucer can fly, so the dot can reach the aliens)
@@ -4563,8 +4561,8 @@
       if (++b.t < SKY_BOLT) continue;
       b.gone = true;   // (it's reached the dot: whatever is there gets hit)
       const c = k.cop;
-      if (c && !c.out && Math.abs(sx - c.x) < 30 && sy > c.y - 19 && sy < c.y + 12) {   // (the cop ship: one hit)
-        k.booms.push({ x: c.x, y: c.y, t: 0, big: true }); k.cop = null; sfx.boom(); r.say = 'GOT THE COPS!'; r.sayT = 90;
+      if (c && !c.out && Math.abs(sx - c.x) < 30 && sy > c.y - 19 && sy < c.y + 12) {   // (the cop ship: it bounces off)
+        k.booms.push({ x: sx, y: sy, t: 0, small: true }); tone(2400, 0.05, 'square', 0.02, 900);
         continue;
       }
       let hit = false;
@@ -4735,7 +4733,7 @@
     drawText('JUMP PICKS  BARK LEAVES', PW / 2, 76, 'pink', 'center');
   }
   // (the cops in the bank, the same cops as outside: they walk in at the door one at a time with the alarm going, and walk
-  // after the pugs and shoot, and a bark pops them. They're stepped and drawn by the same code as outside, with the
+  // after the pugs and shoot, and nothing kills them. They're stepped and drawn by the same code as outside, with the
   // bank's own list of them swapped in and the view held still)
   function roomCops(fn) {
     const g = plain, r = g.room, was = [g.cam, g.cops, g.copShots, g.copShip, g.obs];
@@ -6132,8 +6130,8 @@
   }
   // Barking an alien dead in the city brings the space cops (the user asked): their ship comes in with its siren going, stops over
   // the ground just ahead of the pugs, drops them out one at a time and flies off. On the ground they walk after the
-  // nearest pug and shoot at it. A shot kills, but it flies at where the pug was, so it can be dodged, jumped or outrun,
-  // and a bark pops them too. They wait outside while you're in a building.
+  // nearest pug and shoot at it. A shot kills, but it flies at where the pug was, so it can be dodged, jumped or outrun.
+  // Nothing kills them (the user asked). They wait outside while you're in a building.
   const COP_COUNT = 2, COP_AHEAD = 70, COP_RANGE = 80, COP_MAX = 4, COP_SHOT = 3.2, COP_WALK = 0.9;
   function callCops() {
     const g = plain;
