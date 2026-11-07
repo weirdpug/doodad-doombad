@@ -3409,8 +3409,8 @@
   // (what he yells after the last one, for how many frames, and the 16 px squares the island breaks up into)
   const ISLE_YELL = 'HOW!!!!!!!!!!!', ISLE_YELL_T = 120, ISLE_COLS = 14, ISLE_ROWS = 6;
   // (the fall from there, in frames: the wormhole, the drop to Jupiter, a pug's fall through the shop and the gap between
-  // pugs; where in the shop it comes through; and the shop counter the pugs walk along)
-  const DROP_HOLE = 150, DROP_SKY = 120, DROP_FALL = 14, DROP_GAP = 12, DROP_X = 156, SHOP_Y = 190, SHOP_L = 14, SHOP_R = PW - 14;
+  // pugs; where in the shop it comes through; the shop counter the pugs walk along; and the wait there for the last target)
+  const DROP_HOLE = 150, DROP_SKY = 120, DROP_FALL = 14, DROP_GAP = 12, DROP_X = 156, SHOP_Y = 190, SHOP_L = 14, SHOP_R = PW - 14, SHOP_AIM_WAIT = 120;
   let isleArt = null;
   const BOSS_AT = 120, BOSS_HP = 20, SAUCER_HP = 10, BOSS_X = 176, BOSS_SHOOT = 12, SHOT_SPEED = 4.5, BOSS_SCALE = 0.6, BOSS_MOVE = 1.6;
   // (the top of whatever is highest at x, for those who walk over everything; half: how wide they are each side)
@@ -3708,10 +3708,10 @@
   // Down a wormhole, out over Jupiter, into its red spot (where the shop is) and through the ceiling of Gloop's shop,
   // landing on his counter among the broken planks. Gloop's out, and the pugs can walk up and down the counter for as long
   // as they like, twice their usual size; the pause menu is the way back to the main menu. One last target locks onto one
-  // of them as soon as they land, and one last burrito follows, which kills like the others. (the user asked)
+  // of them two seconds after they land, and one last burrito follows, which kills like the others. (the user asked)
   function shopBurrito() {
     const g = plain, d = g.drop, alive = g.pugs.filter(p => !p.dead);
-    if (!d.fired && alive.length) {
+    if (!d.fired && alive.length && ++d.walkT > SHOP_AIM_WAIT) {
       if (!d.aim) {
         const p = alive[Math.floor(Math.random() * alive.length)];
         d.aim = { x: p.x, y: p.y - 14, t: 0 }; tone(1100, 0.08, 'square', 0.03, 0);
@@ -3763,7 +3763,7 @@
     g.bits = g.bits.filter(b => b.t > 0);
     // (once the last pug is down they are all yours; a player who joins now comes in through the hole)
     if (!d.walk && c === DROP_FALL + (n - 1) * DROP_GAP) {
-      d.walk = true;
+      d.walk = true; d.walkT = 0;
       g.pugs = d.ids.map((id, i) => shopPug(id, DROP_X + Math.round((i - (n - 1) / 2) * 34), SHOP_Y));
     }
     if (d.walk) {
