@@ -2055,6 +2055,7 @@
   //   B0SS2     goes straight to the space screen where you steer the alien's saucer (codeSpace), from any screen
   //   B0SS3     goes straight to the island in space (codeIsle), from any screen
   //   W0RM      goes straight to the island crumbling, the pugs standing on it (codeWorm), from any screen
+  //   TAC0      goes straight to Gloop yelling after the last burrito (codeYell), from any screen
   // A code's first key still does its usual job if it is a game key (B barks, ZER0's Z jumps), but once a
   // code has begun, its next keys only type the code: the coin code's S doesn't also climb down or pick a
   // menu choice, the skip code's X makes no tacos. A key that doesn't fit, or nothing typed for 25 seconds,
@@ -2065,7 +2066,8 @@
     { code: 'EXP', at: 0, run: () => codeExp() }, { code: 'L0CK', at: 0, run: () => relock() },
     { code: 'L0CK2', at: 0, run: () => codeMissions() }, { code: 'YAY!', at: 0, run: () => unlockAll() },
     { code: 'B0SS', at: 0, run: () => codeBoss() }, { code: 'B0SS2', at: 0, run: () => codeSpace() },
-    { code: 'B0SS3', at: 0, run: () => codeIsle() }, { code: 'W0RM', at: 0, run: () => codeWorm() }];
+    { code: 'B0SS3', at: 0, run: () => codeIsle() }, { code: 'W0RM', at: 0, run: () => codeWorm() },
+    { code: 'TAC0', at: 0, run: () => codeYell() }];
   // The zero code (the user asked for one to reset their coins): every pug's coins are set to 0 and saved.
   // Store things already bought are kept.
   // (the lock code, the user asked 2026-10-31: every unlock forgotten, and a pet that is locked again goes home, and a
@@ -3488,17 +3490,23 @@
     boomPic.hidden = true; boomPicT = 0;
     landOnIsle(plain.pugs.map(p => p.id));
   }
-  // (w0rm: straight to the island crumbling under the pugs, past the words, the burritos and the yell)
-  function codeWorm() {
+  // (tac0: straight to Gloop yelling, past his words and the burritos; a pug already on the island stays where it is)
+  function codeYell() {
     if (!plain) codeBoss();
     if (!plain) return;
     if (!plain.space) plainSpace(plain.pugs);
     boomPic.hidden = true; boomPicT = 0;
-    landOnIsle(plain.pugs.map(p => p.id));
-    for (const p of plain.pugs) { p.y = ISLE_Y; p.ground = true; }
-    plain.isleT = ISLE_WORDS_END; plain.isleShot = ISLE_BURRITOS;
+    if (!plain.isle || plain.drop || plain.pugs.every(p => p.dead)) {
+      landOnIsle(plain.pugs.map(p => p.id));
+      for (const p of plain.pugs) { p.y = ISLE_Y; p.ground = true; }
+    }
+    plain.isleT = ISLE_WORDS_END; plain.isleShot = ISLE_BURRITOS; plain.aim = null; plain.thrown = []; plain.tauntT = 0;
     startCrumble();
-    plain.crumble.t = ISLE_YELL_T - 1;
+  }
+  // (w0rm: the same, but past the yell too, straight to the island crumbling under the pugs)
+  function codeWorm() {
+    codeYell();
+    if (plain) plain.crumble.t = ISLE_YELL_T - 1;
   }
   // (the space screen: one saucer for each of these pugs, side by side)
   function plainSpace(pugs) {
