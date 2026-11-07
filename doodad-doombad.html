@@ -1818,14 +1818,15 @@
   // A player's controller went away (unplugged, or a wireless pad switched itself off): that pug
   // leaves instead of standing there for barrels to hit, and the game pauses so nobody is caught
   // out. Pressing A on a controller brings them back.
-  function leaveSlot(id) {
+  // (bye: they left on purpose, with BYE, so nothing pauses to say so)
+  function leaveSlot(id, bye) {
     if (!id || !joined[id]) return;
     joined[id] = false;
     players = players.filter(p => p.id !== id);
     showControllerHelp(); updateHud(true);
     // (in the Store opened from the main menu no game is running: it just shows the pugs still here)
     // (in the Colosseum its pug fights on for the computer, and the fight pauses to say so)
-    if ((arena || race || dig || hop || plain) && fromTitle && phase === 'mini') { pauseMini(`Player ${id + 1}'s controller disconnected. Press A on a controller to bring them back.`); return; }
+    if ((arena || race || dig || hop || plain) && fromTitle && phase === 'mini') { if (!bye) pauseMini(`Player ${id + 1}'s controller disconnected. Press A on a controller to bring them back.`); return; }
     if (fromTitle) { if (phase === 'paused') showPause(pauseView, menuSel); return; }
     if (phase === 'play' || phase === 'paused' || phase === 'win') {
       // if everyone left was sitting out, the team is out: that costs a heart and the level restarts
@@ -1833,8 +1834,30 @@
       if (phase !== 'win' && !players.some(p => isIn(p) || p.state === 'dead')) {
         if (lives > 1) { lives--; resetLevel(); } else { gameOver(); return; }
       }
-      pauseGame(`Player ${id + 1}'s controller disconnected. Press A on a controller to bring them back.`);
+      if (!bye) pauseGame(`Player ${id + 1}'s controller disconnected. Press A on a controller to bring them back.`);
     }
+  }
+  // BYE, typed on the keyboard: the keyboard's player leaves the game (the user asked). As Player 2, 3 or 4 their pug just
+  // goes, and the others play on. As Player 1, Cinnamon has to stay, so the next controller player takes her over and
+  // their own pug goes. With nobody else playing that's the end of the game: the main game goes to the main menu, and an
+  // Arcade game back to The Arcade. On a menu, alone, or with the keyboard not playing, nothing happens.
+  function keyboardBye() {
+    const who = kbSlot !== null ? kbSlot : ownerOf(0) === undefined ? 0 : null;
+    if (who === null) return;
+    if (who > 0) { kbSlot = null; leaveSlot(who, true); toast(`${LOOK[who].name} left the game.`, LOOK[who].hex); return; }
+    const next = joinedIds().find(i => i > 0 && ownerOf(i) !== undefined);
+    if (next !== undefined) {
+      padOwner[ownerOf(next)] = 0; kbSlot = null; leaveSlot(next, true);
+      toast(`Player 1 left the game. Player ${next + 1} is ${LOOK[0].name} now.`, LOOK[0].hex);
+      return;
+    }
+    const inMini = fromTitle && (phase === 'mini' || (phase === 'paused' && /(Pause|Over)$/.test(pauseView)));
+    if (phase === 'play' || phase === 'win' || (phase === 'paused' && !fromTitle)) toMainMenu();
+    else if (inMini) {
+      if (phase === 'mini') pauseMini();
+      (plain ? leavePlain : arena ? backFromArena : race ? backFromRace : dig ? backFromDig : hop ? backFromHop : backToArcade)();
+    } else return;
+    toast(`${LOOK[0].name} left the game.`, LOOK[0].hex);
   }
 
   // Barrels roll a little faster every level (about 10% per level), topping out at level 15
@@ -2056,6 +2079,7 @@
   //   B0SS3     goes straight to the island in space (codeIsle), from any screen
   //   W0RM      goes straight to the island crumbling, the pugs standing on it (codeWorm), from any screen
   //   TAC0      goes straight to Gloop yelling after the last burrito (codeYell), from any screen
+  //   BYE       the keyboard's player leaves the game (keyboardBye)
   // A code's first key still does its usual job if it is a game key (B barks, ZER0's Z jumps), but once a
   // code has begun, its next keys only type the code: the coin code's S doesn't also climb down or pick a
   // menu choice, the skip code's X makes no tacos. A key that doesn't fit, or nothing typed for 25 seconds,
@@ -2067,7 +2091,7 @@
     { code: 'L0CK2', at: 0, run: () => codeMissions() }, { code: 'YAY!', at: 0, run: () => unlockAll() },
     { code: 'B0SS', at: 0, run: () => codeBoss() }, { code: 'B0SS2', at: 0, run: () => codeSpace() },
     { code: 'B0SS3', at: 0, run: () => codeIsle() }, { code: 'W0RM', at: 0, run: () => codeWorm() },
-    { code: 'TAC0', at: 0, run: () => codeYell() }];
+    { code: 'TAC0', at: 0, run: () => codeYell() }, { code: 'BYE', at: 0, run: () => keyboardBye() }];
   // The zero code (the user asked for one to reset their coins): every pug's coins are set to 0 and saved.
   // Store things already bought are kept.
   // (the lock code, the user asked 2026-10-31: every unlock forgotten, and a pet that is locked again goes home, and a
