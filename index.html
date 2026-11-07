@@ -3940,7 +3940,7 @@
   function enterPlanet() {
     const g = plain, ids = g.fin.ids;
     g.fin = null; g.stroll = false; g.drop = null; g.space = null; g.isle = false; g.crumble = null; g.hole = null; g.warp = null; g.boss = null; g.nuke = null;
-    g.obs = []; g.drops = []; g.rovers = []; g.martians = []; g.ships = []; g.bits = []; g.endT = 0; g.cam = -PW / 2; g.planet = true; g.room = null; g.roomOn = {}; g.statueAt = {}; g.shipAt = {};
+    g.obs = []; g.drops = []; g.rovers = []; g.martians = []; g.ships = []; g.bits = []; g.endT = 0; g.cam = -PW / 2; g.planet = true; g.room = null; g.roomOn = {}; g.statueAt = {}; g.statueX = {}; g.shipAt = {};
     g.pcData = { paint: {}, blob: 0, bars: [3, 5, 2, 6, 4, 7, 3, 5], notes: [false, false, false, false] };
     g.pugs = ids.map((id, i) => shopPug(id, i * 16 - 8, -20));
     tone(600, 0.4, 'sine', 0.06, 300);
@@ -4113,7 +4113,7 @@
       labPotion(72, '#e8282f', 0), labPotion(102, '#5fd068', 1), labPotion(132, '#b48ae0', 2), labPotion(162, '#ffcc3d', 0), labPotion(192, '#7ae0ff', 1), labPotion(222, '#ff9ac0', 2)] },
     { wall: '#c8a040', floor: '#6a4a10', things: [
       { x: 110, say: "IT'S LOCKED", s: [150, 'square', -60], draw: b => { b('#6a4a2a', -16, -16, 32, 16); b('#c8a040', -3, -12, 6, 6); b('#8a5a34', -17, -22, 34, 8); } },
-      { x: 190, watch: true, say: 'IT BLINKED', s: [110, 'sawtooth', -40], draw: (b, r, on, t) => { b('#86838f', -20, -6, 40, 6); b('#a09daa', -20, -6, 40, 1); ctx.drawImage(gloopStatue(statueAwake() ? 'glow' : on && (t >> 5) & 1 ? 'blink' : on ? 'glow' : 'idle', plain.room.look), ctxX(b) - 17, PLAIN_Y - 60, 33, 54); } }] },
+      { x: 190, watch: true, say: 'IT BLINKED', s: [110, 'sawtooth', -40], draw: (b, r, on, t) => drawStatue(b, on, t) }] },
     { wall: '#4f6ad0', floor: '#26307a', things: [
       { x: 110, say: 'GOING UP? NO.', s: [523, 'sine', 523], draw: (b, r, on) => { b('#8d90a0', -18, -56, 36, 56); b('#14122a', -16, -54, 32, 54); if (on) { b('#ffe08a', -14, -52, 28, 52); } else { b('#55556a', -16, -54, 15, 54); b('#55556a', 1, -54, 15, 54); } } },
       { x: 190, say: 'SATURN IS MISSING', s: [700, 'sine', -200], draw: (b, r, on, t) => { b('#55556a', -2, -18, 4, 18); b('#55556a', -10, -3, 20, 3); r('#2f5bff', 0, -32, 15); r('#5fd068', on ? Math.sin(t * 0.1) * 9 : -5, -34, 5); r('#ffffff', on ? Math.cos(t * 0.1) * 9 : 6, -28, 2); } }] },
@@ -4150,24 +4150,47 @@
       return cells.join('');
     });
   }
+  // (one leg lifted for a step: that side's leg and shoe move up two rows)
+  function liftLeg(rows, left) {
+    return rows.map((row, y) => {
+      if (y < 30) return row;
+      const from = rows[y + 2] || '.'.repeat(row.length);
+      return left ? from.slice(0, 11) + row.slice(11) : row.slice(0, 11) + from.slice(11);
+    });
+  }
   const statuePics = {};
-  function gloopStatue(look, turn) {
-    const key = look + turn;
+  function gloopStatue(look, turn, leg) {
+    const key = look + turn + '/' + leg;
     if (!statuePics[key]) {
-      const rows = look === 'blink' ? GLOOP.blink : look === 'glow' ? GLOOP.idle.map((row, y) => y < 10 ? row.replace(/W/g, 'E') : row) : GLOOP.idle;
-      statuePics[key] = bakeWith(turn ? turnHead(rows, turn) : rows, STATUE_COLS);
+      let rows = look === 'blink' ? GLOOP.blink : look === 'glow' ? GLOOP.idle.map((row, y) => y < 10 ? row.replace(/W/g, 'E') : row) : GLOOP.idle;
+      if (turn) rows = turnHead(rows, turn);
+      if (leg) rows = liftLeg(rows, leg === 1);
+      statuePics[key] = bakeWith(rows, STATUE_COLS);
     }
     return statuePics[key];
   }
-  // (5 seconds after you first touch the statue it wakes up, for good, and its head turns to watch whoever is nearest)
-  const STATUE_WAKE = 300, STATUE_TURN = 3;
+  // (5 seconds after you first touch the statue it wakes up, for good: its head turns to watch whoever is nearest, and a
+  // second later it steps down and comes after them, slowly. It stays where it got to, even if you leave and come back.)
+  const STATUE_WAKE = 300, STATUE_TURN = 3, STATUE_WALK = 60, STATUE_SPEED = 0.5, STATUE_GAP = 18, STATUE_STRIDE = 14;
   const statueAwake = () => plain.statueAt[plain.room.n] <= plain.t;
+  const thingX = k => k.watch && plain.statueX[plain.room.n] !== undefined ? plain.statueX[plain.room.n] : k.x;
   function stepStatue() {
     const g = plain, r = g.room, k = ROOMS[r.kind].things.find(o => o.watch);
-    if (!k || !statueAwake() || !g.pugs.length || g.t % 8) return;
-    const near = g.pugs.reduce((a, p) => Math.abs(p.x - k.x) < Math.abs(a.x - k.x) ? p : a), d = near.x - k.x;
+    if (!k || !statueAwake() || !g.pugs.length) return;
+    const x = thingX(k), near = g.pugs.reduce((a, p) => Math.abs(p.x - x) < Math.abs(a.x - x) ? p : a), d = near.x - x;
+    if (Math.abs(d) > STATUE_GAP && g.t >= g.statueAt[r.n] + STATUE_WALK) {
+      g.statueX[r.n] = x + Math.sign(d) * STATUE_SPEED;
+      if (r.stride++ % STATUE_STRIDE === 0) { noise(0.08, 0.05, 160, 70); tone(70, 0.1, 'sine', 0.05, -20); }   // (a stone foot coming down)
+    } else r.stride = 0;
+    if (g.t % 8) return;
     const want = Math.sign(d) * Math.min(STATUE_TURN, Math.floor(Math.abs(d) / 12));
     if (want !== r.look) { r.look += Math.sign(want - r.look); noise(0.1, 0.03, 180, 120); }
+  }
+  function drawStatue(b, on, t) {
+    const r = plain.room, x = plain.statueX[r.n] === undefined ? b.x : plain.statueX[r.n];
+    b('#86838f', -20, -6, 40, 6); b('#a09daa', -20, -6, 40, 1);   // (its step, which stays behind when it walks off)
+    const up = Math.max(0, Math.min(6, 26 - Math.abs(x - b.x))), leg = r.stride ? 1 + (Math.floor(r.stride / STATUE_STRIDE) & 1) : 0;
+    ctx.drawImage(gloopStatue(statueAwake() ? 'glow' : on && (t >> 5) & 1 ? 'blink' : on ? 'glow' : 'idle', r.look, leg), Math.round(x) - 17, PLAIN_Y - 54 - up, 33, 54);
   }
   const ROOM_DOOR = 22, ROOM_REACH = 20;
   // (where building n stands: its own spot, or where its saucer has been parked)
@@ -4183,7 +4206,7 @@
     const g = plain;
     const kind = Math.floor(planetHash(n + 0.5) * 13);
     if (ROOMS[kind].refill) g.roomOn[n] = [];   // (the potions are back)
-    g.room = { n, kind, sayT: 0, say: '', alt: 0, pilot: null, look: 0, on: g.roomOn[n] || (g.roomOn[n] = [false, false]) };
+    g.room = { n, kind, sayT: 0, say: '', alt: 0, pilot: null, look: 0, stride: 0, on: g.roomOn[n] || (g.roomOn[n] = [false, false]) };
     g.pugs = g.pugs.map((p, i) => Object.assign(shopPug(p.id, ROOM_DOOR + 16 + i * 16, PLAIN_Y), { ground: true, upWas: true }));
     tone(420, 0.12, 'sine', 0.05, 200);
   }
@@ -4269,7 +4292,7 @@
     if (!p.ground || p.sitting) return null;
     if (p.x < ROOM_DOOR + 12) return -1;
     if (ROOMS[plain.room.kind].counter && Math.abs(p.x - 150) < 50) return -2;   // (at the counter)
-    const i = ROOMS[plain.room.kind].things.findIndex((k, n) => Math.abs(p.x - k.x) < (k.breaks ? 15 : ROOM_REACH) && !(k.breaks && plain.room.on[n]));
+    const i = ROOMS[plain.room.kind].things.findIndex((k, n) => Math.abs(p.x - thingX(k)) < (k.breaks ? 15 : ROOM_REACH) && !(k.breaks && plain.room.on[n]));
     return i < 0 ? null : i;
   }
   // (what EATS sells: a name, a price in coins and how it's drawn, sitting on y and with its middle at x)
@@ -4595,7 +4618,7 @@
         ctx.restore();
       } else drawPlainPug(p, Math.round(p.x), Math.round(p.y), 'black');
       const at = roomSpot(p);
-      if (at !== null && !r.pick && !r.eat && !r.pilot) drawUpArrow(at === -2 ? 150 : at < 0 ? ROOM_DOOR : R.things[at].x, PLAIN_Y - (at === -2 ? 56 : at < 0 ? 52 : 66));
+      if (at !== null && !r.pick && !r.eat && !r.pilot) drawUpArrow(at === -2 ? 150 : at < 0 ? ROOM_DOOR : thingX(R.things[at]), PLAIN_Y - (at === -2 ? 56 : at < 0 ? 52 : 66));
     }
     for (const b of g.bits) { ctx.fillStyle = b.col; ctx.fillRect(Math.round(b.x), Math.round(b.y), 2, 2); }
     if (r.eat) drawEat();
