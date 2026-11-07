@@ -4108,7 +4108,7 @@
     { wall: '#d8f0e0', floor: '#8a9aa8', scene: drawLab, refill: true, things: [
       labPotion(72, '#e8282f', 0), labPotion(102, '#5fd068', 1), labPotion(132, '#b48ae0', 2), labPotion(162, '#ffcc3d', 0), labPotion(192, '#7ae0ff', 1), labPotion(222, '#ff9ac0', 2)] },
     { wall: '#c8a040', floor: '#6a4a10', things: [
-      { x: 110, say: 'ALIEN MONEY IS ALL ROCKS', s: [988, 'square', 500], draw: (b, r, on) => { b('#6a4a2a', -16, -16, 32, 16); b('#c8a040', -3, -12, 6, 6); if (on) { b('#8a5a34', -16, -30, 32, 6); for (const a of [-10, 0, 9]) r('#ffe08a', a, -18, 5); } else b('#8a5a34', -17, -22, 34, 8); } },
+      { x: 110, say: "IT'S LOCKED", s: [150, 'square', -60], draw: b => { b('#6a4a2a', -16, -16, 32, 16); b('#c8a040', -3, -12, 6, 6); b('#8a5a34', -17, -22, 34, 8); } },
       { x: 190, say: 'IT BLINKED', s: [110, 'sawtooth', -40], draw: (b, r, on, t) => { b('#86838f', -20, -6, 40, 6); b('#a09daa', -20, -6, 40, 1); ctx.drawImage(gloopStatue(on && (t >> 5) & 1 ? 'blink' : on ? 'glow' : 'idle'), ctxX(b) - 17, PLAIN_Y - 60, 33, 54); } }] },
     { wall: '#4f6ad0', floor: '#26307a', things: [
       { x: 110, say: 'GOING UP? NO.', s: [523, 'sine', 523], draw: (b, r, on) => { b('#8d90a0', -18, -56, 36, 56); b('#14122a', -16, -54, 32, 54); if (on) { b('#ffe08a', -14, -52, 28, 52); } else { b('#55556a', -16, -54, 15, 54); b('#55556a', 1, -54, 15, 54); } } },
