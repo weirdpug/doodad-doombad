@@ -4248,27 +4248,29 @@
           r('#c8ccd8', x + dx, -22 + lift * 2, 2);
         }
       } }] },
-    // (17: the museum of Earth stuff: an Earth toaster that shoots bread, and the bones of an Earth beast, which fall apart)
+    // (17: the museum of the planet's history: four famous things, each on a stand with a little metal plaque. Up at one
+    // zooms in on its plaque, which says what it is and why it's famous. (the user asked))
     { wall: '#efe6d2', floor: '#7a5a3a', scene: drawMuseum, things: [
-      { x: 110, say: 'IT SHOOTS BREAD!', s: [700, 'square', 400], draw: (b, r, on, t) => {
-        b('#c8ccd8', -12, -26, 24, 3); b('#eef0f6', -10, -23, 20, 23); b('#d8d6de', 6, -23, 4, 23); b('#ffcc3d', -6, -14, 12, 3);
-        if (on) for (const [a, d] of [[-5, 0], [1, 14]]) { const up = Math.sin(((t + d) % 36) / 36 * Math.PI) * 22; b('#d8a050', a, -42 - up, 4, 6); b('#a8743a', a, -42 - up, 4, 1); }
-        b('#c8ccd8', -8, -36, 16, 10); b('#8d90a0', -8, -27, 16, 1); b('#3a3a4a', -5, -36, 4, 1); b('#3a3a4a', 1, -36, 4, 1); b('#14122a', 8, on ? -30 : -34, 2, 2);
+      { x: 70, s: [300, 'sine', 400], plaque: ['THE FIRST SAUCER', 'BUILT BY GRANDMA ZIBB IN HER GARAGE. IT WAS THE FIRST SHIP EVER TO LEAVE THE PLANET. IT COULD ONLY FLY BACKWARDS SO SHE FLEW ALL THE WAY TO THE MOONS LOOKING OVER HER SHOULDER.'], draw: (b, r, on, t) => {
+        museumStand(b);
+        b('#55556a', -1, -30, 2, 6); b('#8a5a2a', -9, -31, 18, 2); b('#a8743a', -12, -34, 24, 4); b('#7ae0ff', -5, -39, 10, 5); b('#c8eeff', -4, -38, 2, 2);
+        b('#6a3e1e', -8, -33, 2, 1); b('#6a3e1e', 6, -32, 2, 1); b((t >> 4) & 1 ? '#ffcc3d' : '#8a6a20', -11, -32, 2, 1); b((t >> 4) & 1 ? '#8a6a20' : '#ffcc3d', 9, -32, 2, 1);
       } },
-      { x: 180, names: ['GOOD AS NEW', 'DO NOT TOUCH THE BONES!'], s: [160, 'square', -80], draw: (b, r, on) => {
-        b('#55556a', -24, -8, 48, 8); b('#8d90a0', -24, -8, 48, 2); b('#ffcc3d', -8, -5, 16, 3);
-        const bone = '#f4f0e0';
-        if (+on) {   // (a heap of bones)
-          for (const [a, c, w] of [[-14, -11, 8], [-6, -10, 10], [3, -11, 7], [-10, -13, 6], [6, -13, 9], [-2, -14, 6], [12, -10, 5]]) b(bone, a, c, w, 2);
-          b(bone, -18, -15, 7, 5); b('#14122a', -16, -14, 2, 2);
-          return;
-        }
-        // (an Earth beast, which is a pug: skull with its short snout, spine, ribs, four legs and a curly tail)
-        b(bone, -16, -27, 9, 8); b(bone, -19, -23, 4, 4); b('#14122a', -13, -25, 2, 2); b('#14122a', -19, -21, 3, 1);
-        b(bone, -7, -22, 20, 2);
-        for (const a of [-4, 0, 4, 8]) b(bone, a, -20, 2, 6);
-        for (const a of [-5, -1, 9, 13]) b(bone, a, -14, 2, 6);
-        b(bone, 13, -26, 2, 4); b(bone, 15, -28, 4, 2); b(bone, 18, -26, 2, 3);
+      { x: 115, s: [300, 'sine', 400], plaque: ["KING ZORP'S CROWN", 'WORN BY THE VERY FIRST KING OF THE PLANET. IT HAS TWO HOLES FOR HIS ANTENNAE. HE WAS KING FOR THREE DAYS. THEN HE TRIPPED OVER A BLOB AND EVERYONE VOTED FOR THE BLOB INSTEAD.'], draw: (b, r, on, t) => {
+        museumStand(b);
+        b('#8a1f2a', -11, -28, 22, 4); b('#b0242c', -11, -28, 22, 1); b('#ffcc3d', -12, -26, 1, 3); b('#ffcc3d', 11, -26, 1, 3);
+        b('#ffcc3d', -8, -33, 16, 5); b('#ffcc3d', -8, -37, 3, 4); b('#ffcc3d', -2, -38, 4, 5); b('#ffcc3d', 5, -37, 3, 4);
+        b('#14122a', -6, -32, 2, 2); b('#14122a', 4, -32, 2, 2); b('#e8282f', -1, -32, 2, 2); b('#fff6c8', -7, -33, 1, 1);
+      } },
+      { x: 160, s: [300, 'sine', 400], plaque: ['THE FIRST SLIME', 'THE OLDEST SLIME ON THE PLANET. ALL THE SLIME THERE HAS EVER BEEN CAME FROM THIS ONE JAR. IT IS ONE MILLION YEARS OLD AND IT STILL WIGGLES. PLEASE DO NOT DRINK IT AGAIN.'], draw: (b, r, on, t) => {
+        museumStand(b);
+        b('#d8f4ff', -6, -39, 12, 15); b('#5fd068', -5, -32, 10, 7); b('#7af0a0', -5 + ((t >> 3) % 3) * 2, -33, 4, 1); b('#b4f5c8', -3 + ((t >> 4) % 4) * 2, -30 - ((t >> 2) % 3), 1, 1);
+        b('#ffffff', -5, -38, 1, 10); b('#8d90a0', -7, -42, 14, 3); b('#55556a', -7, -40, 14, 1);
+      } },
+      { x: 205, s: [300, 'sine', 400], plaque: ['THE PINK MOON ROCK', 'LONG AGO A GIANT METEOR HIT THE PLANET. IT KNOCKED OFF A BIG PIECE THAT FLEW UP INTO THE SKY AND BECAME THE LITTLE PINK MOON. THIS ROCK FELL BACK DOWN. IT IS STILL A LITTLE BIT WARM.'], draw: (b, r, on, t) => {
+        museumStand(b);
+        r('#ff9ac0', 0, -32, 8); r('#d86a90', 3, -29, 4); r('#d86a90', -4, -35, 2); r('#d86a90', 4, -36, 1.5); r('#ffd0e0', -3, -37, 2);
+        if ((t >> 4) & 1) { b('rgba(255,140,140,0.6)', -3, -46, 1, 3); b('rgba(255,140,140,0.6)', 2, -48, 1, 3); }   // (still warm)
       } }] }];
   const ctxX = b => b.x;
   // (Gloop carved in stone for the temple: his own picture in grey, plus one with glowing eyes for when it wakes up)
@@ -4380,6 +4382,7 @@
     g.bits = g.bits.filter(b => b.t > 0);
     if (r.eat) { stepEat(); g.kbAtk = false; return; }
     if (r.drink) { stepDrink(); g.kbAtk = false; return; }
+    if (r.plaque) { stepPlaque(); g.kbAtk = false; return; }
     if (r.pick) { stepPick(); g.kbAtk = false; return; }
     if (r.pilot) { stepPilot(); g.kbAtk = false; return; }
     if (r.pc) { stepPc(); g.kbAtk = false; return; }
@@ -4414,6 +4417,11 @@
         noise(0.25, 0.14, 5000, 1500); tone(1800, 0.12, 'square', 0.04, -900); tone(900, 0.16, 'sine', 0.05, -500, 0.05);
         for (let i = 0; i < 26; i++) g.bits.push({ x: thing.x, y: PLAIN_Y - 36, vx: (Math.random() - 0.5) * 3.4, vy: -1 - Math.random() * 2.6, g: 0.14, t: 34 + Math.random() * 14, col: i % 3 ? thing.col : '#d8f4ff' });
         continue;
+      }
+      if (thing.plaque) {
+        p.moving = false; r.plaque = { i: at, t: 0, out: false, id: p.id, held: true }; r.sayT = 0;
+        tone(thing.s[0], 0.3, thing.s[1], 0.03, thing.s[2]);
+        break;
       }
       if (thing.drink) {
         p.moving = false; r.on[at] = true; r.say = thing.say; r.sayT = 90; r.drink = { t: 0, id: p.id, kind: thing.drink, at };
@@ -4619,16 +4627,55 @@
   // (the museum: a banner, three paintings, Saturn as it was, a pug and a burrito, and a guard strolling along the back)
   function drawMuseum(t) {
     const box = (col, x, y, w, h) => { ctx.fillStyle = col; ctx.fillRect(x, PLAIN_Y + y, w, h); };
-    box('#8a1f2a', 84, -134, 72, 13); drawText('EARTH STUFF', 120, PLAIN_Y - 131, 'gold', 'center');
+    box('#8a1f2a', 84, -134, 72, 13); drawText('OUR HISTORY', 120, PLAIN_Y - 131, 'gold', 'center');
     const frame = (x, bg) => { box('#c8a040', x - 2, -114, 40, 32); box('#8a6a20', x - 2, -84, 40, 2); box(bg, x, -112, 36, 28); };
-    frame(44, '#1f0e46'); box('#d8b080', 51, -99, 22, 2); bb('#e8c070', 62, PLAIN_Y - 98, 6); box('#d8b080', 56, -99, 12, 2); box('#ffffff', 47, -108, 1, 1); box('#ffffff', 74, -104, 1, 1);
-    frame(146, '#7ae0ff'); box('#14122a', 154, -106, 5, 7); box('#14122a', 169, -106, 5, 7); bb('#d8a060', 164, PLAIN_Y - 97, 9); bb('#3a2a1a', 164, PLAIN_Y - 94, 5);
-    box('#ffffff', 159, -101, 2, 2); box('#ffffff', 167, -101, 2, 2); box('#ff6a9a', 163, -91, 2, 2);
-    frame(198, '#ff9ac0'); box('#e8c070', 204, -104, 24, 12); box('#c8904a', 204, -104, 3, 12); box('#5fd068', 225, -102, 3, 3); box('#e8282f', 225, -97, 3, 3); box('#c8904a', 213, -104, 1, 12);
+    // (the two moons over the hills; King Zorp in his crown; the first saucer, going backwards)
+    frame(44, '#2b1460'); box('#2fb88a', 44, -90, 36, 6); bb('#6ae0c8', 57, PLAIN_Y - 101, 7); bb('#ff9ac0', 71, PLAIN_Y - 106, 3); box('#ffffff', 47, -109, 1, 1); box('#ffffff', 75, -97, 1, 1);
+    frame(146, '#8a1f2a'); box('#b48ae0', 153, -92, 22, 8); box('#5fd068', 157, -104, 14, 12); box('#14122a', 159, -100, 3, 4); box('#14122a', 166, -100, 3, 4);
+    box('#ffcc3d', 157, -108, 14, 4); box('#ffcc3d', 157, -111, 2, 3); box('#ffcc3d', 163, -111, 2, 3); box('#ffcc3d', 169, -111, 2, 3); box('#5fd068', 160, -112, 1, 4); box('#5fd068', 167, -112, 1, 4);
+    frame(198, '#1f0e46'); box('#a8743a', 206, -100, 14, 3); box('#7ae0ff', 210, -103, 6, 3); box('#ffffff', 222, -100, 5, 1); box('#ffffff', 223, -97, 4, 1); box('#ffffff', 201, -109, 1, 1); box('#ffffff', 229, -108, 1, 1);
     // (the guard, in a cap, walking slowly up and down behind everything)
     const gx = Math.round(150 + Math.sin(t * 0.008) * 70), face = Math.cos(t * 0.008) < 0 ? -1 : 1;
     drawAlien(gx, '#5fd068', (t >> 4) & 1, face);
     box('#1d2f8c', gx - 6, -22, 12, 2); box('#1d2f8c', gx - 4, -24, 8, 2); box('#ffcc3d', gx - 1, -24, 2, 2); box('#1d2f8c', gx - 3, -10, 6, 5);
+  }
+  // (a museum stand: a white block with a little metal plaque on its front)
+  function museumStand(b) {
+    b('#eef0f6', -10, -22, 20, 22); b('#d8d6de', 6, -22, 4, 22); b('#c8ccd8', -12, -24, 24, 3);
+    b('#55586a', -8, -9, 16, 6); b('#b4b8c8', -7, -8, 14, 4); b('#d0d4e0', -7, -8, 14, 1);
+  }
+  // (Up at a museum thing: the view zooms in on its plaque until the plaque fills the screen; Up, jump or bark goes back)
+  const PLAQUE_ZOOM = 18;
+  function stepPlaque() {
+    const g = plain, r = g.room, k = r.plaque, p = g.pugs.find(q => q.id === k.id);
+    if (k.out) { if (--k.t <= 0) r.plaque = null; return; }
+    if (k.t < PLAQUE_ZOOM) k.t++;
+    if (!p) { k.out = true; return; }
+    p.upDoor = true;
+    const inp = plainInput(p), back = (inp.up && !k.held) || inp.jump || inp.bark;
+    k.held = inp.up;
+    if (k.t >= PLAQUE_ZOOM && back) { k.out = true; tone(700, 0.2, 'sine', 0.03, -400); }
+  }
+  // (the words on a plaque, split into lines of at most n letters)
+  const plaqueLines = (text, n) => text.split(' ').reduce((lines, w) => {
+    if (lines.length && (lines[lines.length - 1] + ' ' + w).length <= n) lines[lines.length - 1] += ' ' + w; else lines.push(w);
+    return lines;
+  }, []);
+  function drawPlaque() {
+    const r = plain.room, k = r.plaque, thing = ROOMS[r.kind].things[k.i], u = Math.min(1, k.t / PLAQUE_ZOOM), e = u * u * (3 - 2 * u);
+    const from = [thing.x - 7, PLAIN_Y - 8, 14, 4], to = [12, 102, 216, 128];
+    const [x, y, w, h] = from.map((v, i) => Math.round(v + (to[i] - v) * e));
+    ctx.fillStyle = `rgba(10,10,22,${(0.65 * e).toFixed(2)})`; ctx.fillRect(0, 0, PW, PH);
+    ctx.fillStyle = '#55586a'; ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
+    ctx.fillStyle = '#b4b8c8'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#d0d4e0'; ctx.fillRect(x, y, w, Math.max(1, Math.round(h * 0.06)));
+    ctx.fillStyle = 'rgba(255,255,255,0.14)'; for (let j = 6; j < h - 2; j += 5) ctx.fillRect(x + 2, y + j, w - 4, 1);
+    if (u < 1 || k.out) return;
+    for (const [bx, by] of [[x + 6, y + 6], [x + w - 6, y + 6], [x + 6, y + h - 6], [x + w - 6, y + h - 6]]) { bb('#55586a', bx, by, 2.5); bb('#d0d4e0', bx - 0.5, by - 0.5, 1); }
+    drawText(thing.plaque[0], PW / 2, y + 9, 'black', 'center');
+    ctx.fillStyle = '#55586a'; ctx.fillRect(x + 16, y + 20, w - 32, 1);
+    plaqueLines(thing.plaque[1], 32).forEach((line, j) => drawText(line, PW / 2, y + 27 + j * 11, 'black', 'center'));
+    drawText('JUMP OR BARK TO GO BACK', PW / 2, 86, 'pink', 'center');
   }
   // (a pot plant, for the corner of a floor with no door)
   function drawPlant(x) {
@@ -4936,7 +4983,7 @@
         ctx.save(); ctx.translate(Math.round(p.x), Math.round(p.y)); ctx.rotate(-p.face * 0.22); drawPlainPug(p, 0, 0, 'black'); ctx.restore();
       } else drawPlainPug(p, Math.round(p.x), Math.round(p.y), 'black');
       const at = roomSpot(p);
-      if (at !== null && !r.pick && !r.eat && !r.drink && !r.pilot && !r.lift) drawUpArrow(at === -2 ? 150 : at < 0 ? ROOM_DOOR : thingX(R.things[at]), PLAIN_Y - (at === -2 ? 56 : at < 0 ? 52 : 66));
+      if (at !== null && !r.pick && !r.eat && !r.drink && !r.plaque && !r.pilot && !r.lift) drawUpArrow(at === -2 ? 150 : at < 0 ? ROOM_DOOR : thingX(R.things[at]), PLAIN_Y - (at === -2 ? 56 : at < 0 ? 52 : 66));
     }
     for (const b of g.bits) { ctx.fillStyle = b.col; ctx.fillRect(Math.round(b.x), Math.round(b.y), 2, 2); }
     if (r.eat) drawEat();
@@ -4946,6 +4993,7 @@
     if (r.pilot) drawText('ARROWS FLY  SPACE STOPS', PW / 2, 72, 'cyan', 'center');
     if (r.pc) drawPc();
     if (r.lift) drawLiftPanel();
+    if (r.plaque) drawPlaque();
   }
   function drawPlanet() {
     const g = plain, cam = g.cam;
