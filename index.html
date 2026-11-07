@@ -4058,13 +4058,21 @@
         for (let i = 0; i < 8; i++) box(i % 2 ? '#c8a040' : '#e8c060', -44 + i * 5, -(i + 1) * 8, 88 - i * 10, 8);
         box('#6a4a10', -5, -12, 10, 12); round('#ffffff', 0, -40, 7); round('#3fbfae', 0, -40, 4); round('#14122a', 0, -40, 2);
         break;
-      case 5:   // (twin towers with a bridge)
-        for (const a of [-34, 14]) {
-          box('#3a4ea8', a, -74, 20, 74); box('#4f6ad0', a + 2, -74, 16, 74); round('#9fe0ff', a + 10, -74, 10, true);
-          for (let r = 0; r < 5; r++) box('#ffe08a', a + 7, -66 + r * 13, 6, 7);
-        }
-        box('#7a8ee0', -14, -50, 28, 5); box('#3a4ea8', -14, -45, 28, 1);
+      case 5: {   // (a bank, where the twin towers were (the user asked): blue stone, cream pillars, barred windows, gold
+        // trim, its name, and a big gold coin turning on the roof)
+        box('#a8acbc', -40, -4, 80, 4); box('#c8ccd8', -37, -7, 74, 3);
+        box('#3a4ea8', -34, -52, 68, 45); box('#4f6ad0', -32, -50, 64, 43);
+        for (const a of [-26, 16]) { box('#14122a', a, -42, 10, 18); box('#7ae0ff', a + 1, -41, 8, 16); box('#9fe0ff', a + 1, -41, 8, 2); for (const i of [3, 6]) box('#55556a', a + i, -41, 1, 16); }
+        for (const a of [-32, -15, 10, 27]) { box('#eee0b8', a, -50, 5, 43); box('#c8b888', a + 3, -50, 2, 43); box('#fff6e0', a - 1, -52, 7, 2); box('#fff6e0', a - 1, -9, 7, 2); }
+        box('#c8a040', -10, -30, 20, 23); box('#6a3e1e', -8, -28, 7, 21); box('#6a3e1e', 1, -28, 7, 21); box('#8a5a34', -7, -27, 5, 19); box('#8a5a34', 2, -27, 5, 19);
+        box('#ffcc3d', -3, -18, 1, 3); box('#ffcc3d', 2, -18, 1, 3);
+        box('#c8a040', -38, -56, 76, 4); box('#ffcc3d', -38, -56, 76, 1);
+        box('#3a4ea8', -24, -67, 48, 11); box('#14122a', -16, -66, 32, 9); drawText('BANK', x, PLAIN_Y - 65, 'gold', 'center');
+        const spin = Math.abs(Math.cos(plain.t * 0.04)), cy = PLAIN_Y - 77;
+        for (const [col, rad] of [['#c8a040', 9], ['#ffcc3d', 7]]) { ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(x, cy, Math.max(0.6, rad * spin), rad, 0, 0, Math.PI * 2); ctx.fill(); }
+        if (spin > 0.4) { box('#c8a040', -1, -81, 2, 8); box('#fff6c8', Math.round(-4 * spin), -83, 2, 2); }
         break;
+      }
       case 6:   // (a glass greenhouse full of plants)
         for (const [a, t] of [[-20, 24], [-8, 34], [6, 28], [18, 20]]) { box('#2fb88a', a, -t, 3, t); round('#5fd068', a + 1, -t, 6); }
         round('rgba(159,224,255,0.45)', 0, -3, 36, true);
@@ -4173,9 +4181,12 @@
     { wall: '#c8a040', floor: '#6a4a10', things: [
       { x: 110, say: "IT'S LOCKED", s: [150, 'square', -60], draw: b => { b('#6a4a2a', -16, -16, 32, 16); b('#c8a040', -3, -12, 6, 6); b('#8a5a34', -17, -22, 34, 8); } },
       { x: 190, watch: true, say: 'IT BLINKED', s: [110, 'sawtooth', -40], draw: (b, r, on, t) => drawStatueStep(b, on, t) }] },
-    { wall: '#4f6ad0', floor: '#26307a', things: [
-      { x: 110, say: 'GOING UP? NO.', s: [523, 'sine', 523], draw: (b, r, on) => { b('#8d90a0', -18, -56, 36, 56); b('#14122a', -16, -54, 32, 54); if (on) { b('#ffe08a', -14, -52, 28, 52); } else { b('#55556a', -16, -54, 15, 54); b('#55556a', 1, -54, 15, 54); } } },
-      { x: 190, say: 'SATURN IS MISSING', s: [700, 'sine', -200], draw: (b, r, on, t) => { b('#55556a', -2, -18, 4, 18); b('#55556a', -10, -3, 20, 3); r('#2f5bff', 0, -32, 15); r('#5fd068', on ? Math.sin(t * 0.1) * 9 : -5, -34, 5); r('#ffffff', on ? Math.cos(t * 0.1) * 9 : 6, -28, 2); } }] },
+    // (5: the bank (the twin towers were; the user asked): Up at the vault opens it, and shuts it again; Up at the bell on
+    // the counter rings it, and the teller says something)
+    { wall: '#e3d9c0', floor: '#8a8e9e', scene: drawBank, things: [
+      { x: 72, names: ['LOCKED UP TIGHT', 'SO MUCH GOLD'], s: [90, 'square', -40], draw: (b, r, on, t) => drawVault(b, r, +on, t) },
+      { x: 170, names: ['NEXT PLEASE', 'WELCOME TO THE BANK', 'NO LOANS FOR PUGS', 'PLEASE WIPE YOUR PAWS'], s: [1568, 'triangle', 0], draw: b => {
+        b('#8a6a20', -5, -26, 10, 2); b('#ffcc3d', -4, -31, 8, 5); b('#ffcc3d', -3, -33, 6, 2); b('#c8a040', -1, -35, 2, 2); b('#fff6c8', -2, -31, 1, 2); } }] },
     { wall: '#bfeee0', floor: '#2fb88a', things: [
       { x: 110, say: 'IT GREW!', s: [330, 'sine', 700], draw: (b, r, on) => { const h = on ? 58 : 18; b('#a8743a', -8, -10, 16, 10); b('#2f9f92', -1, -10 - h, 3, h); r('#ff9ac0', 0, -12 - h, on ? 10 : 5); r('#ffcc3d', 0, -12 - h, on ? 4 : 2); } },
       { x: 190, say: 'SNAP!', s: [200, 'square', -120], draw: (b, r, on, t) => { const gap = on && (t >> 3) & 1 ? 2 : 10; b('#a8743a', -8, -10, 16, 10); b('#2f9f92', -1, -22, 3, 12); b('#c81f2a', -12, -30 - gap, 24, 6); b('#c81f2a', -12, -30 + gap - 4, 24, 6); for (let i = 0; i < 4; i++) { b('#ffffff', -11 + i * 7, -24 - gap, 3, 3); b('#ffffff', -11 + i * 7, -27 + gap - 4, 3, 3); } } }] },
@@ -4516,7 +4527,7 @@
   // how far below where it parks the saucer can fly, so the dot can reach the aliens)
   const SKY_BOLT = 6, SKY_GUN = [73, 44], SKY_LOW = -30;
   // (each kind of building's half width and height, for what a shot hits)
-  const HOME_BOX = { 0: [34, 40], 1: [26, 100], 2: [22, 26], 3: [28, 62], 4: [44, 64], 5: [34, 80], 6: [36, 36], 7: [30, 50], 8: [32, 74], 9: [32, 90], 11: [40, 60], 12: [20, 88], [MUSEUM]: [42, 72] };
+  const HOME_BOX = { 0: [34, 40], 1: [26, 100], 2: [22, 26], 3: [28, 62], 4: [44, 64], 5: [38, 86], 6: [36, 36], 7: [30, 50], 8: [32, 74], 9: [32, 90], 11: [40, 60], 12: [20, 88], [MUSEUM]: [42, 72] };
   // (the saucer flown from inside: the middle of the window is where it is)
   const shipSpot = () => [buildingX(plain.room.n), PLAIN_Y - 44 - plain.room.alt];
   const inHome = (n, x, y) => { const [hw, h] = HOME_BOX[homeKind(n)]; return Math.abs(x - buildingX(n)) < hw && y > PLAIN_Y - h; };
@@ -4865,6 +4876,49 @@
     drawText('JUMP OR BARK TO GO BACK', PW / 2, 86, 'pink', 'center');
   }
   // (a pot plant, for the corner of a floor with no door)
+  // (inside the bank: a checked marble floor, its name, a clock, a plant, and the teller behind the counter in a green
+  // visor and a bow tie, behind gold bars with a gap to talk through)
+  function drawBank(t) {
+    const box = (col, x, y, w, h) => { ctx.fillStyle = col; ctx.fillRect(x, PLAIN_Y + y, w, h); };
+    for (let i = 0; i * 16 < PW; i++) for (let j = 0; j < 4; j++) if ((i + j) & 1) box('#a8acbc', i * 16, 2 + j * 10, 16, 10);
+    box('#1d2f8c', 76, -134, 88, 13); drawText('BANK OF ZORP', 120, PLAIN_Y - 131, 'gold', 'center');
+    bb('#ffffff', 212, PLAIN_Y - 98, 9); ctx.strokeStyle = '#c8a040'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(212, PLAIN_Y - 98, 9, 0, Math.PI * 2); ctx.stroke();
+    box('#22222c', 211, -104, 2, 6); box('#22222c', 212, -99, 5, 2);
+    drawPlant(116);
+    const bob = (t >> 5) & 1, cx = 196, L = 132, R = PW;
+    ctx.save(); ctx.translate(0, -18 - bob);
+    drawAlien(cx, '#5fd068', 0, 1);
+    const u = (col, a, b, w, h) => { ctx.fillStyle = col; ctx.fillRect(cx + a, PLAIN_Y + b, w, h); };
+    u('rgba(47,184,138,0.8)', -7, -21, 14, 3); u('#1d6a3a', -8, -18, 16, 1);
+    u('#ffffff', -3, -10, 6, 3); u('#e8282f', -3, -10, 2, 2); u('#e8282f', 1, -10, 2, 2); u('#b0242c', -1, -10, 2, 2);
+    ctx.restore();
+    box('rgba(190,235,255,0.16)', L, -58, R - L, 33);
+    for (let x = L + 3; x < R; x += 7) if (Math.abs(x - cx) > 9) box('#c8a040', x, -58, 1, 33);
+    box('#c8a040', L, -61, R - L, 3); box('#ffcc3d', L, -61, R - L, 1);
+    box('#6a3e1e', L, -22, R - L, 22); for (let x = L + 5; x < R - 12; x += 27) box('#8a5a34', x, -18, 21, 14);
+    box('#eee0b8', L - 2, -25, R - L + 2, 3); box('#c8b888', L - 2, -23, R - L + 2, 1);
+  }
+  // (the bank's vault, a big round steel door in the wall; open, it's swung aside and the gold is showing)
+  function drawVault(b, r, open, t) {
+    r('#3a3a4a', 0, -28, 24); r('#6a6e80', 0, -28, 22);
+    if (open) {
+      r('#1a1622', 0, -28, 19);
+      b('#5a4a2a', -17, -34, 34, 2); b('#5a4a2a', -17, -22, 34, 2);
+      for (const [a, c] of [[-12, -38], [-6, -38], [0, -38], [6, -38], [-9, -42], [-3, -42], [3, -42]]) { b('#c8a040', a, c, 6, 4); b('#ffcc3d', a, c, 6, 1); }
+      for (const a of [-12, -7, -2, 3, 8, 13]) r('#ffcc3d', a, -24.5, 2.5);
+      for (const a of [-9.5, 0.5, 10.5]) r('#c8a040', a, -28.5, 2.5);
+      for (const a of [-6, 6]) { r('#c8a070', a, -13, 4.5); b('#8a6a40', a - 1, -19, 2, 2); b('#ffcc3d', a - 1, -14, 2, 2); }
+      const k = (t >> 3) % 4, [sx, sy] = [[-8, -40], [9, -26], [-3, -44], [5, -38]][k];
+      b('#ffffff', sx, sy, 1, 1); b('#ffffff', sx - 1, sy, 3, 1); b('#ffffff', sx, sy - 1, 1, 3);
+      ctx.fillStyle = '#8d90a0'; ctx.beginPath(); ctx.ellipse(b.x - 28, PLAIN_Y - 28, 6, 21, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#a8acbc'; ctx.beginPath(); ctx.ellipse(b.x - 29, PLAIN_Y - 28, 4, 19, 0, 0, Math.PI * 2); ctx.fill();
+    } else {
+      r('#a8acbc', 0, -28, 19); r('#c8ccd8', 0, -28, 15); r('#b4b8c8', 0, -28, 10);
+      for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; r('#8d90a0', Math.cos(a) * 17, -28 + Math.sin(a) * 17, 1.5); }
+      b('#55586a', -9, -29, 18, 2); b('#55586a', -1, -37, 2, 18); r('#55586a', 0, -28, 4); r('#ffcc3d', 0, -28, 2);
+    }
+    b('#55556a', -22, -4, 44, 4);
+  }
   function drawPlant(x) {
     const box = (col, a, y, w, h) => { ctx.fillStyle = col; ctx.fillRect(x + a, PLAIN_Y + y, w, h); };
     box('#a8743a', -7, -12, 14, 12); box('#8a5a2a', -7, -12, 14, 2);
