@@ -4015,10 +4015,10 @@
     c.fillStyle = '#ff9ac0'; c.beginPath(); c.arc(52, 34, 11, 0, Math.PI * 2); c.fill();
     c.fillStyle = '#ffc4dc'; c.beginPath(); c.arc(49, 31, 7, 0, Math.PI * 2); c.fill();
   }
-  // (which kind of building is at slot n: one of the 13, but never 10, the egg pod, which is gone; its slots get one of
-  // the others instead, so the street has no gaps and every other building stays where it was)
-  const HOME_KINDS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12];
-  const homeKind = n => { const k = Math.floor(planetHash(n + 0.5) * 13); return k !== 10 ? k : HOME_KINDS[Math.floor(planetHash(n + 0.65) * HOME_KINDS.length)]; };
+  // (which kind of building is at slot n: one of the 13, but never 10, the egg pod, which is gone: its slots are the
+  // museum's now (the user asked for one more building), so every other building stays where it was)
+  const MUSEUM = 17;
+  const homeKind = n => { const k = Math.floor(planetHash(n + 0.5) * 13); return k === 10 ? MUSEUM : k; };
   // (a building of that kind at screen x)
   function drawAlienHome(x, kind) {
     const box = (col, a, b, w, h2) => { ctx.fillStyle = col; ctx.fillRect(x + a, PLAIN_Y + b, w, h2); };
@@ -4090,6 +4090,17 @@
         box('#14122a', -23, -60, 46, 15); drawText('EATS', x, PLAIN_Y - 57, 'gold', 'center');
         box('#3a2a78', -6, -22, 12, 22); box('#7ae0ff', -30, -24, 16, 12); box('#7ae0ff', 14, -24, 16, 12);
         break;
+      case MUSEUM: {   // (a museum: white columns under a pointed roof, wide steps and its name)
+        box('#c8c5d0', -42, -4, 84, 4); box('#d8d6de', -38, -8, 76, 4);
+        box('#a8acbc', -34, -46, 68, 38);
+        for (const a of [-32, -20, 14, 26]) { box('#ffffff', a, -44, 6, 36); box('#c8ccd8', a + 4, -44, 2, 36); box('#eef0f6', a - 1, -46, 8, 2); }
+        box('#6a3e1e', -8, -28, 16, 20); box('#8a5a34', -6, -26, 5, 18); box('#8a5a34', 1, -26, 5, 18); box('#ffcc3d', -2, -18, 1, 2); box('#ffcc3d', 1, -18, 1, 2);
+        box('#d8d6de', -40, -54, 80, 8);
+        ctx.fillStyle = '#eef0f6'; ctx.beginPath(); ctx.moveTo(x - 42, PLAIN_Y - 54); ctx.lineTo(x, PLAIN_Y - 72); ctx.lineTo(x + 42, PLAIN_Y - 54); ctx.closePath(); ctx.fill();
+        round('#ffcc3d', 0, -61, 3);
+        box('#14122a', -21, -54, 42, 9); drawText('MUSEUM', x, PLAIN_Y - 53, 'gold', 'center');
+        break;
+      }
       default:   // (a rocket on its pad)
         box('#55556a', -28, -6, 56, 6); box('#8d90a0', 18, -70, 3, 64); box('#8d90a0', 10, -60, 10, 2);
         ctx.fillStyle = '#b0242c'; ctx.beginPath(); ctx.moveTo(x - 10, PLAIN_Y - 68); ctx.lineTo(x, PLAIN_Y - 88); ctx.lineTo(x + 10, PLAIN_Y - 68); ctx.closePath(); ctx.fill();
@@ -4107,7 +4118,7 @@
     box('#14122a', -4, -16, 3, 4); box('#14122a', 1, -16, 3, 4); box('#ffffff', -3, dizzy ? -14 : -16, 1, 1); box('#ffffff', 2, -16, 1, 1);
     box(col, -3, -23, 1, 3); box(col, 2, -23, 1, 3); box('#ffcc3d', -4, -24, 2, 2); box('#ffcc3d', 2, -24, 2, 2);
   }
-  // Inside the aliens' buildings: pressing Up in front of one goes in, and everyone with it. Each of the 12 kinds has its
+  // Inside the aliens' buildings: pressing Up in front of one goes in, and everyone with it. Each of the 13 kinds has its
   // own room with its own two things to play with: Up in front of one uses it (and stays that way, building by building),
   // Up at the door goes back out. A little arrow shows when Up will do something. (the user asked)
   // (a thing's x, what shows at the top when it's used, its sound, and how it's drawn: b a box and r a ball, both from its
@@ -4240,6 +4251,28 @@
           ctx.strokeStyle = '#8d90a0'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(b.x + x + 0.5, PLAIN_Y - 33); ctx.lineTo(b.x + x + dx + 0.5, PLAIN_Y - 23 + lift * 2); ctx.stroke();
           r('#c8ccd8', x + dx, -22 + lift * 2, 2);
         }
+      } }] },
+    // (17: the museum of Earth stuff: an Earth toaster that shoots bread, and the bones of an Earth beast, which fall apart)
+    { wall: '#efe6d2', floor: '#7a5a3a', scene: drawMuseum, things: [
+      { x: 110, say: 'IT SHOOTS BREAD!', s: [700, 'square', 400], draw: (b, r, on, t) => {
+        b('#c8ccd8', -12, -26, 24, 3); b('#eef0f6', -10, -23, 20, 23); b('#d8d6de', 6, -23, 4, 23); b('#ffcc3d', -6, -14, 12, 3);
+        if (on) for (const [a, d] of [[-5, 0], [1, 14]]) { const up = Math.sin(((t + d) % 36) / 36 * Math.PI) * 22; b('#d8a050', a, -42 - up, 4, 6); b('#a8743a', a, -42 - up, 4, 1); }
+        b('#c8ccd8', -8, -36, 16, 10); b('#8d90a0', -8, -27, 16, 1); b('#3a3a4a', -5, -36, 4, 1); b('#3a3a4a', 1, -36, 4, 1); b('#14122a', 8, on ? -30 : -34, 2, 2);
+      } },
+      { x: 180, names: ['GOOD AS NEW', 'DO NOT TOUCH THE BONES!'], s: [160, 'square', -80], draw: (b, r, on) => {
+        b('#55556a', -24, -8, 48, 8); b('#8d90a0', -24, -8, 48, 2); b('#ffcc3d', -8, -5, 16, 3);
+        const bone = '#f4f0e0';
+        if (+on) {   // (a heap of bones)
+          for (const [a, c, w] of [[-14, -11, 8], [-6, -10, 10], [3, -11, 7], [-10, -13, 6], [6, -13, 9], [-2, -14, 6], [12, -10, 5]]) b(bone, a, c, w, 2);
+          b(bone, -18, -15, 7, 5); b('#14122a', -16, -14, 2, 2);
+          return;
+        }
+        // (an Earth beast, which is a pug: skull with its short snout, spine, ribs, four legs and a curly tail)
+        b(bone, -16, -27, 9, 8); b(bone, -19, -23, 4, 4); b('#14122a', -13, -25, 2, 2); b('#14122a', -19, -21, 3, 1);
+        b(bone, -7, -22, 20, 2);
+        for (const a of [-4, 0, 4, 8]) b(bone, a, -20, 2, 6);
+        for (const a of [-5, -1, 9, 13]) b(bone, a, -14, 2, 6);
+        b(bone, 13, -26, 2, 4); b(bone, 15, -28, 4, 2); b(bone, 18, -26, 2, 3);
       } }] }];
   const ctxX = b => b.x;
   // (Gloop carved in stone for the temple: his own picture in grey, plus one with glowing eyes for when it wakes up)
@@ -4586,6 +4619,20 @@
     }
     box('#8a8e9e', 114, -30, 108, 30); for (const x of [114, 150, 186, 222]) box('#6a6e80', x, -32, 3, 32);
     box('#a8acbc', 114, -30, 108, 2);
+  }
+  // (the museum: a banner, three paintings, Saturn as it was, a pug and a burrito, and a guard strolling along the back)
+  function drawMuseum(t) {
+    const box = (col, x, y, w, h) => { ctx.fillStyle = col; ctx.fillRect(x, PLAIN_Y + y, w, h); };
+    box('#8a1f2a', 84, -134, 72, 13); drawText('EARTH STUFF', 120, PLAIN_Y - 131, 'gold', 'center');
+    const frame = (x, bg) => { box('#c8a040', x - 2, -114, 40, 32); box('#8a6a20', x - 2, -84, 40, 2); box(bg, x, -112, 36, 28); };
+    frame(44, '#1f0e46'); box('#d8b080', 51, -99, 22, 2); bb('#e8c070', 62, PLAIN_Y - 98, 6); box('#d8b080', 56, -99, 12, 2); box('#ffffff', 47, -108, 1, 1); box('#ffffff', 74, -104, 1, 1);
+    frame(146, '#7ae0ff'); box('#14122a', 154, -106, 5, 7); box('#14122a', 169, -106, 5, 7); bb('#d8a060', 164, PLAIN_Y - 97, 9); bb('#3a2a1a', 164, PLAIN_Y - 94, 5);
+    box('#ffffff', 159, -101, 2, 2); box('#ffffff', 167, -101, 2, 2); box('#ff6a9a', 163, -91, 2, 2);
+    frame(198, '#ff9ac0'); box('#e8c070', 204, -104, 24, 12); box('#c8904a', 204, -104, 3, 12); box('#5fd068', 225, -102, 3, 3); box('#e8282f', 225, -97, 3, 3); box('#c8904a', 213, -104, 1, 12);
+    // (the guard, in a cap, walking slowly up and down behind everything)
+    const gx = Math.round(150 + Math.sin(t * 0.008) * 70), face = Math.cos(t * 0.008) < 0 ? -1 : 1;
+    drawAlien(gx, '#5fd068', (t >> 4) & 1, face);
+    box('#1d2f8c', gx - 6, -22, 12, 2); box('#1d2f8c', gx - 4, -24, 8, 2); box('#ffcc3d', gx - 1, -24, 2, 2); box('#1d2f8c', gx - 3, -10, 6, 5);
   }
   // (a pot plant, for the corner of a floor with no door)
   function drawPlant(x) {
