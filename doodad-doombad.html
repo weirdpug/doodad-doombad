@@ -4070,7 +4070,7 @@
   const ROOMS = [
     { wall: '#8a78d0', floor: '#4a3a98', things: [
       { x: 110, say: 'ALIEN CARTOONS!', s: [660, 'square', 120], draw: (b, r, on, t) => { b('#3a2a78', -3, -8, 6, 8); b('#14122a', -20, -40, 40, 32); b(on ? ['#ff6a9a', '#5fd068', '#ffcc3d', '#7ae0ff'][(t >> 3) & 3] : '#2a2a3a', -17, -37, 34, 26); if (on) { r('#ffffff', -6 + ((t >> 2) & 15), -24, 4); } } },
-      { x: 190, say: 'CLICK', s: [300, 'sine', 400], draw: (b, r, on, t) => { b('#55556a', -8, -5, 16, 5); b(on ? '#ff9ac0' : '#6a6a7a', -6, -38, 12, 33); if (on) { r('#ffcc3d', 0, -14 - ((t >> 1) % 18), 4); r('rgba(255,204,61,0.25)', 0, -24, 22); } } }] },
+      { x: 190, sit: true, draw: b => { b('#6a1f2a', -30, -3, 5, 3); b('#6a1f2a', 25, -3, 5, 3); b('#8a1f2a', -28, -30, 56, 18); b('#b0242c', -26, -28, 52, 16); b('#d8384a', -26, -12, 52, 9); b('#8a1f2a', 0, -28, 1, 25); b('#8a1f2a', -33, -17, 9, 14); b('#8a1f2a', 24, -17, 9, 14); } }] },
     { wall: '#5a4ab0', floor: '#2a1f70', things: [
       { x: 110, say: 'YOU CAN SEE EARTH FROM HERE', s: [880, 'sine', -300], draw: (b, r, on) => { b('#55556a', -1, -24, 3, 24); b('#55556a', -8, -2, 18, 2); ctx.save(); ctx.translate(ctxX(b), PLAIN_Y - 26); ctx.rotate(-0.6); ctx.fillStyle = '#c8a040'; ctx.fillRect(-16, -3, 32, 6); ctx.fillStyle = on ? '#7ae0ff' : '#14122a'; ctx.fillRect(16, -4, 3, 8); ctx.restore(); } },
       { x: 190, say: 'PLINK PLONK', s: [523, 'triangle', 262], draw: (b, r, on, t) => { b('#14122a', -22, -26, 44, 18); b('#14122a', -20, -8, 4, 8); b('#14122a', 16, -8, 4, 8); for (let i = 0; i < 7; i++) b(on && ((t >> 3) & 7) === i ? '#ffcc3d' : '#ffffff', -20 + i * 6, -20, 5, 12); } }] },
@@ -4129,6 +4129,15 @@
     if (r.eat) { stepEat(); g.kbAtk = false; return; }
     if (r.pick) { stepPick(); g.kbAtk = false; return; }
     for (const p of g.pugs) {
+      // (sitting: any way of moving gets up again, and a pug can still bark from there)
+      if (p.sitting) {
+        p.upDoor = true;
+        const inp = plainInput(p);
+        if (inp.bark && p.barkT < 25) { p.barkT = 45; sfx.bark(LOOK[p.id].bark); }
+        if (p.barkT > 0) p.barkT--;
+        if (inp.left || inp.right || inp.jump || p.upFresh) { p.sitting = false; p.y = PLAIN_Y; tone(200, 0.12, 'sine', 0.04, 100); }
+        continue;
+      }
       const at = roomSpot(p);
       p.upDoor = at !== null;
       floorPug(p, 14, PW - 14, PLAIN_Y, 1.25, -3.4);
@@ -4142,6 +4151,12 @@
         return;
       }
       const thing = things[at];
+      if (thing.sit) {
+        // (sits down facing the TV, the first pug at one end of the couch and the next one along)
+        p.sitting = true; p.x = thing.x - 14 + g.pugs.filter(q => q.sitting && q !== p).length * 14; p.y = PLAIN_Y - 12; p.face = -1; p.moving = false;
+        tone(140, 0.2, 'sine', 0.06, -40);
+        continue;
+      }
       r.on[at] = !r.on[at]; r.say = thing.say; r.sayT = 150;
       tone(thing.s[0], 0.35, thing.s[1], 0.06, thing.s[2]);
     }
@@ -4149,7 +4164,7 @@
   }
   // (what Up does for a pug in a room: -1 the door, 0 or 1 a thing, 2 the alien at a counter, or null)
   function roomSpot(p) {
-    if (!p.ground) return null;
+    if (!p.ground || p.sitting) return null;
     if (p.x < ROOM_DOOR + 12) return -1;
     if (ROOMS[plain.room.kind].scene && Math.abs(p.x - 150) < 50) return 2;   // (at the counter)
     const i = ROOMS[plain.room.kind].things.findIndex(k => Math.abs(p.x - k.x) < ROOM_REACH);
