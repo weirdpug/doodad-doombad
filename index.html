@@ -4114,6 +4114,12 @@
   // Up at the door goes back out. A little arrow shows when Up will do something. (the user asked)
   // (a thing's x, what shows at the top when it's used, its sound, and how it's drawn: b a box and r a ball, both from its
   // foot on the floor, on whether it's in use, t the time; a room with a scene draws that instead of its alien walking)
+  // The office has a lift (the user asked): Up at it opens its panel of floors, the arrows or stick choose one, jump
+  // goes, bark leaves it. Everyone rides up together, and each floor is its own office room with two things to use.
+  // Only the ground floor has the door out. (ROOMS 13 to 16 are the floors above; no building is ever one of them.)
+  const LIFT_X = 54, LIFT_SWAP = 30, LIFT_RIDE = 62;
+  const LIFT_FLOORS = ['OFFICE', 'MEETING ROOM', 'BREAK ROOM', 'SERVER ROOM', "BOSS'S OFFICE"], LIFT_KINDS = [1, 13, 14, 15, 16];
+  const LIFT = { x: LIFT_X, lift: true, draw: b => drawLift(b) };
   const ROOMS = [
     { wall: '#8a78d0', floor: '#4a3a98', things: [
       { x: 110, names: ['CHANNEL 1: CARTOONS', 'CHANNEL 2: ALIEN NEWS', 'CHANNEL 3: SPACE SHOW', 'CHANNEL 4: ALIEN SOCCER'], s: [660, 'square', 120], draw: (b, r, on, t) => {
@@ -4143,7 +4149,7 @@
       } },
       { x: 190, sit: true, draw: b => { b('#6a1f2a', -30, -3, 5, 3); b('#6a1f2a', 25, -3, 5, 3); b('#8a1f2a', -28, -30, 56, 18); b('#b0242c', -26, -28, 52, 16); b('#d8384a', -26, -12, 52, 9); b('#8a1f2a', 0, -28, 1, 25); b('#8a1f2a', -33, -17, 9, 14); b('#8a1f2a', 24, -17, 9, 14); } }] },
     { wall: '#d8dbe4', floor: '#55647a', scene: drawOffice, things: [
-      { x: 92, pc: true, draw: (b, r, on, t) => { b('#8a5a34', -20, -16, 40, 4); b('#6a3e1e', -18, -12, 3, 12); b('#6a3e1e', 15, -12, 3, 12); b('#22222c', -10, -36, 20, 16); b('#55556a', -2, -20, 4, 4); b('#8d90a0', -8, -19, 16, 3); b(on ? '#0a1f14' : '#2a2a3a', -8, -34, 16, 12); if (on) for (let i = 0; i < 5; i++) b('#5fd068', -7 + i * 3, -24 - (i + ((t >> 4) % 3)) * 1.6, 2, (i + ((t >> 4) % 3)) * 1.6 + 1); } }] },
+      { x: 92, pc: true, draw: (b, r, on, t) => { b('#8a5a34', -20, -16, 40, 4); b('#6a3e1e', -18, -12, 3, 12); b('#6a3e1e', 15, -12, 3, 12); b('#22222c', -10, -36, 20, 16); b('#55556a', -2, -20, 4, 4); b('#8d90a0', -8, -19, 16, 3); b(on ? '#0a1f14' : '#2a2a3a', -8, -34, 16, 12); if (on) for (let i = 0; i < 5; i++) b('#5fd068', -7 + i * 3, -24 - (i + ((t >> 4) % 3)) * 1.6, 2, (i + ((t >> 4) % 3)) * 1.6 + 1); } }, LIFT] },
     { wall: '#6a6e80', floor: '#3a3a4a', window: true, things: [
       { x: 110, pilot: true, say: 'VWOOOOM', s: [90, 'sawtooth', 300], draw: (b, r, on, t) => { b('#3a3a4a', -14, -10, 28, 10); b('#8d90a0', -2, on ? -14 : -30, 4, on ? 8 : 20); r(on ? '#5fd068' : '#e8282f', 0, on ? -16 : -32, 5); if (on) for (let i = 0; i < 6; i++) b((i + (t >> 3)) % 6 < 2 ? '#7ae0ff' : '#2a4aa8', -14 + i * 5, -6, 4, 3); } }] },
     { wall: '#d8f0e0', floor: '#8a9aa8', scene: drawLab, refill: true, things: [
@@ -4172,7 +4178,66 @@
     { wall: '#ffe8c8', floor: '#c8742f', things: [], scene: drawBakery, counter: true },
     { wall: '#d8dbe4', floor: '#6a6e80', things: [
       { x: 110, say: '3 2 1 ... NOT YET', s: [523, 'square', -200], draw: (b, r, on, t) => { b('#55556a', -18, -40, 36, 40); b('#14122a', -14, -36, 28, 16); if (on) drawText(String(3 - ((t >> 5) % 4)), ctxX(b), PLAIN_Y - 31, 'red', 'center'); for (let i = 0; i < 3; i++) b(['#e8282f', '#ffcc3d', '#5fd068'][i], -12 + i * 9, -14, 6, 6); } },
-      { x: 190, say: 'NICE VIEW', s: [1100, 'sine', 200], draw: (b, r, on, t) => { r('#8d90a0', 0, -38, 18); r(on ? '#050614' : '#55556a', 0, -38, 14); if (on) { b('#ffffff', -6, -44, 2, 2); b('#ffffff', 5, -34, 2, 2); b('#9fe0ff', -2 + ((t >> 4) & 3), -30, 2, 2); r('#6ae0c8', 7, -45, 4); } } }] }];
+      { x: 190, say: 'NICE VIEW', s: [1100, 'sine', 200], draw: (b, r, on, t) => { r('#8d90a0', 0, -38, 18); r(on ? '#050614' : '#55556a', 0, -38, 14); if (on) { b('#ffffff', -6, -44, 2, 2); b('#ffffff', 5, -34, 2, 2); b('#9fe0ff', -2 + ((t >> 4) & 3), -30, 2, 2); r('#6ae0c8', 7, -45, 4); } } }] },
+    // (13: the meeting room. Up at the screen goes on to the next slide; Up at the end of the table wakes whoever's asleep)
+    { wall: '#e8dcc4', floor: '#4a5a7a', upstairs: true, scene: drawMeeting, things: [LIFT,
+      { x: 122, names: ['SLIDE 1: SALES', 'SLIDE 2: MORE SALES', 'SLIDE 3: LUNCH', 'SLIDE 4: THE END'], s: [880, 'square', 0], draw: (b, r, on) => {
+        b('#55556a', -1, -134, 2, 8); b('#55556a', -32, -126, 64, 46); b('#ffffff', -30, -124, 60, 42);
+        const slide = +on, title = ['SALES', 'SALES!!', 'LUNCH', ''][slide];
+        if (title) drawText(title, b.x, PLAIN_Y - 121, 'black', 'center');
+        if (slide < 2) for (let i = 0; i < 4; i++) { const h = slide ? 8 + i * 6 : 5 + i * 4; b(slide ? '#ffcc3d' : '#5fd068', -22 + i * 12, -86 - h, 8, h); }
+        else if (slide === 2) { b('#c8904a', -7, -96, 14, 10); b('#a8743a', -3, -96, 2, 10); b('#a8743a', 2, -96, 2, 10); r('#ff9ac0', 0, -100, 8); r('#ffffff', -3, -103, 2); r('#e8282f', 0, -109, 3); }
+        else drawText('THE END', b.x, PLAIN_Y - 106, 'black', 'center');
+      } },
+      { x: 196, names: ['ZZZ...', 'I WAS NOT ASLEEP!'], s: [600, 'square', 300], draw: (b, r, on, t) => {
+        if (!on) { const u = (t >> 2) % 24; drawText('Z', b.x + 6 + (u >> 3), PLAIN_Y - 44 - u, 'black', 'center'); }
+      } }] },
+    // (14: the break room: a coffee machine on the counter, and a water cooler)
+    { wall: '#c8eedc', floor: '#b08a5a', upstairs: true, scene: drawBreakRoom, things: [LIFT,
+      { x: 122, say: 'SLIME COFFEE!', s: [300, 'sawtooth', -100], draw: (b, r, on, t) => {
+        b('#22222c', -9, -56, 18, 24); b('#3a3a4a', -9, -56, 18, 4); b(on ? '#e8282f' : '#5fd068', 4, -53, 2, 2);
+        b('#14122a', -6, -44, 12, 12); b('#55556a', -2, -44, 4, 3); b('#ffffff', -4, -38, 8, 6); b('#ffffff', 4, -37, 2, 3);
+        if (on) {
+          b('#5fc88f', -3, -37, 6, 2); b('#5fc88f', -1, -41 + ((t >> 2) % 3), 2, 2);
+          for (let i = 0; i < 3; i++) b('rgba(255,255,255,0.7)', -3 + i * 3, -58 - ((t >> 3) + i * 3) % 8, 1, 2);
+        }
+      } },
+      { x: 190, say: 'GLUG GLUG', s: [180, 'sine', -60], draw: (b, r, on, t) => {
+        b('#c8ccd8', -8, -30, 16, 30); b('#a8acbc', -8, -30, 16, 2); b('#2f5bff', -10, -22, 2, 3); b('#e8282f', 8, -22, 2, 3);
+        b('#9fe0ff', -7, -50, 14, 18); b('#5fc0ff', -7, -44, 14, 12); b('#d8f4ff', -5, -48, 2, 14); b('#9fe0ff', -2, -32, 4, 2);
+        if (on) for (let i = 0; i < 3; i++) { const u = ((t >> 1) + i * 6) % 14; b('#ffffff', -4 + i * 3, -33 - u, 2, 2); }
+      } }] },
+    // (15: the server room. Up at the big switch turns all the servers off, and on again; the screen uploads, if there's power)
+    { wall: '#2a2e3a', floor: '#4a4f5f', upstairs: true, scene: drawServers, things: [LIFT,
+      { x: 122, names: ['BACK ON. FIXED IT!', 'HAVE YOU TRIED TURNING IT OFF AND ON?'], s: [140, 'square', -100], draw: (b, r, on) => {
+        b('#55556a', -10, -34, 20, 34); b('#3a3a4a', -7, -31, 14, 18); b('#ffcc3d', -7, -10, 14, 2); b('#14122a', -7, -6, 14, 2);
+        b('#c8ccd8', -1, on ? -22 : -36, 2, 10); b('#e8282f', -3, on ? -14 : -40, 6, 4);
+      } },
+      { x: 196, names: ['UPLOAD DONE', 'UPLOADING CAT PICTURES'], s: [1046, 'square', 200], draw: (b, r, on, t) => {
+        b('#6a6e80', -14, -18, 28, 3); b('#55556a', -12, -15, 2, 15); b('#55556a', 10, -15, 2, 15);
+        b('#22222c', -10, -38, 20, 16); b('#55556a', -2, -22, 4, 4);
+        if (plain.room.on[1]) { b('#05060a', -8, -36, 16, 12); return; }   // (no power)
+        b('#0a1f14', -8, -36, 16, 12); b('#2a4a3a', -7, -31, 14, 3); b('#5fd068', -7, -31, on ? (t >> 2) % 15 : 14, 3);
+      } }] },
+    // (16: the boss's office, at the top, with a big window over the city)
+    { wall: '#4a2a5a', floor: '#8a1f2a', upstairs: true, window: true, high: 70, scene: drawBossRoom, things: [LIFT,
+      { x: 160, names: ['WHO LET A DOG IN HERE?', 'GET BACK TO WORK!', "YOU'RE FIRED!", 'JUST KIDDING'], s: [200, 'square', -60], draw: (b, r, on) => {
+        b('#3a1a2a', -11, -50, 22, 30);
+        ctx.save(); ctx.translate(0, -16); drawAlien(b.x, '#b48ae0', 0, -1); ctx.restore();
+        b('#ffffff', -3, -26, 6, 4); b('#e8282f', -1, -26, 2, 4);
+        if (+on === 2) { b('#14122a', -5, -34, 4, 1); b('#14122a', 1, -34, 4, 1); }   // (cross)
+        b('#6a3e1e', -24, -20, 48, 20); b('#8a5a34', -26, -22, 52, 3); b('#5a3010', -20, -16, 40, 1); b('#ffcc3d', -8, -26, 16, 4);
+      } },
+      { x: 214, say: 'CLACK CLACK', s: [1500, 'square', -800], draw: (b, r, on, t) => {
+        b('#6a3e1e', -12, -16, 24, 3); b('#6a3e1e', -10, -13, 2, 13); b('#6a3e1e', 8, -13, 2, 13);
+        b('#55556a', -11, -18, 22, 2); b('#c8ccd8', -11, -34, 22, 1); b('#c8ccd8', -11, -34, 1, 16); b('#c8ccd8', 10, -34, 1, 16);
+        const swing = on ? Math.sin(t * 0.2) : 0;
+        for (let i = 0; i < 5; i++) {
+          const x = -8 + i * 4, lift = (i === 0 && swing < 0) || (i === 4 && swing > 0) ? Math.abs(swing) : 0, dx = (i === 0 ? -1 : 1) * lift * 5;
+          ctx.strokeStyle = '#8d90a0'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(b.x + x + 0.5, PLAIN_Y - 33); ctx.lineTo(b.x + x + dx + 0.5, PLAIN_Y - 23 + lift * 2); ctx.stroke();
+          r('#c8ccd8', x + dx, -22 + lift * 2, 2);
+        }
+      } }] }];
   const ctxX = b => b.x;
   // (Gloop carved in stone for the temple: his own picture in grey, plus one with glowing eyes for when it wakes up)
   const STATUE_COLS = { p: '#b0adb8', r: '#d8d6de', q: '#86838f', o: '#4a4754', v: '#9a97a3', W: '#e8e6ee', K: '#4a4754', Y: '#c8c5d0', R: '#86838f', D: '#6e6b78', N: '#6e6b78', n: '#a09daa', I: '#7a7784', E: '#ff3e30' };
@@ -4270,7 +4335,7 @@
     const g = plain;
     const kind = Math.floor(planetHash(n + 0.5) * 13);
     if (ROOMS[kind].refill) g.roomOn[n] = [];   // (the potions are back)
-    g.room = { n, kind, sayT: 0, say: '', alt: 0, pilot: null, on: g.roomOn[n] || (g.roomOn[n] = [false, false]) };
+    g.room = { n, kind, floor: 0, lift: null, sayT: 0, say: '', alt: 0, pilot: null, on: g.roomOn[n] || (g.roomOn[n] = [false, false]) };
     g.pugs = g.pugs.map((p, i) => Object.assign(shopPug(p.id, ROOM_DOOR + 16 + i * 16, PLAIN_Y), { ground: true, upWas: true }));
     tone(420, 0.12, 'sine', 0.05, 200);
   }
@@ -4285,6 +4350,7 @@
     if (r.pick) { stepPick(); g.kbAtk = false; return; }
     if (r.pilot) { stepPilot(); g.kbAtk = false; return; }
     if (r.pc) { stepPc(); g.kbAtk = false; return; }
+    if (r.lift) { stepLift(); g.kbAtk = false; return; }
     if (r.alt > 0) r.alt = Math.max(0, r.alt - 2);   // (settling back down once it's stopped)
     for (const p of g.pugs) {
       // (sitting: any way of moving gets up again, and a pug can still bark from there)
@@ -4316,6 +4382,7 @@
         for (let i = 0; i < 26; i++) g.bits.push({ x: thing.x, y: PLAIN_Y - 36, vx: (Math.random() - 0.5) * 3.4, vy: -1 - Math.random() * 2.6, g: 0.14, t: 34 + Math.random() * 14, col: i % 3 ? thing.col : '#d8f4ff' });
         continue;
       }
+      if (thing.lift) { p.moving = false; r.lift = { id: p.id, sel: r.floor, held: { left: false, right: false, up: true, down: false }, ride: 0, to: 0 }; r.sayT = 0; sfx.tick(); break; }
       if (thing.pc) { p.moving = false; r.on[at] = true; openPc(p); break; }
       if (thing.pilot) {
         p.moving = false; r.pilot = { id: p.id }; r.on[at] = true; r.say = thing.say; r.sayT = 90;
@@ -4353,7 +4420,7 @@
   // (what Up does for a pug in a room: -1 the door, -2 the alien at a counter, 0 up the number of a thing, or null)
   function roomSpot(p) {
     if (!p.ground || p.sitting) return null;
-    if (p.x < ROOM_DOOR + 12) return -1;
+    if (p.x < ROOM_DOOR + 12 && !ROOMS[plain.room.kind].upstairs) return -1;
     if (ROOMS[plain.room.kind].counter && Math.abs(p.x - 150) < 50) return -2;   // (at the counter)
     const i = ROOMS[plain.room.kind].things.findIndex((k, n) => Math.abs(p.x - thingX(k)) < (k.breaks ? 15 : ROOM_REACH) && !(k.breaks && plain.room.on[n]) && !statueGone(k));
     return i < 0 ? null : i;
@@ -4483,6 +4550,111 @@
     }
     box('#8a8e9e', 114, -30, 108, 30); for (const x of [114, 150, 186, 222]) box('#6a6e80', x, -32, 3, 32);
     box('#a8acbc', 114, -30, 108, 2);
+  }
+  // (a pot plant, for the corner of a floor with no door)
+  function drawPlant(x) {
+    const box = (col, a, y, w, h) => { ctx.fillStyle = col; ctx.fillRect(x + a, PLAIN_Y + y, w, h); };
+    box('#a8743a', -7, -12, 14, 12); box('#8a5a2a', -7, -12, 14, 2);
+    bb('#2f9f4a', x, PLAIN_Y - 20, 8); bb('#5fd068', x - 4, PLAIN_Y - 24, 5); bb('#5fd068', x + 4, PLAIN_Y - 26, 5); bb('#2f9f4a', x, PLAIN_Y - 31, 5);
+  }
+  const officeLights = box => { for (const x of [80, 140, 200]) { box('#ffffff', x, -136, 34, 3); box('#b4b8c8', x, -133, 34, 1); } };
+  // (the lift doors, with the floor it's on lit up over them)
+  function drawLift(b) {
+    b('#55556a', -16, -50, 32, 50); b('#8d90a0', -14, -48, 13, 48); b('#8d90a0', 1, -48, 13, 48);
+    b('#b4b8c8', -12, -46, 2, 44); b('#b4b8c8', 3, -46, 2, 44); b('#3a3a4a', -1, -48, 2, 48);
+    b('#14122a', -8, -60, 16, 9); drawText(String((plain.room.floor || 0) + 1), b.x, PLAIN_Y - 59, 'red', 'center');
+  }
+  // (the meeting room: three aliens round a long table, the one at the end asleep until woken, and a projector)
+  function drawMeeting(t) {
+    const box = (col, x, y, w, h) => { ctx.fillStyle = col; ctx.fillRect(x, PLAIN_Y + y, w, h); };
+    drawPlant(18); officeLights(box);
+    ctx.fillStyle = 'rgba(255,255,220,0.16)'; ctx.beginPath(); ctx.moveTo(152, PLAIN_Y - 24); ctx.lineTo(92, PLAIN_Y - 82); ctx.lineTo(152, PLAIN_Y - 82); ctx.closePath(); ctx.fill();
+    for (const [x, col] of [[106, '#5fd068'], [150, '#ffd060'], [196, '#6ae0c8']]) {
+      box('#3a3a4a', x - 7, -32, 14, 18);
+      ctx.save(); ctx.translate(0, -12); drawAlien(x, col, 0, x < 196 ? 1 : -1); ctx.restore();
+    }
+    if (!plain.room.on[2]) { box('#6ae0c8', 192, -28, 8, 4); box('#14122a', 192, -26, 3, 1); box('#14122a', 197, -26, 3, 1); }   // (eyes shut)
+    box('#6a3e1e', 90, -18, 144, 4); box('#8a5a34', 90, -18, 144, 1); box('#6a3e1e', 94, -14, 3, 14); box('#6a3e1e', 227, -14, 3, 14);
+    box('#22222c', 146, -24, 12, 6); box('#fff6c8', 146, -23, 2, 3);
+  }
+  // (the break room: cupboards and a counter, a fridge, a poster, and an alien with a mug)
+  function drawBreakRoom(t) {
+    const box = (col, x, y, w, h) => { ctx.fillStyle = col; ctx.fillRect(x, PLAIN_Y + y, w, h); };
+    drawPlant(18); officeLights(box);
+    box('#d8b080', 92, -100, 64, 24); box('#b08a5a', 123, -100, 2, 24); box('#8a5a2a', 118, -90, 2, 4); box('#8a5a2a', 128, -90, 2, 4);
+    box('#14122a', 160, -122, 64, 15); drawText('BREAK TIME', 192, PLAIN_Y - 119, 'gold', 'center');
+    box('#eef0f6', 92, -30, 64, 30); box('#8d90a0', 90, -32, 68, 3); box('#c8ccd8', 123, -28, 2, 28); box('#8d90a0', 118, -20, 2, 4); box('#8d90a0', 128, -20, 2, 4);
+    box('#eef0f6', 212, -58, 24, 58); box('#c8ccd8', 212, -38, 24, 1); box('#8d90a0', 214, -54, 2, 12); box('#8d90a0', 214, -34, 2, 12); box('#e8282f', 228, -52, 3, 3); box('#ffcc3d', 224, -46, 3, 3);
+    drawAlien(164, '#b48ae0', 0, -1);
+    box('#ffffff', 156, -12, 5, 5); box('#ffffff', 154, -11, 2, 3); box('#5fc88f', 157, -12, 3, 1);
+    for (let i = 0; i < 2; i++) box('rgba(255,255,255,0.7)', 157 + i * 2, -16 - ((t >> 3) + i * 4) % 8, 1, 2);
+  }
+  // (the server room: racks of blinking servers, dark when the big switch is off)
+  function drawServers(t) {
+    const box = (col, x, y, w, h) => { ctx.fillStyle = col; ctx.fillRect(x, PLAIN_Y + y, w, h); }, off = plain.room.on[1];
+    for (let x = 0; x < PW; x += 20) box('#3a3f4f', x, 0, 1, PH - PLAIN_Y);
+    box('#e8282f', 14, -22, 8, 20); box('#14122a', 14, -2, 8, 2); box('#22222c', 16, -26, 4, 4); box('#ffffff', 15, -16, 6, 3);
+    for (const x of [84, 106, 140, 162, 210]) {
+      box('#14122a', x, -70, 20, 70); box('#22222c', x + 1, -69, 18, 68);
+      for (let j = 0; j < 8; j++) {
+        box('#3a3a4a', x + 2, -67 + j * 8, 16, 6);
+        if (!off) for (let k = 0; k < 3; k++) if (((t >> 3) + x + j * 7 + k * 13) % 5 < 2) box(['#5fd068', '#7ae0ff', '#ffcc3d'][k], x + 4 + k * 4, -65 + j * 8, 2, 2);
+      }
+    }
+    ctx.strokeStyle = '#14122a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(60, PLAIN_Y - 96); ctx.quadraticCurveTo(120, PLAIN_Y - 80, 160, PLAIN_Y - 92); ctx.quadraticCurveTo(200, PLAIN_Y - 104, 240, PLAIN_Y - 90); ctx.stroke();
+    if (off) { ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(0, 100, PW, PH - 100); }
+  }
+  // (the boss's office: shelves of trophies, a bookcase, and a rug)
+  function drawBossRoom(t) {
+    const box = (col, x, y, w, h) => { ctx.fillStyle = col; ctx.fillRect(x, PLAIN_Y + y, w, h); };
+    drawPlant(18);
+    box('#6a3e1e', 200, -112, 38, 3); box('#ffcc3d', 205, -122, 6, 10); box('#ffcc3d', 203, -124, 10, 3); box('#c8ccd8', 220, -120, 6, 8); box('#c8ccd8', 218, -122, 10, 3);
+    box('#6a3e1e', 78, -40, 26, 40); for (let j = 0; j < 3; j++) { box('#3a1f10', 80, -38 + j * 13, 22, 11); for (let k = 0; k < 5; k++) box(['#e8282f', '#2f5bff', '#ffcc3d', '#5fd068', '#b48ae0'][(j + k) % 5], 81 + k * 4, -36 + j * 13 + (k & 1), 3, 9 - (k & 1)); }
+    box('#c8a040', 120, 0, 80, 2);
+  }
+  // (riding the lift: its panel of floors, then the ride itself)
+  function stepLift() {
+    const g = plain, r = g.room, k = r.lift;
+    if (k.ride) {
+      if (++k.ride === LIFT_SWAP) goFloor(k.to);
+      if (k.ride === LIFT_RIDE - 16) { tone(1320, 0.35, 'sine', 0.05); tone(1046, 0.5, 'sine', 0.05, 0, 0.16); }   // (ding)
+      if (k.ride >= LIFT_RIDE) r.lift = null;
+      return;
+    }
+    const p = g.pugs.find(q => q.id === k.id);
+    if (!p) { r.lift = null; return; }
+    p.upDoor = true;
+    const inp = plainInput(p), fresh = d => inp[d] && !k.held[d], n = LIFT_FLOORS.length;
+    if (fresh('up') || fresh('right')) { k.sel = (k.sel + 1) % n; sfx.tick(); }
+    if (fresh('down') || fresh('left')) { k.sel = (k.sel + n - 1) % n; sfx.tick(); }
+    k.held = { left: inp.left, right: inp.right, up: inp.up, down: inp.down };
+    if (inp.bark) { r.lift = null; sfx.tick(); return; }
+    if (!inp.jump) return;
+    if (k.sel === r.floor) { r.lift = null; sfx.tick(); return; }
+    k.to = k.sel; k.ride = 1; tone(110, 0.9, 'sawtooth', 0.025, k.to > r.floor ? 80 : -40);
+  }
+  // (everyone gets out of the lift on floor f; each floor keeps what's been done there, building by building)
+  function goFloor(f) {
+    const g = plain, r = g.room, key = f ? r.n + '/' + f : r.n;
+    r.floor = f; r.kind = LIFT_KINDS[f]; r.on = g.roomOn[key] || (g.roomOn[key] = [false, false, false]);
+    g.pugs.forEach((p, i) => Object.assign(p, { x: LIFT_X + 22 + i * 14, y: PLAIN_Y, vy: 0, ground: true, sitting: false, face: 1, moving: false }));
+    g.bits = []; r.say = LIFT_FLOORS[f]; r.sayT = 110;
+  }
+  function drawLiftPanel() {
+    const r = plain.room, k = r.lift, n = LIFT_FLOORS.length;
+    if (k.ride) {
+      const a = k.ride < LIFT_SWAP ? k.ride / LIFT_SWAP : Math.max(0, (LIFT_RIDE - 16 - k.ride) / (LIFT_RIDE - 16 - LIFT_SWAP));
+      ctx.fillStyle = `rgba(10,10,22,${Math.min(1, a).toFixed(2)})`; ctx.fillRect(0, 0, PW, PH);
+      if (a > 0.8) drawText('FLOOR ' + (k.to + 1), PW / 2, 160, 'gold', 'center');
+      return;
+    }
+    drawText('WHICH FLOOR?', PW / 2, 4, 'gold', 'center');
+    for (let f = n - 1; f >= 0; f--) {
+      const y = 16 + (n - 1 - f) * 12, label = `${f + 1}  ${LIFT_FLOORS[f]}${f === r.floor ? ' - HERE' : ''}`;
+      if (f === k.sel) { ctx.fillStyle = '#ffcc3d'; ctx.fillRect(40, y - 2, 160, 10); ctx.fillStyle = '#14122a'; ctx.fillRect(41, y - 1, 158, 8); }
+      drawText(label, 46, y, f === k.sel ? 'gold' : 'cyan');
+    }
+    drawText('JUMP GOES  BARK LEAVES', PW / 2, 78, 'pink', 'center');
   }
   // The office computer: Up at the desk fills the screen with its desktop and eight pretend apps. The arrows or stick move
   // about, jump opens and uses things, bark goes back. (the user asked)
@@ -4663,7 +4835,7 @@
     ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(0, PLAIN_Y, PW, 2);
     if (R.window) drawRoomWindow(r.n);
     // (the way out)
-    ctx.fillStyle = '#14122a'; ctx.fillRect(ROOM_DOOR - 13, PLAIN_Y - 46, 26, 46); ctx.fillStyle = '#c8ffb0'; ctx.fillRect(ROOM_DOOR - 11, PLAIN_Y - 44, 22, 44);
+    if (!R.upstairs) { ctx.fillStyle = '#14122a'; ctx.fillRect(ROOM_DOOR - 13, PLAIN_Y - 46, 26, 46); ctx.fillStyle = '#c8ffb0'; ctx.fillRect(ROOM_DOOR - 11, PLAIN_Y - 44, 22, 44); }
     if (R.scene) R.scene(t);
     else drawAlien(Math.round(150 + Math.sin(t * 0.012) * 8), '#5fd068', (t >> 3) & 1, Math.cos(t * 0.012) < 0 ? -1 : 1);
     R.things.forEach((k, i) => {
@@ -4682,7 +4854,7 @@
         ctx.restore();
       } else drawPlainPug(p, Math.round(p.x), Math.round(p.y), 'black');
       const at = roomSpot(p);
-      if (at !== null && !r.pick && !r.eat && !r.pilot) drawUpArrow(at === -2 ? 150 : at < 0 ? ROOM_DOOR : thingX(R.things[at]), PLAIN_Y - (at === -2 ? 56 : at < 0 ? 52 : 66));
+      if (at !== null && !r.pick && !r.eat && !r.pilot && !r.lift) drawUpArrow(at === -2 ? 150 : at < 0 ? ROOM_DOOR : thingX(R.things[at]), PLAIN_Y - (at === -2 ? 56 : at < 0 ? 52 : 66));
     }
     for (const b of g.bits) { ctx.fillStyle = b.col; ctx.fillRect(Math.round(b.x), Math.round(b.y), 2, 2); }
     if (r.eat) drawEat();
@@ -4690,6 +4862,7 @@
     if (r.sayT > 0) drawText(r.say, PW / 2, 84, 'gold', 'center');
     if (r.pilot) drawText('ARROWS FLY  SPACE STOPS', PW / 2, 72, 'cyan', 'center');
     if (r.pc) drawPc();
+    if (r.lift) drawLiftPanel();
   }
   function drawPlanet() {
     const g = plain, cam = g.cam;
@@ -4736,7 +4909,7 @@
   // (a big oval window in a room's wall, looking out on the real planet around this building: the same aliens and
   // buildings, moving as they do outside)
   function drawRoomWindow(n) {
-    const cx = 128, cy = 150, rx = 62, ry = 36, s = 0.55, x = buildingX(n), alt = plain.room.alt;
+    const cx = 128, cy = 150, rx = 62, ry = 36, s = 0.55, x = buildingX(n), alt = plain.room.alt + (ROOMS[plain.room.kind].high || 0);
     const oval = (col, grow) => { ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(cx, cy, rx + grow, ry + grow, 0, 0, Math.PI * 2); ctx.fill(); };
     oval('#3a3a4a', 6); oval('#a8acbc', 4); oval('#55556a', 1);
     ctx.save(); ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); ctx.clip();
