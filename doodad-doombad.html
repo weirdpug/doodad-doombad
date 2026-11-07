@@ -3440,7 +3440,9 @@
   // (how far out on Jupiter, each way from the shop, a space station stands)
   const STATION_D = 800;
   // (barking within STATION_NEAR of one sets it talking: each line's first and last frame, and its words, 3 seconds each
-  // with 2 seconds of quiet between, and when it's finished; it starts STATION_WAIT frames after the bark)
+  // with 2 seconds of quiet between, and when it's finished; it starts STATION_WAIT frames after the bark; then it blows
+  // up: the frames of little blasts before the big one, and until the last of the smoke has gone)
+  const STATION_BIG = 60, STATION_GONE = 190;
   const STATION_NEAR = 130, STATION_WAIT = 60, STATION_TALK = [[0, 180, ['HEY I THINK I HEARD', 'A SPACE STATION', 'FROM EARTH']], [300, 480, ['YAYYYYYY!!!']],
     [480, 660, ['WE HAVE TO SEND', 'THEM A MESSAGE']], [780, 960, ['MAYBE IF WE BLOW', 'UP THE SHIP', 'THEY WILL SEE']], [1080, 1260, ['YEAH']]], STATION_END = 1260;
   // (what Gloop says when the last burrito has landed, and for how many frames)
@@ -3774,7 +3776,7 @@
   // Walking back into the shop on that side goes back in. (the user asked)
   function leaveShop(side) {
     const g = plain, d = g.drop;
-    if (d.hutX === undefined) d.hutX = g.cam + PW / 2;
+    if (d.hutX === undefined) { d.hutX = g.cam + PW / 2; d.blown = {}; }
     const x0 = d.hutX + 60 * side;
     g.stroll = { hutX: d.hutX, drop: d, space: g.space, side }; g.cam = x0 - PW / 2;
     g.drop = null; g.isle = false; g.space = null; g.crumble = null; g.hole = null; g.warp = null; g.boss = null; g.nuke = null;
@@ -3795,9 +3797,15 @@
       const L = g.cam + 8, R = g.cam + PW - 8, dx = s.side > 0 ? floorPug(p, Math.max(L, door), R, PLAIN_Y, 1.25, -3.4) : floorPug(p, L, Math.min(R, door), PLAIN_Y, 1.25, -3.4);
       if (dx === -s.side && p.ground && (s.side > 0 ? p.x <= door : p.x >= door)) { backInShop(); g.kbAtk = false; return; }
       // (a bark near a space station gets an answer: 44 is the frame a bark starts)
-      if (p.barkT === 44 && !s.talk) for (const side of [-1, 1]) if (Math.abs(p.x - (s.hutX + side * STATION_D)) < STATION_NEAR) s.talk = { side, t: -STATION_WAIT };
+      if (p.barkT === 44 && !s.talk && !s.boom) for (const side of [-1, 1]) if (!s.drop.blown[side] && Math.abs(p.x - (s.hutX + side * STATION_D)) < STATION_NEAR) s.talk = { side, t: -STATION_WAIT };
     }
-    if (s.talk && ++s.talk.t >= STATION_END) s.talk = null;
+    if (s.talk && ++s.talk.t >= STATION_END) { s.boom = { side: s.talk.side, t: 0, shake: 0, balls: [] }; s.talk = null; }
+    if (s.boom) stepStationBoom();
+    for (const b of g.bits) {
+      b.x += b.vx; b.y += b.vy; b.vy += b.g || 0; b.t--;
+      if (b.y > PLAIN_Y) { b.y = PLAIN_Y; b.vx *= 0.5; b.vy = 0; }
+    }
+    g.bits = g.bits.filter(b => b.t > 0);
     g.kbAtk = false;
     if (g.pugs.length) {
       const xs = g.pugs.map(p => p.x);
@@ -3832,6 +3840,43 @@
     // (the windows)
     for (let i = 0; i < 9; i++) { box('#3a3a4a', -55 + i * 12.5, -48, 8, 8); box((i + (plain.t >> 6)) % 5 ? '#ffe08a' : '#9fe0ff', -54 + i * 12.5, -47, 6, 6); }
     drawText('SPACE STATION', x, PLAIN_Y - 36, 'black', 'center');
+  }
+  // After its last word the station blows itself up, with nobody hurt: little blasts all along it, faster and faster, then
+  // a huge one with a flash, the screen shaking and bits of it raining down. It's gone for good, leaving a wreck behind.
+  // (the user asked)
+  function stepStationBoom() {
+    const g = plain, s = g.stroll, b = s.boom, sx = s.hutX + b.side * STATION_D, ball = (x, y, max, life) => b.balls.push({ x, y, max, life, t: 0 });
+    b.t++;
+    if (b.shake > 0) b.shake--;
+    if (b.t < STATION_BIG && b.t % Math.max(3, 10 - (b.t >> 1)) === 0) {
+      ball(sx - 70 + Math.random() * 140, PLAIN_Y - 22 - Math.random() * 60, 8 + Math.random() * 8, 24);
+      noise(0.14, 0.09, 1800, 300);
+    }
+    if (b.t === STATION_BIG) {
+      s.drop.blown[b.side] = true; b.shake = 45; sfx.boom();
+      for (let i = 0; i < 18; i++) ball(sx - 90 + Math.random() * 180, PLAIN_Y - 10 - Math.random() * 100, 16 + Math.random() * 22, 50 + Math.random() * 60);
+      for (let i = 0; i < 46; i++) g.bits.push({ x: sx - 80 + Math.random() * 160, y: PLAIN_Y - 20 - Math.random() * 70, vx: (Math.random() - 0.5) * 4, vy: -1 - Math.random() * 4, g: 0.1, t: 120 + Math.random() * 60, s: 2 + Math.floor(Math.random() * 4), col: ['#c8ccd8', '#8d90a0', '#1d2f8c', '#6a6e80', '#7ac8e8'][i % 5] });
+    }
+    for (const o of b.balls) o.t++;
+    b.balls = b.balls.filter(o => o.t < o.life);
+    if (b.t >= STATION_GONE) s.boom = null;
+  }
+  function drawStationBoom() {
+    const g = plain, b = g.stroll.boom, big = b.t - STATION_BIG;
+    for (const o of b.balls) {
+      const u = o.t / o.life;
+      ctx.fillStyle = u < 0.2 ? '#fff4d8' : u < 0.5 ? '#ffcc3d' : u < 0.75 ? '#ff6a30' : '#55463a';
+      ctx.beginPath(); ctx.arc(Math.round(o.x - g.cam), Math.round(o.y), o.max * (0.4 + 0.6 * u), 0, Math.PI * 2); ctx.fill();
+    }
+    if (big >= 0 && big < 14) { ctx.fillStyle = `rgba(255,255,255,${(1 - big / 14).toFixed(2)})`; ctx.fillRect(0, 0, PW, PH); }
+  }
+  // (what's left of a space station: a scorch mark, stumps of its legs and some scraps)
+  function drawWreck(x) {
+    if (x < -130 || x > PW + 130) return;
+    const box = (col, a, b, w, h) => { ctx.fillStyle = col; ctx.fillRect(x + a, PLAIN_Y + b, w, h); };
+    box('#2a160a', -84, -1, 168, 3); box('#2a160a', -56, -2, 112, 1);
+    box('#55556a', -52, -9, 4, 9); box('#55556a', -20, -5, 4, 5); box('#55556a', 16, -11, 4, 11); box('#55556a', 48, -6, 4, 6);
+    box('#8d90a0', -36, -5, 14, 5); box('#c8ccd8', -30, -8, 9, 3); box('#6a6e80', 26, -4, 16, 4); box('#1d2f8c', 58, -3, 12, 3);
   }
   // What a space station says when barked at: a white speech bubble over it, its tail pointing down at the aerial, kept on
   // the screen if the station is near the edge (the user asked)
@@ -4413,6 +4458,9 @@
       return;
     }
     const g = plain, off = (((g.cam * 0.25 + g.t * 0.1) % PLAIN_SKY_W) + PLAIN_SKY_W) % PLAIN_SKY_W;
+    ctx.save();
+    const quake = g.stroll && g.stroll.boom ? g.stroll.boom.shake : 0;
+    if (quake) ctx.translate(quake % 4 < 2 ? 3 : -3, quake % 6 < 3 ? 2 : -2);
     ctx.drawImage(g.sky, -off, 0); ctx.drawImage(g.sky, PLAIN_SKY_W - off, 0);
     // the ground: perfectly flat, with little marks that pass by to show the pugs are moving
     const [top, mid, low] = g.spot.ground;
@@ -4438,7 +4486,7 @@
     }
     if (g.stroll) {
       drawHut(Math.round(g.stroll.hutX - g.cam));
-      for (const side of [-1, 1]) drawStation(Math.round(g.stroll.hutX + side * STATION_D - g.cam));
+      for (const side of [-1, 1]) (g.stroll.drop.blown[side] ? drawWreck : drawStation)(Math.round(g.stroll.hutX + side * STATION_D - g.cam));
     } else drawPlainGloop();
     for (const s of g.ships) {
       const pic = sprite('ufo_' + ((g.t >> 3) & 1));
@@ -4450,8 +4498,10 @@
       if (pic) ctx.drawImage(pic, Math.round(m.x - g.cam) - (pic.width >> 1), Math.round(m.y) - pic.height);
     }
     for (const b of g.drops) blit('barrel_roll' + (Math.floor(b.spin / 6) % 4), Math.round(b.x - g.cam) - 5, Math.round(b.y) - 5);
-    for (const b of g.bits) { ctx.fillStyle = b.col || '#8a5630'; ctx.fillRect(Math.round(b.x - g.cam), Math.round(b.y), 2, 2); }
+    for (const b of g.bits) { ctx.fillStyle = b.col || '#8a5630'; ctx.fillRect(Math.round(b.x - g.cam), Math.round(b.y), b.s || 2, b.s || 2); }
     for (const p of g.pugs) drawPlainPug(p, Math.round(p.x - g.cam), Math.round(p.y), 'black');
+    if (g.stroll && g.stroll.boom) drawStationBoom();
+    ctx.restore();
     if (g.stroll && g.stroll.talk) drawStationTalk();
   }
   // (one pug with its feet at X, Y, in its costume, and its bark in the given colour)
