@@ -4098,7 +4098,7 @@
     { wall: '#5a4ab0', floor: '#2a1f70', things: [
       { x: 110, say: 'YOU CAN SEE EARTH FROM HERE', s: [880, 'sine', -300], draw: (b, r, on) => { b('#55556a', -1, -24, 3, 24); b('#55556a', -8, -2, 18, 2); ctx.save(); ctx.translate(ctxX(b), PLAIN_Y - 26); ctx.rotate(-0.6); ctx.fillStyle = '#c8a040'; ctx.fillRect(-16, -3, 32, 6); ctx.fillStyle = on ? '#7ae0ff' : '#14122a'; ctx.fillRect(16, -4, 3, 8); ctx.restore(); } },
       { x: 190, say: 'PLINK PLONK', s: [523, 'triangle', 262], draw: (b, r, on, t) => { b('#14122a', -22, -26, 44, 18); b('#14122a', -20, -8, 4, 8); b('#14122a', 16, -8, 4, 8); for (let i = 0; i < 7; i++) b(on && ((t >> 3) & 7) === i ? '#ffcc3d' : '#ffffff', -20 + i * 6, -20, 5, 12); } }] },
-    { wall: '#6a6e80', floor: '#3a3a4a', things: [
+    { wall: '#6a6e80', floor: '#3a3a4a', window: true, things: [
       { x: 110, say: 'VWOOOOM', s: [90, 'sawtooth', 300], draw: (b, r, on, t) => { b('#3a3a4a', -14, -10, 28, 10); b('#8d90a0', -2, on ? -14 : -30, 4, on ? 8 : 20); r(on ? '#5fd068' : '#e8282f', 0, on ? -16 : -32, 5); if (on) for (let i = 0; i < 6; i++) b((i + (t >> 3)) % 6 < 2 ? '#7ae0ff' : '#2a4aa8', -14 + i * 5, -6, 4, 3); } },
       { x: 185, say: 'DO NOT PRESS THAT AGAIN', s: [440, 'square', 440], draw: (b, r, on, t) => { b('#55556a', -10, -24, 20, 24); r(on && (t >> 3) & 1 ? '#ffcc3d' : '#e8282f', 0, -30, 8); if (on && (t >> 3) & 1) { ctx.fillStyle = 'rgba(232,40,47,0.18)'; ctx.fillRect(0, 100, PW, 138); } } }] },
     { wall: '#e8dcc0', floor: '#8a5a34', things: [
@@ -4318,6 +4318,7 @@
     ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(0, 100, PW, 5);
     ctx.fillStyle = R.floor; ctx.fillRect(0, PLAIN_Y, PW, PH - PLAIN_Y);
     ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(0, PLAIN_Y, PW, 2);
+    if (R.window) drawRoomWindow(r.n);
     // (the way out)
     ctx.fillStyle = '#14122a'; ctx.fillRect(ROOM_DOOR - 13, PLAIN_Y - 46, 26, 46); ctx.fillStyle = '#c8ffb0'; ctx.fillRect(ROOM_DOOR - 11, PLAIN_Y - 44, 22, 44);
     if (R.scene) R.scene(t);
@@ -4345,8 +4346,17 @@
     if (r.sayT > 0) drawText(r.say, PW / 2, 84, 'gold', 'center');
   }
   function drawPlanet() {
-    const g = plain, cam = g.cam, t = g.t;
+    const g = plain, cam = g.cam;
     if (g.room) return drawRoom();
+    drawPlanetScene(cam, null);
+    for (const p of g.pugs) {
+      drawPlainPug(p, Math.round(p.x - cam), Math.round(p.y), 'gold');
+      if (p.ground && planetDoor(p.x) !== null) drawUpArrow(Math.round(p.x - cam), PLAIN_Y - 28);
+    }
+  }
+  // (the planet with the view at cam, all but the building numbered skip: the outside, and what a window looks out on)
+  function drawPlanetScene(cam, skip) {
+    const t = plain.t;
     if (!alienSky) buildAlienSky();
     ctx.drawImage(alienSky, 0, 0);
     // (far hills, sliding by slowly)
@@ -4358,7 +4368,7 @@
     ctx.fillStyle = '#7af0c0'; ctx.fillRect(0, PLAIN_Y, PW, 2);
     ctx.fillStyle = '#2fb88a';
     for (let n = Math.floor(cam / 19) - 1; n * 19 < cam + PW + 19; n++) { const h = planetHash(n); ctx.fillRect(Math.round(n * 19 + h * 12 - cam), PLAIN_Y + 10 + Math.floor(h * (PH - PLAIN_Y - 14)), 3 + Math.floor(h * 6), 1); }
-    for (let n = Math.floor((cam - 80) / 170); n * 170 < cam + PW + 80; n++) drawAlienHome(Math.round(n * 170 + planetHash(n + 0.25) * 70 - cam), planetHash(n + 0.5));
+    for (let n = Math.floor((cam - 80) / 170); n * 170 < cam + PW + 80; n++) if (n !== skip) drawAlienHome(Math.round(n * 170 + planetHash(n + 0.25) * 70 - cam), planetHash(n + 0.5));
     // (a few saucers going over)
     for (let n = Math.floor((cam - 60) / 260); n * 260 < cam + PW + 60; n++) {
       const pic = sprite('ufo_' + ((t >> 3) & 1)), h = planetHash(n + 0.75);
@@ -4371,10 +4381,23 @@
       if (kind > 0.85) { const pic = sprite((t >> 3) & 1 ? 'dg_blob2' : 'dg_blob1'); if (pic) ctx.drawImage(pic, Math.round(x - cam) - (pic.width >> 1), PLAIN_Y - pic.height); }
       else drawAlien(Math.round(x - cam), cols[Math.floor(kind * cols.length)], (t >> 3) & 1, Math.cos(a) < 0 ? -1 : 1);
     }
-    for (const p of g.pugs) {
-      drawPlainPug(p, Math.round(p.x - cam), Math.round(p.y), 'gold');
-      if (p.ground && planetDoor(p.x) !== null) drawUpArrow(Math.round(p.x - cam), PLAIN_Y - 28);
-    }
+  }
+  // (a big oval window in a room's wall, looking out on the real planet around this building: the same aliens and
+  // buildings, moving as they do outside)
+  function drawRoomWindow(n) {
+    const cx = 128, cy = 150, rx = 62, ry = 36, s = 0.55, x = n * 170 + planetHash(n + 0.25) * 70;
+    const oval = (col, grow) => { ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(cx, cy, rx + grow, ry + grow, 0, 0, Math.PI * 2); ctx.fill(); };
+    oval('#3a3a4a', 6); oval('#a8acbc', 4); oval('#55556a', 1);
+    ctx.save(); ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); ctx.clip();
+    ctx.translate(cx, cy); ctx.scale(s, s); ctx.translate(-PW / 2, 44 - PLAIN_Y);
+    drawPlanetScene(x - PW / 2, n);
+    ctx.restore();
+    // (a shine on the glass, and the bolts round the frame)
+    ctx.save(); ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); ctx.clip();
+    ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.beginPath(); ctx.moveTo(cx - 34, cy - 40); ctx.lineTo(cx - 14, cy - 40); ctx.lineTo(cx - 44, cy + 40); ctx.lineTo(cx - 64, cy + 40); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = '#3a3a4a';
+    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; ctx.fillRect(Math.round(cx + Math.cos(a) * (rx + 2.5)) - 1, Math.round(cy + Math.sin(a) * (ry + 2.5)) - 1, 2, 2); }
   }
   // (on to Saturn; reaching it puts it on Boss Fight's list)
   function saturnScene() {
