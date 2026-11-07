@@ -3440,8 +3440,8 @@
   // (how far out on Jupiter, each way from the shop, a space station stands)
   const STATION_D = 800;
   // (barking within STATION_NEAR of one sets it talking: each line's first and last frame, and its words, 3 seconds each
-  // with 2 seconds of quiet between, and when it's finished)
-  const STATION_NEAR = 130, STATION_TALK = [[0, 180, ['HEY I THINK I HEARD', 'A SPACE STATION', 'FROM EARTH']], [300, 480, ['YAYYYYYY!!!']],
+  // with 2 seconds of quiet between, and when it's finished; it starts STATION_WAIT frames after the bark)
+  const STATION_NEAR = 130, STATION_WAIT = 60, STATION_TALK = [[0, 180, ['HEY I THINK I HEARD', 'A SPACE STATION', 'FROM EARTH']], [300, 480, ['YAYYYYYY!!!']],
     [480, 660, ['WE HAVE TO SEND', 'THEM A MESSAGE']], [780, 960, ['MAYBE IF WE BLOW', 'UP THE SHIP', 'THEY WILL SEE']], [1080, 1260, ['YEAH']]], STATION_END = 1260;
   // (what Gloop says when the last burrito has landed, and for how many frames)
   const SHOP_SAY ="I'M OUT OF BURRITOS", SHOP_SAY_T = 240;
@@ -3795,7 +3795,7 @@
       const L = g.cam + 8, R = g.cam + PW - 8, dx = s.side > 0 ? floorPug(p, Math.max(L, door), R, PLAIN_Y, 1.25, -3.4) : floorPug(p, L, Math.min(R, door), PLAIN_Y, 1.25, -3.4);
       if (dx === -s.side && p.ground && (s.side > 0 ? p.x <= door : p.x >= door)) { backInShop(); g.kbAtk = false; return; }
       // (a bark near a space station gets an answer: 44 is the frame a bark starts)
-      if (p.barkT === 44 && !s.talk) for (const side of [-1, 1]) if (Math.abs(p.x - (s.hutX + side * STATION_D)) < STATION_NEAR) s.talk = { side, t: 0 };
+      if (p.barkT === 44 && !s.talk) for (const side of [-1, 1]) if (Math.abs(p.x - (s.hutX + side * STATION_D)) < STATION_NEAR) s.talk = { side, t: -STATION_WAIT };
     }
     if (s.talk && ++s.talk.t >= STATION_END) s.talk = null;
     g.kbAtk = false;
