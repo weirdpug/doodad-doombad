@@ -3445,7 +3445,7 @@
   const STATION_BIG = 60, STATION_CUT = 120, STATION_SHOT = 180;
   // (Gloop's ship over Jupiter after that: the frames between its nukes, a nuke's speed, how far off a pug its blast
   // reaches, how far ahead of a walking pug he aims, and the size the nukes are drawn, the bigger the smaller the number)
-  const HUNT_GAP = 100, HUNT_SPEED = 2.8, HUNT_NEAR = 26, HUNT_LEAD = 45, HUNT_Z = 2.6;
+  const HUNT_GAP = 55, HUNT_SPEED = 5, HUNT_NEAR = 26, HUNT_LEAD = 8, HUNT_Z = 2.6;
   const STATION_NEAR = 130, STATION_WAIT = 60, STATION_TALK = [[0, 180, ['HEY I THINK I HEARD', 'A SPACE STATION', 'FROM EARTH']], [300, 480, ['YAYYYYYY!!!']],
     [480, 660, ['WE HAVE TO SEND', 'THEM A MESSAGE']], [780, 960, ['MAYBE IF WE BLOW', 'UP THE SHIP', 'THEY WILL SEE']], [1080, 1260, ['YEAH']]], STATION_END = 1260;
   // (what Gloop says when the last burrito has landed, and for how many frames)
@@ -3779,7 +3779,7 @@
   // Walking back into the shop on that side goes back in. (the user asked)
   function leaveShop(side) {
     const g = plain, d = g.drop;
-    if (d.hutX === undefined) { d.hutX = g.cam + PW / 2; d.blown = {}; }
+    if (d.hutX === undefined) { d.hutX = g.cam + PW / 2; d.blown = {}; d.craters = []; }
     const x0 = d.hutX + 60 * side;
     g.stroll = { hutX: d.hutX, drop: d, space: g.space, side }; g.cam = x0 - PW / 2;
     g.drop = null; g.isle = false; g.space = null; g.crumble = null; g.hole = null; g.warp = null; g.boss = null; g.nuke = null;
@@ -3849,6 +3849,7 @@
       n.x += n.vx; n.y += n.vy;
       if (n.y < PLAIN_Y - 4) continue;
       n.gone = true; noise(0.6, 0.25, 2400, 150); tone(70, 0.5, 'sine', 0.2, -40);
+      g.stroll.drop.craters.push(n.x);
       for (let i = 0; i < 7; i++) h.balls.push({ x: n.x - 24 + Math.random() * 48, y: PLAIN_Y - Math.random() * 34, max: 9 + Math.random() * 11, life: 28 + Math.random() * 26, t: 0 });
       for (const p of g.pugs) if (!p.dead && Math.abs(p.x - n.x) < HUNT_NEAR) {
         p.dead = true; p.barkT = 0; p.moving = false; p.ground = true; p.y = PLAIN_Y; sfx.die();
@@ -3858,6 +3859,16 @@
     h.nukes = h.nukes.filter(n => !n.gone);
     for (const o of h.balls) o.t++;
     h.balls = h.balls.filter(o => o.t < o.life);
+  }
+  // (a little crater a nuke has left in the ground at screen x: a dark bowl with a raised rim; it's only a mark, and the
+  // pugs walk across it)
+  function drawCrater(x) {
+    if (x < -24 || x > PW + 24) return;
+    const [top, mid] = plain.spot.ground;
+    ctx.fillStyle = mid; ctx.fillRect(x - 19, PLAIN_Y - 1, 7, 2); ctx.fillRect(x + 12, PLAIN_Y - 1, 7, 2); ctx.fillRect(x - 17, PLAIN_Y - 3, 4, 2); ctx.fillRect(x + 13, PLAIN_Y - 3, 4, 2);
+    ctx.fillStyle = top; ctx.fillRect(x - 17, PLAIN_Y - 3, 4, 1); ctx.fillRect(x + 13, PLAIN_Y - 3, 4, 1);
+    ctx.fillStyle = '#2a160a'; ctx.beginPath(); ctx.ellipse(x, PLAIN_Y, 14, 9, 0, 0, Math.PI); ctx.fill();
+    ctx.fillStyle = '#4a2a18'; ctx.beginPath(); ctx.ellipse(x, PLAIN_Y + 1, 9, 5, 0, 0, Math.PI); ctx.fill();
   }
   function drawHunt() {
     const g = plain, h = g.stroll.hunt;
@@ -4570,6 +4581,7 @@
       ctx.fillRect(Math.round(b.x - g.cam) - 6, plainFloor(b.x, b.y + 5) - 2, 12, 2);
     }
     if (g.stroll) {
+      for (const c of g.stroll.drop.craters) drawCrater(Math.round(c - g.cam));
       drawHut(Math.round(g.stroll.hutX - g.cam));
       for (const side of [-1, 1]) (g.stroll.drop.blown[side] ? drawWreck : drawStation)(Math.round(g.stroll.hutX + side * STATION_D - g.cam));
     } else drawPlainGloop();
