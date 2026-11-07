@@ -3447,6 +3447,9 @@
   // with 2 seconds of quiet between, and when it's finished; it starts STATION_WAIT frames after the bark; then it blows
   // up: the frames of little blasts before the big one, when it cuts away to Gloop, and how long that lasts)
   const STATION_BIG = 60, STATION_CUT = 120, STATION_SHOT = 180;
+  // (Gloop's ship over Jupiter after that: the frames between its nukes, a nuke's speed, how far off a pug its blast
+  // reaches, how far ahead of a walking pug he aims, and the size the nukes are drawn, the bigger the smaller the number)
+  const HUNT_GAP = 100, HUNT_SPEED = 2.8, HUNT_NEAR = 26, HUNT_LEAD = 45, HUNT_Z = 2.6;
   const STATION_NEAR = 130, STATION_WAIT = 60, STATION_TALK = [[0, 180, ['HEY I THINK I HEARD', 'A SPACE STATION', 'FROM EARTH']], [300, 480, ['YAYYYYYY!!!']],
     [480, 660, ['WE HAVE TO SEND', 'THEM A MESSAGE']], [780, 960, ['MAYBE IF WE BLOW', 'UP THE SHIP', 'THEY WILL SEE']], [1080, 1260, ['YEAH']]], STATION_END = 1260;
   // (what Gloop says when the last burrito has landed, and for how many frames)
@@ -3797,12 +3800,17 @@
     // (everything waits while the view is away with Gloop; back here the smoke has cleared)
     if (s.shot) {
       g.kbAtk = false;
-      if (++s.shot.t >= STATION_SHOT) { s.shot = null; s.boom = null; g.bits = []; }
+      if (++s.shot.t >= STATION_SHOT) {
+        s.shot = null; s.boom = null; g.bits = [];
+        // (he comes for them, from the far side of the station)
+        if (!s.hunt) { const side = s.hutX < g.cam + PW / 2 ? 1 : -1; s.hunt = { x: g.cam + PW / 2 + side * 180, y: 54, face: -side, shootT: 80, nukes: [], balls: [], endT: 0 }; noise(1.2, 0.08, 300, 60); }
+      }
       return;
     }
     for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.pugs.some(p => p.id === i)) g.pugs.push(Object.assign(shopPug(i, g.cam + PW / 2, PLAIN_Y), { ground: true }));
     g.pugs = g.pugs.filter(p => arenaDriven(p.id));
     for (const p of g.pugs) {
+      if (p.dead) continue;
       // (the shop bars the way on the side it is on: walking into it there goes back in)
       const L = g.cam + 8, R = g.cam + PW - 8, dx = s.side > 0 ? floorPug(p, Math.max(L, door), R, PLAIN_Y, 1.25, -3.4) : floorPug(p, L, Math.min(R, door), PLAIN_Y, 1.25, -3.4);
       if (dx === -s.side && p.ground && (s.side > 0 ? p.x <= door : p.x >= door)) { backInShop(); g.kbAtk = false; return; }
@@ -3820,6 +3828,53 @@
     if (g.pugs.length) {
       const xs = g.pugs.map(p => p.x);
       g.cam += ((Math.min(...xs) + Math.max(...xs)) / 2 - PW / 2 - g.cam) * 0.1;
+    }
+    if (s.hunt) stepHunt();
+  }
+  // On the way back to the shop Gloop tries to kill them: his ship follows them along overhead, firing HOVERACKS nukes at
+  // where they're heading. A pug that stops or turns back gets blown up; one that keeps going stays just ahead of the
+  // blasts. Reaching the shop ends it. If they all die, it's the explosion picture for 2 seconds, then the main menu.
+  // (the user asked)
+  function stepHunt() {
+    const g = plain, h = g.stroll.hunt, alive = g.pugs.filter(p => !p.dead);
+    if (h.endT && --h.endT === 0) return leavePlain();
+    const prey = alive.length ? alive.reduce((a, p) => Math.abs(p.x - h.x) < Math.abs(a.x - h.x) ? p : a) : null;
+    if (prey) {
+      h.x += clamp(prey.x - h.x, -1.7, 1.7);
+      if (Math.abs(prey.x - h.x) > 12) h.face = prey.x < h.x ? -1 : 1;
+      if (Math.abs(prey.x - h.x) < 150 && --h.shootT <= 0) {
+        h.shootT = HUNT_GAP;
+        const x = h.x, y = h.y + 18, tx = prey.x + (prey.moving ? prey.face * HUNT_LEAD : 0), ty = PLAIN_Y - 4, d = Math.hypot(tx - x, ty - y), dir = tx < x ? -1 : 1;
+        h.nukes.push({ x, y, vx: (tx - x) / d * HUNT_SPEED, vy: (ty - y) / d * HUNT_SPEED, dir, ang: Math.atan2(ty - y, (tx - x) * dir) });
+        noise(0.5, 0.08, 500, 2000); tone(120, 0.4, 'sawtooth', 0.04, 300);
+      }
+    }
+    for (const n of h.nukes) {
+      n.x += n.vx; n.y += n.vy;
+      if (n.y < PLAIN_Y - 4) continue;
+      n.gone = true; noise(0.6, 0.25, 2400, 150); tone(70, 0.5, 'sine', 0.2, -40);
+      for (let i = 0; i < 7; i++) h.balls.push({ x: n.x - 24 + Math.random() * 48, y: PLAIN_Y - Math.random() * 34, max: 9 + Math.random() * 11, life: 28 + Math.random() * 26, t: 0 });
+      for (const p of g.pugs) if (!p.dead && Math.abs(p.x - n.x) < HUNT_NEAR) {
+        p.dead = true; p.barkT = 0; p.moving = false; p.ground = true; p.y = PLAIN_Y; sfx.die();
+        if (!h.endT && g.pugs.every(q => q.dead)) { h.endT = 150; sfx.boom(); boomPic.hidden = false; boomPicT = NUKE.pic; }
+      }
+    }
+    h.nukes = h.nukes.filter(n => !n.gone);
+    for (const o of h.balls) o.t++;
+    h.balls = h.balls.filter(o => o.t < o.life);
+  }
+  function drawHunt() {
+    const g = plain, h = g.stroll.hunt;
+    for (const n of h.nukes) drawNuke({ x: n.x - g.cam, y: n.y, dir: n.dir, ang: n.ang, t: NUKE_HIT }, HUNT_Z);
+    drawBossShip({ x: h.x - g.cam, y: h.y, face: h.face, hit: 0, shootT: h.shootT });
+    drawBlasts(h.balls);
+  }
+  // (fireballs going from white hot to smoke)
+  function drawBlasts(balls) {
+    for (const o of balls) {
+      const u = o.t / o.life;
+      ctx.fillStyle = u < 0.2 ? '#fff4d8' : u < 0.5 ? '#ffcc3d' : u < 0.75 ? '#ff6a30' : '#55463a';
+      ctx.beginPath(); ctx.arc(Math.round(o.x - plain.cam), Math.round(o.y), o.max * (0.4 + 0.6 * u), 0, Math.PI * 2); ctx.fill();
     }
   }
   // A space station standing on Jupiter, at screen x: a white hull on legs with its name and a row of lit windows, a glass
@@ -3899,12 +3954,8 @@
     ctx.restore();
   }
   function drawStationBoom() {
-    const g = plain, b = g.stroll.boom, big = b.t - STATION_BIG;
-    for (const o of b.balls) {
-      const u = o.t / o.life;
-      ctx.fillStyle = u < 0.2 ? '#fff4d8' : u < 0.5 ? '#ffcc3d' : u < 0.75 ? '#ff6a30' : '#55463a';
-      ctx.beginPath(); ctx.arc(Math.round(o.x - g.cam), Math.round(o.y), o.max * (0.4 + 0.6 * u), 0, Math.PI * 2); ctx.fill();
-    }
+    const b = plain.stroll.boom, big = b.t - STATION_BIG;
+    drawBlasts(b.balls);
     if (big >= 0 && big < 14) { ctx.fillStyle = `rgba(255,255,255,${(1 - big / 14).toFixed(2)})`; ctx.fillRect(0, 0, PW, PH); }
   }
   // (what's left of a space station: a scorch mark, stumps of its legs and some scraps)
@@ -4255,10 +4306,10 @@
   }
   // the nuke: a white body, red nose and fins, hazard stripes at the tail and its name down the side, nose pointing the
   // way it faces; the letters always read left to right
-  function drawNuke(n) {
+  function drawNuke(n, z = NUKE_Z) {
     const box = (col, x, y, w, h) => { ctx.fillStyle = col; ctx.fillRect(x, y, w, h); };
     const tri = (col, x1, y1, x2, y2, x3, y3) => { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.lineTo(x3, y3); ctx.closePath(); ctx.fill(); };
-    ctx.save(); ctx.translate(Math.round(n.x), Math.round(n.y)); ctx.scale(n.dir / NUKE_Z, 1 / NUKE_Z); ctx.rotate(n.ang);
+    ctx.save(); ctx.translate(Math.round(n.x), Math.round(n.y)); ctx.scale(n.dir / z, 1 / z); ctx.rotate(n.ang);
     if (n.t > NUKE_LAUNCH) tri((plain.t >> 1) & 1 ? '#ffcc3d' : '#ff6a50', -92, -12, -130 - (plain.t % 4) * 6, 0, -92, 12);
     tri('#b0242c', -84, -20, -110, -40, -62, -20); tri('#b0242c', -84, 20, -110, 40, -62, 20);
     box('#55556a', -92, -12, 8, 24);
@@ -4539,6 +4590,7 @@
     for (const b of g.bits) { ctx.fillStyle = b.col || '#8a5630'; ctx.fillRect(Math.round(b.x - g.cam), Math.round(b.y), b.s || 2, b.s || 2); }
     for (const p of g.pugs) drawPlainPug(p, Math.round(p.x - g.cam), Math.round(p.y), 'black');
     if (g.stroll && g.stroll.boom) drawStationBoom();
+    if (g.stroll && g.stroll.hunt) drawHunt();
     ctx.restore();
     if (g.stroll && g.stroll.talk) drawStationTalk();
   }
