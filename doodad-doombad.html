@@ -4109,7 +4109,7 @@
       labPotion(72, '#e8282f', 0), labPotion(102, '#5fd068', 1), labPotion(132, '#b48ae0', 2), labPotion(162, '#ffcc3d', 0), labPotion(192, '#7ae0ff', 1), labPotion(222, '#ff9ac0', 2)] },
     { wall: '#c8a040', floor: '#6a4a10', things: [
       { x: 110, say: 'ALIEN MONEY IS ALL ROCKS', s: [988, 'square', 500], draw: (b, r, on) => { b('#6a4a2a', -16, -16, 32, 16); b('#c8a040', -3, -12, 6, 6); if (on) { b('#8a5a34', -16, -30, 32, 6); for (const a of [-10, 0, 9]) r('#ffe08a', a, -18, 5); } else b('#8a5a34', -17, -22, 34, 8); } },
-      { x: 190, say: 'IT BLINKED', s: [110, 'sawtooth', -40], draw: (b, r, on, t) => { b('#8a6a20', -12, -56, 24, 56); b('#6a4a10', -16, -6, 32, 6); const eye = on && (t >> 5) & 1 ? '#6a4a10' : on ? '#ff3e30' : '#ffffff'; b(eye, -8, -46, 6, 5); b(eye, 2, -46, 6, 5); b('#6a4a10', -6, -34, 12, 2); } }] },
+      { x: 190, say: 'IT BLINKED', s: [110, 'sawtooth', -40], draw: (b, r, on, t) => { b('#86838f', -20, -6, 40, 6); b('#a09daa', -20, -6, 40, 1); ctx.drawImage(gloopStatue(on && (t >> 5) & 1 ? 'blink' : on ? 'glow' : 'idle'), ctxX(b) - 17, PLAIN_Y - 60, 33, 54); } }] },
     { wall: '#4f6ad0', floor: '#26307a', things: [
       { x: 110, say: 'GOING UP? NO.', s: [523, 'sine', 523], draw: (b, r, on) => { b('#8d90a0', -18, -56, 36, 56); b('#14122a', -16, -54, 32, 54); if (on) { b('#ffe08a', -14, -52, 28, 52); } else { b('#55556a', -16, -54, 15, 54); b('#55556a', 1, -54, 15, 54); } } },
       { x: 190, say: 'SATURN IS MISSING', s: [700, 'sine', -200], draw: (b, r, on, t) => { b('#55556a', -2, -18, 4, 18); b('#55556a', -10, -3, 20, 3); r('#2f5bff', 0, -32, 15); r('#5fd068', on ? Math.sin(t * 0.1) * 9 : -5, -34, 5); r('#ffffff', on ? Math.cos(t * 0.1) * 9 : 6, -28, 2); } }] },
@@ -4133,6 +4133,13 @@
       { x: 110, say: '3 2 1 ... NOT YET', s: [523, 'square', -200], draw: (b, r, on, t) => { b('#55556a', -18, -40, 36, 40); b('#14122a', -14, -36, 28, 16); if (on) drawText(String(3 - ((t >> 5) % 4)), ctxX(b), PLAIN_Y - 31, 'red', 'center'); for (let i = 0; i < 3; i++) b(['#e8282f', '#ffcc3d', '#5fd068'][i], -12 + i * 9, -14, 6, 6); } },
       { x: 190, say: 'NICE VIEW', s: [1100, 'sine', 200], draw: (b, r, on, t) => { r('#8d90a0', 0, -38, 18); r(on ? '#050614' : '#55556a', 0, -38, 14); if (on) { b('#ffffff', -6, -44, 2, 2); b('#ffffff', 5, -34, 2, 2); b('#9fe0ff', -2 + ((t >> 4) & 3), -30, 2, 2); r('#6ae0c8', 7, -45, 4); } } }] }];
   const ctxX = b => b.x;
+  // (Gloop carved in stone for the temple: his own picture in grey, plus one with glowing eyes for when it wakes up)
+  const STATUE_COLS = { p: '#b0adb8', r: '#d8d6de', q: '#86838f', o: '#4a4754', v: '#9a97a3', W: '#e8e6ee', K: '#4a4754', Y: '#c8c5d0', R: '#86838f', D: '#6e6b78', N: '#6e6b78', n: '#a09daa', I: '#7a7784', E: '#ff3e30' };
+  let statuePics = null;
+  function gloopStatue(look) {
+    if (!statuePics) statuePics = { idle: bakeWith(GLOOP.idle, STATUE_COLS), blink: bakeWith(GLOOP.blink, STATUE_COLS), glow: bakeWith(GLOOP.idle.map((row, y) => y < 10 ? row.replace(/W/g, 'E') : row), STATUE_COLS) };
+    return statuePics[look];
+  }
   const ROOM_DOOR = 22, ROOM_REACH = 20;
   // (where building n stands: its own spot, or where its saucer has been parked)
   const buildingX = n => plain.shipAt[n] !== undefined ? plain.shipAt[n] : n * 170 + planetHash(n + 0.25) * 70;
