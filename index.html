@@ -4159,16 +4159,18 @@
     const box = (col, x, y, w, h) => { ctx.fillStyle = col; ctx.fillRect(x, PLAIN_Y + y, w, h); };
     const ball = (col, x, y, r) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, PLAIN_Y + y, r, 0, Math.PI * 2); ctx.fill(); };
     box('#14122a', 118, -134, 64, 15); drawText('EATS', 150, 107, 'gold', 'center');
-    // (the alien, big as the room is close, in a white hat, shirt and bow tie and a red apron, nodding a little)
+    // (the alien, the same size as the ones outside, standing up behind the counter in a white hat, shirt and bow tie and a
+    // red apron, nodding a little)
     const bob = (t >> 5) & 1, cx = 150;
-    ctx.save(); ctx.translate(cx, PLAIN_Y - 52 - bob); ctx.scale(2.2, 2.2); ctx.translate(-cx, -PLAIN_Y);
+    ctx.save(); ctx.translate(0, -22 - bob);
     drawAlien(cx, '#5fd068', 0, 1);
     const u = (col, a, b, w, h) => { ctx.fillStyle = col; ctx.fillRect(cx + a, PLAIN_Y + b, w, h); };
     u('#ffffff', -5, -10, 10, 8); u('#e8282f', -3, -8, 6, 6); u('#e8282f', -2, -10, 1, 2); u('#e8282f', 1, -10, 1, 2);
     u('#14122a', -2, -11, 4, 1); u('#14122a', -1, -12, 2, 2);
     u('#ffffff', -6, -21, 12, 3); u('#ffffff', -5, -26, 10, 5); u('#e8282f', -6, -20, 12, 1);
     ctx.restore();
-    // (the counter, and the case on it)
+    // (the counter, and the case on it, drawn big and shrunk down to the floor to go with the alien and the pugs)
+    ctx.save(); ctx.translate(150, PLAIN_Y); ctx.scale(0.55, 0.55); ctx.translate(-150, -PLAIN_Y);
     const L = 66, R = 232, W = R - L;
     box('#6a3e1e', L, -22, W, 22); box('#8a5a34', L + 2, -20, W - 4, 18);
     for (let x = L + 8; x < R - 26; x += 30) box('#6a3e1e', x, -17, 24, 12);
@@ -4197,6 +4199,7 @@
     ctx.fillStyle = 'rgba(255,255,255,0.22)';
     for (const x of [L + 30, L + 40, L + 118]) { ctx.beginPath(); ctx.moveTo(x, PLAIN_Y - 56); ctx.lineTo(x + 7, PLAIN_Y - 56); ctx.lineTo(x - 11, PLAIN_Y - 24); ctx.lineTo(x - 18, PLAIN_Y - 24); ctx.closePath(); ctx.fill(); }
     box('#d8dbe4', L + 1, -58, W - 2, 2); box('#d8dbe4', L + 1, -58, 2, 34); box('#d8dbe4', R - 3, -58, 2, 34);
+    ctx.restore();
   }
   // (a little arrow, bobbing, to show Up will do something here)
   function drawUpArrow(x, y) {
