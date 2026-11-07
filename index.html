@@ -3941,6 +3941,7 @@
     const g = plain, ids = g.fin.ids;
     g.fin = null; g.stroll = false; g.drop = null; g.space = null; g.isle = false; g.crumble = null; g.hole = null; g.warp = null; g.boss = null; g.nuke = null;
     g.obs = []; g.drops = []; g.rovers = []; g.martians = []; g.ships = []; g.bits = []; g.endT = 0; g.cam = -PW / 2; g.planet = true; g.room = null; g.roomOn = {}; g.shipAt = {};
+    g.pcData = { paint: {}, blob: 0, bars: [3, 5, 2, 6, 4, 7, 3, 5], notes: [false, false, false, false] };
     g.pugs = ids.map((id, i) => shopPug(id, i * 16 - 8, -20));
     tone(600, 0.4, 'sine', 0.06, 300);
   }
@@ -4101,7 +4102,7 @@
       } },
       { x: 190, sit: true, draw: b => { b('#6a1f2a', -30, -3, 5, 3); b('#6a1f2a', 25, -3, 5, 3); b('#8a1f2a', -28, -30, 56, 18); b('#b0242c', -26, -28, 52, 16); b('#d8384a', -26, -12, 52, 9); b('#8a1f2a', 0, -28, 1, 25); b('#8a1f2a', -33, -17, 9, 14); b('#8a1f2a', 24, -17, 9, 14); } }] },
     { wall: '#d8dbe4', floor: '#55647a', scene: drawOffice, things: [
-      { x: 92, say: 'NUMBERS GO UP', s: [880, 'square', 200], draw: (b, r, on, t) => { b('#8a5a34', -20, -16, 40, 4); b('#6a3e1e', -18, -12, 3, 12); b('#6a3e1e', 15, -12, 3, 12); b('#22222c', -10, -36, 20, 16); b('#55556a', -2, -20, 4, 4); b('#8d90a0', -8, -19, 16, 3); b(on ? '#0a1f14' : '#2a2a3a', -8, -34, 16, 12); if (on) for (let i = 0; i < 5; i++) b('#5fd068', -7 + i * 3, -24 - (i + ((t >> 4) % 3)) * 1.6, 2, (i + ((t >> 4) % 3)) * 1.6 + 1); } }] },
+      { x: 92, pc: true, draw: (b, r, on, t) => { b('#8a5a34', -20, -16, 40, 4); b('#6a3e1e', -18, -12, 3, 12); b('#6a3e1e', 15, -12, 3, 12); b('#22222c', -10, -36, 20, 16); b('#55556a', -2, -20, 4, 4); b('#8d90a0', -8, -19, 16, 3); b(on ? '#0a1f14' : '#2a2a3a', -8, -34, 16, 12); if (on) for (let i = 0; i < 5; i++) b('#5fd068', -7 + i * 3, -24 - (i + ((t >> 4) % 3)) * 1.6, 2, (i + ((t >> 4) % 3)) * 1.6 + 1); } }] },
     { wall: '#6a6e80', floor: '#3a3a4a', window: true, things: [
       { x: 110, pilot: true, say: 'VWOOOOM', s: [90, 'sawtooth', 300], draw: (b, r, on, t) => { b('#3a3a4a', -14, -10, 28, 10); b('#8d90a0', -2, on ? -14 : -30, 4, on ? 8 : 20); r(on ? '#5fd068' : '#e8282f', 0, on ? -16 : -32, 5); if (on) for (let i = 0; i < 6; i++) b((i + (t >> 3)) % 6 < 2 ? '#7ae0ff' : '#2a4aa8', -14 + i * 5, -6, 4, 3); } }] },
     { wall: '#e8dcc0', floor: '#8a5a34', things: [
@@ -4159,6 +4160,7 @@
     if (r.eat) { stepEat(); g.kbAtk = false; return; }
     if (r.pick) { stepPick(); g.kbAtk = false; return; }
     if (r.pilot) { stepPilot(); g.kbAtk = false; return; }
+    if (r.pc) { stepPc(); g.kbAtk = false; return; }
     if (r.alt > 0) r.alt = Math.max(0, r.alt - 2);   // (settling back down once it's stopped)
     for (const p of g.pugs) {
       // (sitting: any way of moving gets up again, and a pug can still bark from there)
@@ -4183,6 +4185,7 @@
         return;
       }
       const thing = things[at];
+      if (thing.pc) { p.moving = false; r.on[at] = true; openPc(p); break; }
       if (thing.pilot) {
         p.moving = false; r.pilot = { id: p.id }; r.on[at] = true; r.say = thing.say; r.sayT = 90;
         tone(thing.s[0], 0.35, thing.s[1], 0.06, thing.s[2]);
@@ -4349,6 +4352,137 @@
     box('#8a8e9e', 114, -30, 108, 30); for (const x of [114, 150, 186, 222]) box('#6a6e80', x, -32, 3, 32);
     box('#a8acbc', 114, -30, 108, 2);
   }
+  // The office computer: Up at the desk fills the screen with its desktop and eight pretend apps. The arrows or stick move
+  // about, jump opens and uses things, bark goes back. (the user asked)
+  const PC_APPS = ['MAIL', 'PAINT', 'BLOB', 'PIANO', 'WEATHER', 'PHOTOS', 'NOTES', 'CHART'];
+  const PC_MAIL = [['ZORP', 'LUNCH AT EATS?', 'THE CUPCAKES ARE GOOD TODAY.'], ['THE BOSS', 'WORK HARD', 'PLEASE KEEP TYPING.'], ['MOM', 'CALL YOUR MOTHERSHIP', 'YOU NEVER CALL.'], ['RADAR', 'SATURN IS GONE', 'HAS ANYONE SEEN IT?'], ['GLOOP', 'WHY?', 'WHY?']];
+  const PC_SKY = [['TODAY', 'SLIME SHOWERS', '#5fd068'], ['TOMORROW', 'SUNNY AND PURPLE', '#ffcc3d'], ['NEXT DAY', 'BIG METEOR WIND', '#ff6a30'], ['ALWAYS', 'TWO MOONS', '#6ae0c8']];
+  const PC_NOTES = ['BUY MORE SLIME', 'FEED THE BLOB', 'FIX THE SAUCER', 'HIDE FROM THE PUG'];
+  const PC_PHOTOS = ['A STRANGE DOG', 'MY CAR', 'ME AT WORK', 'BEFORE THE ACCIDENT'];
+  const PC_NOTE = [262, 294, 330, 349, 392, 440, 494, 523], PC_INK = ['#e8282f', '#ffcc3d', '#5fd068', '#7ae0ff', '#b48ae0', '#14122a'];
+  function openPc(p) {
+    plain.room.pc = { id: p.id, sel: 0, app: -1, line: 0, read: false, x: 18, y: 18, pen: false, ink: 0, t: 0, hit: 0, held: { left: false, right: false, up: true, down: false } };
+    tone(500, 0.12, 'sine', 0.05, 300);
+  }
+  function stepPc() {
+    const g = plain, r = g.room, k = r.pc, d = g.pcData, p = g.pugs.find(q => q.id === k.id);
+    if (!p) { r.pc = null; return; }
+    p.upDoor = true;
+    const inp = plainInput(p), fresh = w => inp[w] && !k.held[w];
+    const dx = (fresh('right') ? 1 : 0) - (fresh('left') ? 1 : 0), dy = (fresh('down') ? 1 : 0) - (fresh('up') ? 1 : 0);
+    k.held = { left: inp.left, right: inp.right, up: inp.up, down: inp.down };
+    k.t++;
+    if (k.hit > 0) k.hit--;
+    if (inp.bark) {
+      if (k.app === 0 && k.read) k.read = false; else if (k.app >= 0) { k.app = -1; k.pen = false; } else r.pc = null;
+      sfx.tick();
+      return;
+    }
+    if (k.app < 0) {
+      if (dx || dy) { k.sel = (k.sel + dx + dy * 4 + 8) % 8; sfx.tick(); }
+      if (inp.jump) { k.app = k.sel; k.line = 0; k.read = false; tone(700, 0.1, 'sine', 0.04, 200); }
+      return;
+    }
+    const app = PC_APPS[k.app];
+    if (app === 'MAIL') {
+      if (dy && !k.read) { k.line = (k.line + dy + PC_MAIL.length) % PC_MAIL.length; sfx.tick(); }
+      if (inp.jump) { k.read = !k.read; sfx.tick(); }
+    } else if (app === 'PAINT') {
+      // (held arrows keep the brush going; jump puts it down, in the next colour, and lifts it)
+      if (k.t % 3 === 0) {
+        k.x = clamp(k.x + (inp.right ? 1 : 0) - (inp.left ? 1 : 0), 0, 35); k.y = clamp(k.y + (inp.down ? 1 : 0) - (inp.up ? 1 : 0), 0, 34);
+      }
+      if (inp.jump) { k.pen = !k.pen; if (k.pen) k.ink = (k.ink + 1) % PC_INK.length; tone(k.pen ? 500 : 300, 0.07, 'square', 0.03); }
+      if (k.pen) d.paint[k.x + ',' + k.y] = PC_INK[k.ink];
+    } else if (app === 'BLOB') {
+      if (inp.jump) { d.blob++; k.hit = 8; tone(300 + (d.blob % 10) * 40, 0.08, 'square', 0.04); if (d.blob % 10 === 0) sfx.coin(); }
+    } else if (app === 'PIANO') {
+      if (dx) { k.line = (k.line + dx + 8) % 8; sfx.tick(); }
+      if (inp.jump) { k.hit = 12; tone(PC_NOTE[k.line], 0.4, 'triangle', 0.07); }
+    } else if (app === 'WEATHER' || app === 'PHOTOS') {
+      if (dx || inp.jump) { k.line = (k.line + (dx || 1) + 4) % 4; sfx.tick(); }
+    } else if (app === 'NOTES') {
+      if (dy) { k.line = (k.line + dy + 4) % 4; sfx.tick(); }
+      if (inp.jump) { d.notes[k.line] = !d.notes[k.line]; tone(d.notes[k.line] ? 800 : 400, 0.08, 'sine', 0.04); }
+    } else if (app === 'CHART') {
+      if (inp.jump) { const i = Math.floor(Math.random() * 8); d.bars[i] = d.bars[i] >= 16 ? 2 : d.bars[i] + 2; tone(500 + d.bars[i] * 30, 0.1, 'square', 0.04, 200); }
+    }
+  }
+  // (a little picture for each app, in a 28 square at x, y)
+  function pcIcon(i, x, y) {
+    bk('#14122a', x, y, 28, 28);
+    bk(['#fff6e0', '#ffffff', '#176a5a', '#3a2a78', '#7ae0ff', '#ff9ac0', '#ffe08a', '#0a1f14'][i], x + 1, y + 1, 26, 26);
+    if (i === 0) { bk('#c8ccd8', x + 5, y + 8, 18, 12); bk('#8d90a0', x + 5, y + 8, 18, 1); for (let a = 0; a < 9; a++) bk('#8d90a0', x + 5 + a, y + 9 + a * 0.6, 1, 1), bk('#8d90a0', x + 22 - a, y + 9 + a * 0.6, 1, 1); }
+    else if (i === 1) { bb('#e8282f', x + 9, y + 10, 4); bb('#ffcc3d', x + 18, y + 9, 4); bb('#5fd068', x + 10, y + 19, 4); bb('#7ae0ff', x + 19, y + 18, 4); }
+    else if (i === 2) { bb('#5fd068', x + 14, y + 15, 8); bk('#14122a', x + 10, y + 12, 2, 3); bk('#14122a', x + 16, y + 12, 2, 3); }
+    else if (i === 3) { for (let a = 0; a < 4; a++) { bk('#ffffff', x + 4 + a * 5, y + 8, 4, 14); } bk('#14122a', x + 7, y + 8, 3, 8); bk('#14122a', x + 17, y + 8, 3, 8); }
+    else if (i === 4) { bb('#ffcc3d', x + 10, y + 11, 5); bb('#ffffff', x + 16, y + 16, 6); bb('#ffffff', x + 11, y + 18, 4); }
+    else if (i === 5) { bk('#ffffff', x + 5, y + 6, 18, 16); bk('#7ae0ff', x + 7, y + 8, 14, 12); bb('#ffcc3d', x + 11, y + 12, 2); bk('#5fd068', x + 7, y + 16, 14, 4); }
+    else if (i === 6) { for (let a = 0; a < 4; a++) bk('#8a5a34', x + 6, y + 7 + a * 5, 16, 1); }
+    else { for (let a = 0; a < 4; a++) bk('#5fd068', x + 6 + a * 5, y + 20 - a * 4, 4, 3 + a * 4); }
+  }
+  function drawPc() {
+    const g = plain, k = g.room.pc, d = g.pcData, t = g.t, app = k.app < 0 ? null : PC_APPS[k.app], p = g.pugs.find(q => q.id === k.id);
+    const line = (s, y, sw, x) => drawText(s, x === undefined ? 20 : x, y, sw || 'black');
+    bk('#22222c', 0, 0, PW, PH); bk('#3a3a4a', 6, 6, PW - 12, PH - 12);
+    bk(app ? '#fff6e0' : '#2f7f8a', 10, 18, PW - 20, 240); bk('#14122a', 10, 10, PW - 20, 12);
+    drawText(app || 'ALIEN OS', 14, 12, 'gold'); drawText(String(12 + (t >> 9) % 12) + (((t >> 6) & 1) ? ':' : ' ') + String(10 + (t >> 7) % 50), 226, 12, 'cyan');
+    drawText('ARROWS MOVE  JUMP USE  BARK BACK', PW / 2, 264, 'cyan', 'center');
+    if (!app) {
+      PC_APPS.forEach((name, i) => {
+        const x = 24 + (i % 4) * 50, y = 42 + Math.floor(i / 4) * 96;
+        if (i === k.sel) bk('#ffcc3d', x - 4, y - 4, 36, 36);
+        pcIcon(i, x, y);
+        drawText(name, x + 14, y + 36, i === k.sel ? 'gold' : 'black', 'center');
+      });
+    } else if (app === 'MAIL') {
+      if (k.read) {
+        const m = PC_MAIL[k.line];
+        line('FROM ' + m[0], 40); line(m[1], 58, 'red'); bk('#c8ccd8', 20, 74, 200, 1); line(m[2], 86);
+      } else PC_MAIL.forEach((m, i) => {
+        if (i === k.line) bk('#ffcc3d', 16, 34 + i * 34, 208, 28);
+        line(m[0], 38 + i * 34, 'red'); line(m[1], 50 + i * 34);
+      });
+    } else if (app === 'PAINT') {
+      for (const key of Object.keys(d.paint)) { const [a, b] = key.split(','); bk(d.paint[key], 14 + a * 6, 26 + b * 6, 6, 6); }
+      bk(k.pen ? PC_INK[k.ink] : '#14122a', 14 + k.x * 6, 26 + k.y * 6, 6, 6); bk('#ffffff', 16 + k.x * 6, 28 + k.y * 6, 2, 2);
+    } else if (app === 'BLOB') {
+      const pic = sprite((t >> 4) & 1 ? 'dg_blob2' : 'dg_blob1'), s = k.hit ? 5 : 4;
+      if (pic) ctx.drawImage(pic, 120 - pic.width * s / 2, 130 - pic.height * s / 2, pic.width * s, pic.height * s);
+      drawText('BLOBS: ' + d.blob, PW / 2, 200, 'black', 'center', 2);
+      drawText(d.blob >= 10 ? 'LEVEL ' + (Math.floor(d.blob / 10) + 1) + '!' : 'JUMP TO POKE IT', PW / 2, 226, 'red', 'center');
+    } else if (app === 'PIANO') {
+      for (let i = 0; i < 8; i++) { bk('#14122a', 18 + i * 26, 70, 25, 130); bk(i === k.line ? (k.hit ? '#ffcc3d' : '#ffe08a') : '#ffffff', 19 + i * 26, 71, 23, 128); drawText('CDEFGABC'[i], 28 + i * 26, 182, 'black'); }
+      for (const i of [0, 1, 3, 4, 5]) bk('#14122a', 34 + i * 26, 70, 16, 78);
+    } else if (app === 'WEATHER') {
+      const w = PC_SKY[k.line];
+      bk('#160a33', 14, 24, 212, 150);
+      bb(w[2], 120, 96, 34);
+      for (let i = 0; i < 16; i++) bk(w[2], 22 + (i * 37) % 196, 30 + (t + i * 19) % 138, 2, 5);
+      drawText(w[0], PW / 2, 190, 'black', 'center', 2); drawText(w[1], PW / 2, 214, 'red', 'center');
+    } else if (app === 'PHOTOS') {
+      bk('#ffffff', 34, 34, 172, 160); bk('#160a33', 42, 42, 156, 128);
+      ctx.save(); ctx.beginPath(); ctx.rect(42, 42, 156, 128); ctx.clip();
+      if (k.line === 0) { const b = sprite('player_stand', false, LOOK[p ? p.id : 0].swap); if (b) ctx.drawImage(b, 120 - b.width * 3, 120 - b.height * 3, b.width * 6, b.height * 6); }
+      else if (k.line === 1) { const b = sprite('ufo_0'); if (b) ctx.drawImage(b, 76, 84, 88, 44); }
+      else if (k.line === 2) { ctx.translate(120, 150 - PLAIN_Y * 4); ctx.scale(4, 4); ctx.translate(-120, 0); drawAlien(120, '#5fd068', 0, 1); }
+      else { if (!spaceBgReady) { buildSpaceBg(); spaceBgReady = true; } ctx.drawImage(spaceBg, 70 - 52, 122 - 44, 104, 88, 42, 42, 156, 128); }
+      ctx.restore();
+      drawText(PC_PHOTOS[k.line], PW / 2, 178, 'black', 'center');
+    } else if (app === 'NOTES') {
+      line('TO DO', 34, 'red');
+      PC_NOTES.forEach((n, i) => {
+        const y = 60 + i * 34;
+        if (i === k.line) bk('#ffcc3d', 16, y - 6, 208, 22);
+        bk('#14122a', 22, y, 12, 12); bk('#fff6e0', 23, y + 1, 10, 10); if (d.notes[i]) bk('#5fd068', 25, y + 3, 6, 6);
+        line(n, y + 3, 'black', 42);
+      });
+    } else {
+      bk('#0a1f14', 16, 30, 208, 190);
+      d.bars.forEach((b, i) => bk('#5fd068', 26 + i * 24, 212 - b * 10, 18, b * 10));
+      drawText('NUMBERS GO UP', PW / 2, 232, 'black', 'center');
+    }
+  }
   // (a little arrow, bobbing, to show Up will do something here)
   function drawUpArrow(x, y) {
     y += (plain.t >> 4) & 1;
@@ -4389,6 +4523,7 @@
     if (r.pick) drawPick();
     if (r.sayT > 0) drawText(r.say, PW / 2, 84, 'gold', 'center');
     if (r.pilot) drawText('ARROWS FLY  SPACE STOPS', PW / 2, 72, 'cyan', 'center');
+    if (r.pc) drawPc();
   }
   function drawPlanet() {
     const g = plain, cam = g.cam;
