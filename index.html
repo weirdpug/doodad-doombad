@@ -3448,8 +3448,9 @@
   // up: the frames of little blasts before the big one, when it cuts away to Gloop, and how long that lasts)
   const STATION_BIG = 60, STATION_CUT = 120, STATION_SHOT = 180;
   // (Gloop's ship over Jupiter after that: the frames between its nukes, a nuke's speed, how far off a pug its blast
-  // reaches, how far ahead of a walking pug he aims, and the size the nukes are drawn, the bigger the smaller the number)
-  const HUNT_GAP = 55, HUNT_SPEED = 5, HUNT_NEAR = 26, HUNT_LEAD = 8, HUNT_Z = 2.6;
+  // reaches, and the size the nukes are drawn, the bigger the smaller the number; then how far in front of and behind
+  // a walking pug they land, nearest and furthest)
+  const HUNT_GAP = 55, HUNT_SPEED = 5, HUNT_NEAR = 26, HUNT_Z = 2.6, HUNT_FRONT = [70, 100], HUNT_BACK = [40, 70];
   // (how near a crater's middle a pug on the ground has to be to fall in, and how near the shop no crater forms, so a door
   // is never over one)
   const CRATER_R = 9, CRATER_CLEAR = 90;
@@ -3843,9 +3844,9 @@
     }
     if (s.hunt) stepHunt();
   }
-  // On the way back to the shop Gloop tries to kill them: his ship follows them along overhead, firing HOVERACKS nukes at
-  // where they're heading. A pug that stops or turns back gets blown up; one that keeps going stays just ahead of the
-  // blasts. Reaching the shop ends it. If they all die, it's the explosion picture for 2 seconds, then the main menu.
+  // On the way back to the shop Gloop tries to kill them: his ship follows them along overhead, firing HOVERACKS nukes that
+  // land some in front of a walking pug and some behind it, leaving craters to jump. A pug that stops gets one right on
+  // it. Reaching the shop ends it. If they all die, it's the explosion picture for 2 seconds, then the main menu.
   // (the user asked)
   function stepHunt() {
     const g = plain, s = g.stroll, h = s.hunt, alive = g.pugs.filter(p => !p.dead);
@@ -3855,7 +3856,10 @@
       if (Math.abs(prey.x - h.x) > 12) h.face = prey.x < h.x ? -1 : 1;
       if (Math.abs(prey.x - h.x) < 150 && --h.shootT <= 0) {
         h.shootT = HUNT_GAP;
-        const x = h.x, y = h.y + 18, tx = prey.x + (prey.moving ? prey.face * HUNT_LEAD : 0), ty = PLAIN_Y - 4, d = Math.hypot(tx - x, ty - y), dir = tx < x ? -1 : 1;
+        // (where the pug will be when it lands, then in front of that or behind it, at random)
+        const x = h.x, y = h.y + 18, ty = PLAIN_Y - 4, then = prey.x + prey.face * 1.25 * Math.hypot(prey.x - x, ty - y) / HUNT_SPEED;
+        const [near, far] = Math.random() < 0.5 ? HUNT_FRONT : HUNT_BACK.map(v => -v), tx = prey.moving ? then + prey.face * (near + Math.random() * (far - near)) : prey.x;
+        const d = Math.hypot(tx - x, ty - y), dir = tx < x ? -1 : 1;
         h.nukes.push({ x, y, vx: (tx - x) / d * HUNT_SPEED, vy: (ty - y) / d * HUNT_SPEED, dir, ang: Math.atan2(ty - y, (tx - x) * dir) });
         noise(0.5, 0.08, 500, 2000); tone(120, 0.4, 'sawtooth', 0.04, 300);
       }
