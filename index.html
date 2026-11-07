@@ -3743,24 +3743,56 @@
       if (!g.endT && g.pugs.every(q => q.dead)) g.endT = 150;
     }
   }
-  // Walking off the right of the shop leads out onto Jupiter: the same flat ground as the chase, with nothing on it and no
-  // Gloop, to walk about on in either direction for as long as you like. (the user asked)
+  // Walking off the right of the shop leads out of its door onto Jupiter: the same flat ground as the chase, with nothing
+  // on it but the shop and no Gloop, to walk about on for as long as you like. Walking left back into the shop goes back
+  // in. (the user asked)
   function leaveShop() {
-    const g = plain, x0 = g.cam + PW / 2;
-    g.stroll = true; g.drop = null; g.isle = false; g.space = null; g.crumble = null; g.hole = null; g.warp = null; g.boss = null; g.nuke = null;
+    const g = plain, d = g.drop;
+    if (d.hutX === undefined) d.hutX = g.cam + PW / 2 - 60;
+    const x0 = d.hutX + 60;
+    g.stroll = { hutX: d.hutX, drop: d, space: g.space }; g.cam = x0 - PW / 2;
+    g.drop = null; g.isle = false; g.space = null; g.crumble = null; g.hole = null; g.warp = null; g.boss = null; g.nuke = null;
     g.obs = []; g.drops = []; g.rovers = []; g.martians = []; g.ships = []; g.bits = []; g.endT = 0;
     g.pugs = g.pugs.filter(p => !p.dead).map((p, i) => Object.assign(shopPug(p.id, x0 + i * 16 - 8, PLAIN_Y), { ground: true }));
   }
+  function backInShop() {
+    const g = plain, s = g.stroll;
+    g.stroll = false; g.drop = s.drop; g.space = s.space; g.isle = true; g.bits = [];
+    g.pugs = g.pugs.map((p, i) => Object.assign(shopPug(p.id, SHOP_R - 12 - i * 34, SHOP_Y), { face: -1 }));
+  }
   function stepStroll() {
-    const g = plain;
+    const g = plain, door = g.stroll.hutX + 44;
     for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.pugs.some(p => p.id === i)) g.pugs.push(Object.assign(shopPug(i, g.cam + PW / 2, PLAIN_Y), { ground: true }));
     g.pugs = g.pugs.filter(p => arenaDriven(p.id));
-    for (const p of g.pugs) floorPug(p, g.cam + 8, g.cam + PW - 8, PLAIN_Y, 1.25, -3.4);
+    for (const p of g.pugs) {
+      const dx = floorPug(p, Math.max(g.cam + 8, door), g.cam + PW - 8, PLAIN_Y, 1.25, -3.4);
+      if (dx < 0 && p.ground && p.x <= door) { backInShop(); g.kbAtk = false; return; }
+    }
     g.kbAtk = false;
     if (g.pugs.length) {
       const xs = g.pugs.map(p => p.x);
       g.cam += ((Math.min(...xs) + Math.max(...xs)) / 2 - PW / 2 - g.cam) * 0.1;
     }
+  }
+  // Gloop's shop from outside, at screen x: a plank hut with its name up, a porthole, a door on the right, and the hole in
+  // its roof that the pugs came through
+  function drawHut(x) {
+    const box = (col, a, b, w, h) => { ctx.fillStyle = col; ctx.fillRect(x + a, PLAIN_Y + b, w, h); };
+    for (let i = 0; i < 14; i++) box(i % 2 ? '#61391f' : '#6b4226', -42 + i * 6, -56, 6, 56);
+    box('#3e2414', -46, -62, 92, 6); box('#5e3a20', -46, -56, 92, 1);
+    // (the sign)
+    box('#3e2414', -39, -53, 78, 12); box('#fff6e0', -38, -52, 76, 10);
+    drawText(SHOP_NAME, x, PLAIN_Y - 51, 'black', 'center');
+    // (the porthole, with a storm in it)
+    ctx.fillStyle = '#c8a040'; ctx.beginPath(); ctx.arc(x - 20, PLAIN_Y - 22, 11, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#c8482e'; ctx.beginPath(); ctx.arc(x - 20, PLAIN_Y - 22, 8, 0, Math.PI * 2); ctx.fill();
+    box('#f0a070', -27, -24, 14, 3);
+    // (the door, standing open)
+    box('#c8a040', 16, -38, 24, 38); box('#2a160a', 18, -36, 20, 36);
+    // (the hole)
+    ctx.fillStyle = '#2a160a'; ctx.beginPath();
+    [[-14, -62], [-11, -68], [-6, -60], [-1, -69], [4, -59], [9, -67], [14, -62], [10, -56], [-10, -56]].forEach(([a, b], i) => i ? ctx.lineTo(x + a, PLAIN_Y + b) : ctx.moveTo(x + a, PLAIN_Y + b));
+    ctx.closePath(); ctx.fill();
   }
   function shopPug(id, x, y) {
     return { id, x, y, vy: 0, ground: y === SHOP_Y, face: 1, moving: false, anim: 0, barkT: 0, prev: { jump: true, bark: true } };
@@ -4332,7 +4364,7 @@
       ctx.fillStyle = `rgba(20,10,4,${(0.2 + 0.5 * Math.max(0, b.y) / PLAIN_Y).toFixed(2)})`;
       ctx.fillRect(Math.round(b.x - g.cam) - 6, plainFloor(b.x, b.y + 5) - 2, 12, 2);
     }
-    if (!g.stroll) drawPlainGloop();
+    if (g.stroll) drawHut(Math.round(g.stroll.hutX - g.cam)); else drawPlainGloop();
     for (const s of g.ships) {
       const pic = sprite('ufo_' + ((g.t >> 3) & 1));
       if (pic) ctx.drawImage(pic, Math.round(s.x - g.cam) - 22, Math.round(s.y), 44, 22);
