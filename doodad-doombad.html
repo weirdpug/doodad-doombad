@@ -3707,7 +3707,31 @@
   }
   // Down a wormhole, out over Jupiter, into its red spot (where the shop is) and through the ceiling of Gloop's shop,
   // landing on his counter among the broken planks. Gloop's out, and the pugs can walk up and down the counter for as long
-  // as they like, twice their usual size; the pause menu is the way back to the main menu. (the user asked)
+  // as they like, twice their usual size; the pause menu is the way back to the main menu. One last target locks onto one
+  // of them as soon as they land, and one last burrito follows, which kills like the others. (the user asked)
+  function shopBurrito() {
+    const g = plain, d = g.drop, alive = g.pugs.filter(p => !p.dead);
+    if (!d.fired && alive.length) {
+      if (!d.aim) {
+        const p = alive[Math.floor(Math.random() * alive.length)];
+        d.aim = { x: p.x, y: p.y - 14, t: 0 }; tone(1100, 0.08, 'square', 0.03, 0);
+      }
+      if (++d.aim.t === ISLE_AIM) {
+        d.burrito = { x: d.aim.x, y: d.aim.y, from: d.aim.x + (Math.random() < 0.5 ? -80 : 80), t: 0 };
+        d.aim = null; d.fired = true;
+        tone(500, 0.2, 'square', 0.03, -320);
+      }
+    }
+    const b = d.burrito;
+    if (!b || ++b.t < ISLE_FLY) return;
+    d.burrito = null;
+    noise(0.18, 0.12, 1200, 200);
+    for (let i = 0; i < 16; i++) g.bits.push({ x: b.x, y: b.y, vx: (Math.random() - 0.5) * 4, vy: -1 - Math.random() * 2.5, g: 0.12, t: 34, col: BURRITO_BITS[i % BURRITO_BITS.length] });
+    for (const p of g.pugs) if (!p.dead && Math.abs(p.x - b.x) < ISLE_HIT * 2 && Math.abs(p.y - 14 - b.y) < ISLE_HIT * 2) {
+      p.dead = true; p.barkT = 0; p.moving = false; p.ground = true; p.y = SHOP_Y; sfx.die();
+      if (!g.endT && g.pugs.every(q => q.dead)) g.endT = 150;
+    }
+  }
   function shopPug(id, x, y) {
     return { id, x, y, vy: 0, ground: y === SHOP_Y, face: 1, moving: false, anim: 0, barkT: 0, prev: { jump: true, bark: true } };
   }
@@ -3735,7 +3759,7 @@
       k.vy += 0.2; k.x += k.vx; k.y += k.vy; k.a += k.spin;
       if (k.y >= 187) { k.y = 187; k.rest = true; k.a = Math.round(k.a / Math.PI) * Math.PI; }
     }
-    for (const b of g.bits) { b.x += b.vx; b.y += b.vy; b.t--; }
+    for (const b of g.bits) { b.x += b.vx; b.y += b.vy; b.vy += b.g || 0; b.t--; }
     g.bits = g.bits.filter(b => b.t > 0);
     // (once the last pug is down they are all yours; a player who joins now comes in through the hole)
     if (!d.walk && c === DROP_FALL + (n - 1) * DROP_GAP) {
@@ -3745,7 +3769,8 @@
     if (d.walk) {
       for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.pugs.some(p => p.id === i)) g.pugs.push(shopPug(i, DROP_X, -30));
       g.pugs = g.pugs.filter(p => arenaDriven(p.id));
-      for (const p of g.pugs) floorPug(p, SHOP_L, SHOP_R, SHOP_Y, 1.6, -4.4);
+      for (const p of g.pugs) if (!p.dead) floorPug(p, SHOP_L, SHOP_R, SHOP_Y, 1.6, -4.4);
+      shopBurrito();
     }
     g.kbAtk = false;
   }
@@ -3820,6 +3845,9 @@
       const u = Math.min(1, (c - i * DROP_GAP) / DROP_FALL);
       big({ id, face: 1, ground: u >= 1, moving: false, barkT: 0, anim: 0 }, DROP_X + Math.round((i - (n - 1) / 2) * 34), Math.round(-30 + 220 * u * u));
     });
+    if (d.aim) drawAim(d.aim, 1.5);
+    if (c >= 1) for (const b of plain.bits) { ctx.fillStyle = b.col; ctx.fillRect(Math.round(b.x), Math.round(b.y), 2, 2); }
+    if (d.burrito) drawThrown(d.burrito, 2.4);
     ctx.restore();
   }
   // (has the ground at this x crumbled away yet? The top row of cells comes first in the list)
@@ -3878,22 +3906,23 @@
     if (said) drawText(said[1], PW / 2, 40, 'gold', 'center');
     if (plain.tauntT > 0) drawText(ISLE_TAUNT, PW / 2, 40, 'gold', 'center');
     if (crumble && crumble.t < ISLE_YELL_T) drawText(ISLE_YELL, PW / 2, 36, 'gold', 'center', 2.5);
-    // (the target: a blinking red and white ring with cross hairs)
-    const aim = plain.aim;
-    if (aim) {
-      const x = Math.round(aim.x), y = Math.round(aim.y);
-      ctx.fillStyle = (aim.t >> 3) & 1 ? '#ffffff' : '#ff3e30';
-      for (let i = 0; i < 28; i++) ctx.fillRect(Math.round(x + Math.cos(i / 28 * Math.PI * 2) * 9), Math.round(y + Math.sin(i / 28 * Math.PI * 2) * 9), 2, 2);
-      for (const [dx, dy, w, h] of [[-14, 0, 7, 2], [8, 0, 7, 2], [0, -14, 2, 7], [0, 8, 2, 7], [0, 0, 2, 2]]) ctx.fillRect(x + dx, y + dy, w, h);
-    }
+    if (plain.aim) drawAim(plain.aim, 1);
     for (const b of plain.bits) { ctx.fillStyle = b.col; ctx.fillRect(Math.round(b.x), Math.round(b.y), 2, 2); }
-    // (the burritos, flying in from above the screen in an arc, spinning)
-    const pic = sprite('thrown_burrito');
-    for (const b of plain.thrown) {
-      const u = b.t / ISLE_FLY, x = b.from + (b.x - b.from) * u, y = -16 + (b.y + 16) * u - Math.sin(u * Math.PI) * 14;
-      if (!pic) continue;
-      ctx.save(); ctx.translate(Math.round(x), Math.round(y)); ctx.rotate(b.t * 0.7); ctx.scale(1.6, 1.6); ctx.drawImage(pic, -pic.width / 2, -pic.height / 2); ctx.restore();
-    }
+    for (const b of plain.thrown) drawThrown(b, 1.6);
+  }
+  // (a target: a blinking red and white ring with cross hairs)
+  function drawAim(aim, size) {
+    ctx.save(); ctx.translate(Math.round(aim.x), Math.round(aim.y)); ctx.scale(size, size);
+    ctx.fillStyle = (aim.t >> 3) & 1 ? '#ffffff' : '#ff3e30';
+    for (let i = 0; i < 28; i++) ctx.fillRect(Math.round(Math.cos(i / 28 * Math.PI * 2) * 9), Math.round(Math.sin(i / 28 * Math.PI * 2) * 9), 2, 2);
+    for (const [dx, dy, w, h] of [[-14, 0, 7, 2], [8, 0, 7, 2], [0, -14, 2, 7], [0, 8, 2, 7], [0, 0, 2, 2]]) ctx.fillRect(dx, dy, w, h);
+    ctx.restore();
+  }
+  // (a burrito, flying in from above the screen in an arc, spinning)
+  function drawThrown(b, size) {
+    const pic = sprite('thrown_burrito'), u = b.t / ISLE_FLY, x = b.from + (b.x - b.from) * u, y = -16 + (b.y + 16) * u - Math.sin(u * Math.PI) * 14;
+    if (!pic) return;
+    ctx.save(); ctx.translate(Math.round(x), Math.round(y)); ctx.rotate(b.t * 0.7); ctx.scale(size, size); ctx.drawImage(pic, -pic.width / 2, -pic.height / 2); ctx.restore();
   }
   // Cut a pug, in its costume, into little coloured cells that can each be moved on their own. a: how far along the noodle
   // the cell ends up, with the head (the right of the sprite, u over 0.55) squeezed into the last bit of it. u, v: where
