@@ -3411,8 +3411,10 @@
   // (the fall from there, in frames: the wormhole, the drop to Jupiter, a pug's fall through the shop and the gap between
   // pugs; where in the shop it comes through; the shop counter the pugs walk along; and the wait there for the last target)
   const DROP_HOLE = 150, DROP_SKY = 120, DROP_FALL = 14, DROP_GAP = 12, DROP_X = 156, SHOP_Y = 190, SHOP_L = 14, SHOP_R = PW - 14, SHOP_AIM_WAIT = 120;
+  // (the top of the cash register: its left and right ends and its height)
+  const TILL_L = 22, TILL_R = 74, TILL_Y = 158;
   // (what Gloop says when the last burrito has landed, and for how many frames)
-  const SHOP_SAY = "I'M OUT OF BURRITOS", SHOP_SAY_T = 240;
+  const SHOP_SAY ="I'M OUT OF BURRITOS", SHOP_SAY_T = 240;
   let isleArt = null;
   const BOSS_AT = 120, BOSS_HP = 20, SAUCER_HP = 10, BOSS_X = 176, BOSS_SHOOT = 12, SHOT_SPEED = 4.5, BOSS_SCALE = 0.6, BOSS_MOVE = 1.6;
   // (the top of whatever is highest at x, for those who walk over everything; half: how wide they are each side)
@@ -3731,7 +3733,8 @@
     noise(0.18, 0.12, 1200, 200);
     for (let i = 0; i < 16; i++) g.bits.push({ x: b.x, y: b.y, vx: (Math.random() - 0.5) * 4, vy: -1 - Math.random() * 2.5, g: 0.12, t: 34, col: BURRITO_BITS[i % BURRITO_BITS.length] });
     for (const p of g.pugs) if (!p.dead && Math.abs(p.x - b.x) < ISLE_HIT * 2 && Math.abs(p.y - 14 - b.y) < ISLE_HIT * 2) {
-      p.dead = true; p.barkT = 0; p.moving = false; p.ground = true; p.y = SHOP_Y; sfx.die();
+      p.dead = true; p.barkT = 0; p.moving = false; sfx.die();
+      if (!p.ground) { p.ground = true; p.y = SHOP_Y; }
       if (!g.endT && g.pugs.every(q => q.dead)) g.endT = 150;
     }
   }
@@ -3772,7 +3775,14 @@
     if (d.walk) {
       for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.pugs.some(p => p.id === i)) g.pugs.push(shopPug(i, DROP_X, -30));
       g.pugs = g.pugs.filter(p => arenaDriven(p.id));
-      for (const p of g.pugs) if (!p.dead) floorPug(p, SHOP_L, SHOP_R, SHOP_Y, 1.6, -4.4);
+      for (const p of g.pugs) if (!p.dead) {
+        // (a pug walks in front of the cash register, but can jump up and stand on it, and walks off its ends)
+        const was = p.y;
+        floorPug(p, SHOP_L, SHOP_R, SHOP_Y, 1.6, -4.4);
+        const onTill = p.x >= TILL_L && p.x <= TILL_R;
+        if (onTill && !p.ground && p.vy > 0 && was <= TILL_Y && p.y >= TILL_Y) { p.y = TILL_Y; p.vy = 0; p.ground = true; tone(160, 0.08, 'square', 0.04, 60); }
+        else if (!onTill && p.ground && p.y < SHOP_Y) { p.ground = false; p.vy = 0; }
+      }
       shopBurrito();
     }
     g.kbAtk = false;
