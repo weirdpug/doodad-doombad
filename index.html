@@ -4015,12 +4015,16 @@
     c.fillStyle = '#ff9ac0'; c.beginPath(); c.arc(52, 34, 11, 0, Math.PI * 2); c.fill();
     c.fillStyle = '#ffc4dc'; c.beginPath(); c.arc(49, 31, 7, 0, Math.PI * 2); c.fill();
   }
-  // (one of the 13 kinds of building at screen x, picked by h, from 0 to 1)
-  function drawAlienHome(x, h) {
+  // (which kind of building is at slot n: one of the 13, but never 10, the egg pod, which is gone; its slots get one of
+  // the others instead, so the street has no gaps and every other building stays where it was)
+  const HOME_KINDS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12];
+  const homeKind = n => { const k = Math.floor(planetHash(n + 0.5) * 13); return k !== 10 ? k : HOME_KINDS[Math.floor(planetHash(n + 0.65) * HOME_KINDS.length)]; };
+  // (a building of that kind at screen x)
+  function drawAlienHome(x, kind) {
     const box = (col, a, b, w, h2) => { ctx.fillStyle = col; ctx.fillRect(x + a, PLAIN_Y + b, w, h2); };
     const round = (col, a, b, r, half) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x + a, PLAIN_Y + b, r, half ? Math.PI : 0, half ? 0 : Math.PI * 2); ctx.fill(); };
     const blink = (plain.t >> 4) & 1;
-    switch (Math.floor(h * 13)) {
+    switch (kind) {
       case 0:   // (a round house)
         round('#6a58b8', 0, 0, 36, true); round('#b8a8e8', 0, 0, 33, true);
         box('#3a2a78', -8, -20, 16, 20); box('#7ae0ff', -24, -18, 9, 7); box('#7ae0ff', 15, -18, 9, 7);
@@ -4080,12 +4084,6 @@
         for (let i = 0; i < 7; i++) box(i % 2 ? '#6ae0c8' : '#3fbfae', -32 + i * 4, -(i + 1) * 12, 64 - i * 8, 12);
         round('#ffcc3d', 0, -88, 5); box('#176a5a', -6, -16, 12, 16);
         break;
-      case 10:   // (an egg-shaped pod on legs)
-        for (const a of [-16, 13]) box('#55556a', a, -26, 3, 26);
-        box('#8d90a0', -2, -24, 4, 24);
-        ctx.fillStyle = '#ffb060'; ctx.beginPath(); ctx.ellipse(x, PLAIN_Y - 46, 24, 26, 0, 0, Math.PI * 2); ctx.fill();
-        box('#c8742f', -24, -38, 48, 3); round('#7ae0ff', 0, -52, 9); round('#d8f4ff', -3, -55, 3);
-        break;
       case 11:   // (a diner under a striped awning)
         box('#2fb88a', -38, -36, 76, 36); box('#7af0c0', -36, -34, 72, 32);
         for (let i = 0; i < 8; i++) box(i % 2 ? '#ffffff' : '#e8282f', -42 + i * 11, -42, 11, 9);
@@ -4109,7 +4107,7 @@
     box('#14122a', -4, -16, 3, 4); box('#14122a', 1, -16, 3, 4); box('#ffffff', -3, dizzy ? -14 : -16, 1, 1); box('#ffffff', 2, -16, 1, 1);
     box(col, -3, -23, 1, 3); box(col, 2, -23, 1, 3); box('#ffcc3d', -4, -24, 2, 2); box('#ffcc3d', 2, -24, 2, 2);
   }
-  // Inside the aliens' buildings: pressing Up in front of one goes in, and everyone with it. Each of the 13 kinds has its
+  // Inside the aliens' buildings: pressing Up in front of one goes in, and everyone with it. Each of the 12 kinds has its
   // own room with its own two things to play with: Up in front of one uses it (and stays that way, building by building),
   // Up at the door goes back out. A little arrow shows when Up will do something. (the user asked)
   // (a thing's x, what shows at the top when it's used, its sound, and how it's drawn: b a box and r a ball, both from its
@@ -4172,9 +4170,7 @@
     { wall: '#3fbfae', floor: '#176a5a', things: [
       { x: 110, say: 'DING DONG', s: [784, 'triangle', -30], draw: (b, r, on, t) => { const a = on ? Math.sin(t * 0.2) * 7 : 0; b('#55556a', -14, -56, 28, 3); b('#55556a', -14, -56, 3, 56); b('#55556a', 11, -56, 3, 56); r('#ffcc3d', a, -38, 11); b('#ffcc3d', -11 + a, -38, 22, 12); r('#c8a040', a * 1.3, -24, 3); } },
       { x: 190, say: 'SPLASH', s: [900, 'sine', -600], draw: (b, r, on, t) => { b('#8d90a0', -18, -8, 36, 8); b('#7ae0ff', -16, -8, 32, 3); b('#8d90a0', -2, -24, 4, 16); if (on) for (let i = 0; i < 10; i++) { const u = ((t + i * 7) % 40) / 40, d = i % 2 ? 1 : -1; r('#7ae0ff', d * u * 18, -24 - Math.sin(u * Math.PI) * 18 + u * 14, 1.5); } } }] },
-    { wall: '#ffd9a0', floor: '#c8742f', things: [
-      { x: 110, say: 'IT HATCHED!', s: [1046, 'sine', 300], draw: (b, r, on, t) => { b('#a8743a', -14, -8, 28, 8); if (on) { b('#5fd068', -5, -24 - ((t >> 4) & 1), 10, 10); b('#14122a', -3, -22 - ((t >> 4) & 1), 2, 3); b('#14122a', 1, -22 - ((t >> 4) & 1), 2, 3); b('#fff6e0', -9, -14, 18, 6); } else { ctx.fillStyle = '#fff6e0'; ctx.beginPath(); ctx.ellipse(ctxX(b), PLAIN_Y - 20, 10, 13, 0, 0, Math.PI * 2); ctx.fill(); } } },
-      { x: 190, say: 'ROCK-A-BYE', s: [392, 'sine', 40], draw: (b, r, on, t) => { const a = on ? Math.sin(t * 0.09) * 5 : 0; b('#8a5a34', -18 + a, -20, 36, 14); b('#ffffff', -15 + a, -22, 30, 4); b('#8a5a34', -14, -6, 4, 6); b('#8a5a34', 10, -6, 4, 6); b('#55556a', -1 + a, -52, 2, 30); for (const c of [-10, 0, 10]) r(['#ff9ac0', '#ffcc3d', '#7ae0ff'][(c + 10) / 10], c + a, -48, 3); } }] },
+    null,   // (10 was the egg pod, taken away entirely (the user asked); homeKind never picks it)
     { wall: '#ffe8c8', floor: '#c8742f', things: [], scene: drawBakery, counter: true },
     { wall: '#d8dbe4', floor: '#6a6e80', things: [
       { x: 110, say: '3 2 1 ... NOT YET', s: [523, 'square', -200], draw: (b, r, on, t) => { b('#55556a', -18, -40, 36, 40); b('#14122a', -14, -36, 28, 16); if (on) drawText(String(3 - ((t >> 5) % 4)), ctxX(b), PLAIN_Y - 31, 'red', 'center'); for (let i = 0; i < 3; i++) b(['#e8282f', '#ffcc3d', '#5fd068'][i], -12 + i * 9, -14, 6, 6); } },
@@ -4340,7 +4336,7 @@
   }
   function enterRoom(n) {
     const g = plain;
-    const kind = Math.floor(planetHash(n + 0.5) * 13);
+    const kind = homeKind(n);
     if (ROOMS[kind].refill) g.roomOn[n] = [];   // (the potions are back)
     g.room = { n, kind, floor: 0, lift: null, sayT: 0, say: '', alt: 0, pilot: null, on: g.roomOn[n] || (g.roomOn[n] = [false, false]) };
     g.pugs = g.pugs.map((p, i) => Object.assign(shopPug(p.id, ROOM_DOOR + 16 + i * 16, PLAIN_Y), { ground: true, upWas: true }));
@@ -4934,8 +4930,8 @@
     ctx.fillStyle = '#7af0c0'; ctx.fillRect(0, PLAIN_Y, PW, 2);
     ctx.fillStyle = '#2fb88a';
     for (let n = Math.floor(cam / 19) - 1; n * 19 < cam + PW + 19; n++) { const h = planetHash(n); ctx.fillRect(Math.round(n * 19 + h * 12 - cam), PLAIN_Y + 10 + Math.floor(h * (PH - PLAIN_Y - 14)), 3 + Math.floor(h * 6), 1); }
-    for (let n = Math.floor((cam - 80) / 170); n * 170 < cam + PW + 80; n++) if (n !== skip && plain.shipAt[n] === undefined) drawAlienHome(Math.round(buildingX(n) - cam), planetHash(n + 0.5));
-    for (const n of Object.keys(plain.shipAt)) if (+n !== skip) drawAlienHome(Math.round(plain.shipAt[n] - cam), planetHash(+n + 0.5));   // (parked somewhere else)
+    for (let n = Math.floor((cam - 80) / 170); n * 170 < cam + PW + 80; n++) if (n !== skip && plain.shipAt[n] === undefined) drawAlienHome(Math.round(buildingX(n) - cam), homeKind(n));
+    for (const n of Object.keys(plain.shipAt)) if (+n !== skip) drawAlienHome(Math.round(plain.shipAt[n] - cam), homeKind(+n));   // (parked somewhere else)
     // (a few saucers going over)
     for (let n = Math.floor((cam - 60) / 260); n * 260 < cam + PW + 60; n++) {
       const pic = sprite('ufo_' + ((t >> 3) & 1)), h = planetHash(n + 0.75);
