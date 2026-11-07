@@ -4178,10 +4178,10 @@
         continue;
       }
       const at = roomSpot(p);
-      p.upDoor = at !== null;
+      p.upDoor = at !== null || p.upWas;   // (holding Up after a smash must not hop)
       floorPug(p, 14, PW - 14, PLAIN_Y, 1.25, -3.4);
       if (!p.upFresh || at === null) continue;
-      if (at === 2) { r.pick = { sel: 0, id: p.id, held: { left: false, right: false, up: true, down: false }, msg: 0 }; p.moving = false; sfx.tick(); break; }
+      if (at === -2) { r.pick = { sel: 0, id: p.id, held: { left: false, right: false, up: true, down: false }, msg: 0 }; p.moving = false; sfx.tick(); break; }
       if (at < 0) {
         // (back out of the door, in front of the building)
         const x = buildingX(r.n);
@@ -4230,11 +4230,11 @@
     if ((dx || dy) && g.t % 10 === 0) tone(110 + r.alt, 0.1, 'sawtooth', 0.02, dx * 20);
     if (inp.jump) { r.pilot = null; r.on[0] = false; r.say = 'PARKED'; r.sayT = 90; tone(300, 0.3, 'sawtooth', 0.04, -200); }
   }
-  // (what Up does for a pug in a room: -1 the door, 0 or 1 a thing, 2 the alien at a counter, or null)
+  // (what Up does for a pug in a room: -1 the door, -2 the alien at a counter, 0 up the number of a thing, or null)
   function roomSpot(p) {
     if (!p.ground || p.sitting) return null;
     if (p.x < ROOM_DOOR + 12) return -1;
-    if (ROOMS[plain.room.kind].counter && Math.abs(p.x - 150) < 50) return 2;   // (at the counter)
+    if (ROOMS[plain.room.kind].counter && Math.abs(p.x - 150) < 50) return -2;   // (at the counter)
     const i = ROOMS[plain.room.kind].things.findIndex((k, n) => Math.abs(p.x - k.x) < (k.breaks ? 15 : ROOM_REACH) && !(k.breaks && plain.room.on[n]));
     return i < 0 ? null : i;
   }
@@ -4561,7 +4561,7 @@
         ctx.restore();
       } else drawPlainPug(p, Math.round(p.x), Math.round(p.y), 'black');
       const at = roomSpot(p);
-      if (at !== null && !r.pick && !r.eat && !r.pilot) drawUpArrow(at < 0 ? ROOM_DOOR : at === 2 ? 150 : R.things[at].x, PLAIN_Y - (at < 0 ? 52 : at === 2 ? 56 : 66));
+      if (at !== null && !r.pick && !r.eat && !r.pilot) drawUpArrow(at === -2 ? 150 : at < 0 ? ROOM_DOOR : R.things[at].x, PLAIN_Y - (at === -2 ? 56 : at < 0 ? 52 : 66));
     }
     for (const b of g.bits) { ctx.fillStyle = b.col; ctx.fillRect(Math.round(b.x), Math.round(b.y), 2, 2); }
     if (r.eat) drawEat();
