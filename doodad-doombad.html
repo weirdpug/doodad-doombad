@@ -3411,6 +3411,8 @@
   // (the fall from there, in frames: the wormhole, the drop to Jupiter, a pug's fall through the shop and the gap between
   // pugs; where in the shop it comes through; the shop counter the pugs walk along; and the wait there for the last target)
   const DROP_HOLE = 150, DROP_SKY = 120, DROP_FALL = 14, DROP_GAP = 12, DROP_X = 156, SHOP_Y = 190, SHOP_L = 14, SHOP_R = PW - 14, SHOP_AIM_WAIT = 120;
+  // (what Gloop says when the last burrito has landed, and for how many frames)
+  const SHOP_SAY = "I'M OUT OF BURRITOS", SHOP_SAY_T = 240;
   let isleArt = null;
   const BOSS_AT = 120, BOSS_HP = 20, SAUCER_HP = 10, BOSS_X = 176, BOSS_SHOOT = 12, SHOT_SPEED = 4.5, BOSS_SCALE = 0.6, BOSS_MOVE = 1.6;
   // (the top of whatever is highest at x, for those who walk over everything; half: how wide they are each side)
@@ -3722,9 +3724,10 @@
         tone(500, 0.2, 'square', 0.03, -320);
       }
     }
+    if (d.sayT > 0) d.sayT--;
     const b = d.burrito;
     if (!b || ++b.t < ISLE_FLY) return;
-    d.burrito = null;
+    d.burrito = null; d.sayT = SHOP_SAY_T;
     noise(0.18, 0.12, 1200, 200);
     for (let i = 0; i < 16; i++) g.bits.push({ x: b.x, y: b.y, vx: (Math.random() - 0.5) * 4, vy: -1 - Math.random() * 2.5, g: 0.12, t: 34, col: BURRITO_BITS[i % BURRITO_BITS.length] });
     for (const p of g.pugs) if (!p.dead && Math.abs(p.x - b.x) < ISLE_HIT * 2 && Math.abs(p.y - 14 - b.y) < ISLE_HIT * 2) {
@@ -3848,6 +3851,7 @@
     if (d.aim) drawAim(d.aim, 1.5);
     if (c >= 1) for (const b of plain.bits) { ctx.fillStyle = b.col; ctx.fillRect(Math.round(b.x), Math.round(b.y), 2, 2); }
     if (d.burrito) drawThrown(d.burrito, 2.4);
+    if (d.sayT > 0) drawText(SHOP_SAY, PW / 2, 42, 'gold', 'center', 2);
     ctx.restore();
   }
   // (has the ground at this x crumbled away yet? The top row of cells comes first in the list)
