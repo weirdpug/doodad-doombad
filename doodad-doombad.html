@@ -3589,7 +3589,7 @@
     banana = arena = race = dig = hop = null;
     document.body.classList.remove('blackout');
     const spot = PLAIN_SPOTS[Math.floor(Math.random() * PLAIN_SPOTS.length)], x0 = Math.floor(Math.random() * 100000);
-    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300, martians: [], martianT: 420, cops: [], copShip: null, copShots: [], ships: [], obsCount: 0, shipAt: 25, space: null, shots: [], zaps: [], boss: null, spaceT: 0, nuke: null, hole: null, warp: null, isle: false, isleT: 0, aim: null, thrown: [], isleShot: 0, tauntT: 0, crumble: null, drop: null, stroll: false, fin: null, planet: false, room: null };
+    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300, martians: [], martianT: 420, ships: [], obsCount: 0, shipAt: 25, space: null, shots: [], zaps: [], boss: null, spaceT: 0, nuke: null, hole: null, warp: null, isle: false, isleT: 0, aim: null, thrown: [], isleShot: 0, tauntT: 0, crumble: null, drop: null, stroll: false, fin: null, planet: false, room: null };
     const first = kbSlot !== null && joined[kbSlot] ? kbSlot : 0;
     for (let i = 0; i < 4; i++) if (arenaDriven(i) || i === first) plainPug(i);
     try { initAudio(); } catch (e) {}
@@ -3817,7 +3817,7 @@
     const x0 = d.hutX + 60 * side;
     g.stroll = { hutX: d.hutX, drop: d, space: g.space, side }; g.cam = x0 - PW / 2;
     g.drop = null; g.isle = false; g.space = null; g.crumble = null; g.hole = null; g.warp = null; g.boss = null; g.nuke = null;
-    g.obs = []; g.drops = []; g.rovers = []; g.martians = []; g.cops = []; g.copShip = null; g.copShots = []; g.ships = []; g.bits = []; g.endT = 0;
+    g.obs = []; g.drops = []; g.rovers = []; g.martians = []; g.ships = []; g.bits = []; g.endT = 0;
     g.pugs = g.pugs.filter(p => !p.dead).map((p, i) => Object.assign(shopPug(p.id, x0 + (i * 16 - 8) * side, PLAIN_Y), { ground: true, face: side }));
   }
   function backInShop() {
@@ -3936,29 +3936,65 @@
   function enterPlanet() {
     const g = plain, ids = g.fin.ids;
     g.fin = null; g.stroll = false; g.drop = null; g.space = null; g.isle = false; g.crumble = null; g.hole = null; g.warp = null; g.boss = null; g.nuke = null;
-    g.obs = []; g.drops = []; g.rovers = []; g.martians = []; g.cops = []; g.copShip = null; g.copShots = []; g.ships = []; g.bits = []; g.endT = 0; g.cam = -PW / 2; g.planet = true; g.room = null; g.roomOn = {}; g.statues = []; g.shipAt = {};
+    g.obs = []; g.drops = []; g.rovers = []; g.martians = []; g.cops = []; g.copShip = null; g.copShots = []; g.alienPop = {}; g.ships = []; g.bits = []; g.endT = 0; g.cam = -PW / 2; g.planet = true; g.room = null; g.roomOn = {}; g.statues = []; g.shipAt = {};
     g.pcData = { paint: {}, blob: 0, bars: [3, 5, 2, 6, 4, 7, 3, 5], notes: [false, false, false, false] };
     g.pugs = ids.map((id, i) => shopPug(id, i * 16 - 8, -20));
     tone(600, 0.4, 'sine', 0.06, 300);
   }
   function stepPlanet() {
     const g = plain;
+    if (g.endT && --g.endT === 0) return leavePlain();
     stepStatues();
     if (g.room) return stepRoom();
     for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.pugs.some(p => p.id === i)) g.pugs.push(shopPug(i, g.cam + PW / 2, -20));
     g.pugs = g.pugs.filter(p => arenaDriven(p.id));
     for (const p of g.pugs) {
+      if (p.dead) continue;
       // (Up in front of a building goes in, instead of jumping)
-      const door = p.ground ? planetDoor(p.x) : null;
+      const door = p.ground ? planetDoor(p.x) : null, barked = p.barkT;
       p.upDoor = door !== null;
       floorPug(p, g.cam + 8, g.cam + PW - 8, PLAIN_Y, 1.25, -3.4);
+      if (p.barkT > barked) barkCity(p);
       if (door !== null && p.upFresh) { enterRoom(door); g.kbAtk = false; return; }
     }
     g.kbAtk = false;
-    if (g.pugs.length) {
-      const xs = g.pugs.map(p => p.x);
+    const alive = g.pugs.filter(p => !p.dead);
+    if (alive.length) {
+      const xs = alive.map(p => p.x);
       g.cam += ((Math.min(...xs) + Math.max(...xs)) / 2 - PW / 2 - g.cam) * 0.1;
     }
+    stepCity(alive);
+    if (!g.endT && g.pugs.length && g.pugs.every(p => p.dead)) g.endT = 150;
+  }
+  // (the city's alien number n, at time t: each strolls up and down near its spot, for ever)
+  const CITY_COLS = ['#5fd068', '#5fd068', '#5fd068', '#6ae0c8', '#b48ae0', '#ffd060'];
+  function cityAlien(n, t) {
+    const h = planetHash(n + 0.1), a = t * (0.008 + h * 0.012) + h * 6, kind = planetHash(n + 0.3);
+    return { x: n * 58 + h * 30 + Math.sin(a) * 34, face: Math.cos(a) < 0 ? -1 : 1, blob: kind > 0.85, col: CITY_COLS[Math.floor(kind * CITY_COLS.length)] };
+  }
+  // (a bark in the city: every alien and space cop within reach in front of the pug goes dizzy, then pops. g.alienPop is
+  // the aliens barked at, by number: { t: frames left of being dizzy, 0 once dead, x: the spot it stopped at })
+  function barkCity(p) {
+    const g = plain;
+    for (const c of g.cops) { const d = (c.x - p.x) * p.face; if (!c.pop && d > -8 && d < PLAIN_BARK) { c.pop = 20; sfx.stun(); } }
+    for (let n = Math.floor((p.x - 200) / 58); n * 58 < p.x + 140; n++) {
+      if (g.alienPop[n]) continue;
+      const x = cityAlien(n, g.t).x, d = (x - p.x) * p.face;
+      if (d > -8 && d < PLAIN_BARK) { g.alienPop[n] = { t: 20, x }; sfx.stun(); }
+    }
+  }
+  function stepCity(alive) {
+    const g = plain;
+    for (const n of Object.keys(g.alienPop)) {
+      const a = g.alienPop[n];
+      if (!a.t || --a.t) continue;
+      sfx.pop(); callCops();
+      const c = cityAlien(+n, g.t);
+      for (let i = 0; i < 8; i++) g.bits.push({ x: a.x, y: PLAIN_Y - 10, vx: (Math.random() - 0.5) * 3, vy: -1 - Math.random() * 2, t: 24, col: c.blob ? '#5fc88f' : c.col });
+    }
+    for (const b of g.bits) { b.vy += 0.2; b.x += b.vx; b.y += b.vy; b.t--; }
+    g.bits = g.bits.filter(b => b.t > 0);
+    stepCops(alive, p => { if (p.dead) return; p.dead = true; p.y = PLAIN_Y; p.ground = true; p.barkT = 0; sfx.die(); });
   }
   // (the same each time for the same number, so the planet stays put as you walk)
   const planetHash = n => Math.abs(Math.sin(n * 12.9898) * 43758.5453) % 1;
@@ -4061,12 +4097,12 @@
     }
   }
   // (an alien with its feet on the ground at screen x)
-  function drawAlien(x, col, walk, face) {
+  function drawAlien(x, col, walk, face, dizzy) {
     const box = (c, a, b, w, h) => { ctx.fillStyle = c; ctx.fillRect(x + a * face - (face < 0 ? w : 0), PLAIN_Y + b, w, h); };
     box(col, -3, -4 + (walk ? 0 : 1), 2, 4 - (walk ? 0 : 1)); box(col, 1, -4 + (walk ? 1 : 0), 2, 4 - (walk ? 1 : 0));
     box(col, -3, -10, 6, 6);
     box(col, -6, -18, 12, 8); box(col, -5, -20, 10, 2); box(col, -4, -10, 8, 1);
-    box('#14122a', -4, -16, 3, 4); box('#14122a', 1, -16, 3, 4); box('#ffffff', -3, -16, 1, 1); box('#ffffff', 2, -16, 1, 1);
+    box('#14122a', -4, -16, 3, 4); box('#14122a', 1, -16, 3, 4); box('#ffffff', -3, dizzy ? -14 : -16, 1, 1); box('#ffffff', 2, -16, 1, 1);
     box(col, -3, -23, 1, 3); box(col, 2, -23, 1, 3); box('#ffcc3d', -4, -24, 2, 2); box('#ffcc3d', 2, -24, 2, 2);
   }
   // Inside the aliens' buildings: pressing Up in front of one goes in, and everyone with it. Each of the 13 kinds has its
@@ -4656,9 +4692,11 @@
     if (g.room) return drawRoom();
     drawPlanetScene(cam, null);
     drawStatues(cam);
+    drawCops();
+    for (const b of g.bits) { ctx.fillStyle = b.col; ctx.fillRect(Math.round(b.x - cam), Math.round(b.y), 2, 2); }
     for (const p of g.pugs) {
       drawPlainPug(p, Math.round(p.x - cam), Math.round(p.y), 'gold');
-      if (p.ground && planetDoor(p.x) !== null) drawUpArrow(Math.round(p.x - cam), PLAIN_Y - 28);
+      if (!p.dead && p.ground && planetDoor(p.x) !== null) drawUpArrow(Math.round(p.x - cam), PLAIN_Y - 28);
     }
   }
   // (the planet with the view at cam, all but the building numbered skip: the outside, and what a window looks out on)
@@ -4684,10 +4722,11 @@
     }
     // (the aliens, each strolling up and down near its spot)
     for (let n = Math.floor((cam - 90) / 58); n * 58 < cam + PW + 90; n++) {
-      const h = planetHash(n + 0.1), rate = 0.008 + h * 0.012, a = t * rate + h * 6, x = n * 58 + h * 30 + Math.sin(a) * 34;
-      const kind = planetHash(n + 0.3), cols = ['#5fd068', '#5fd068', '#5fd068', '#6ae0c8', '#b48ae0', '#ffd060'];
-      if (kind > 0.85) { const pic = sprite((t >> 3) & 1 ? 'dg_blob2' : 'dg_blob1'); if (pic) ctx.drawImage(pic, Math.round(x - cam) - (pic.width >> 1), PLAIN_Y - pic.height); }
-      else drawAlien(Math.round(x - cam), cols[Math.floor(kind * cols.length)], (t >> 3) & 1, Math.cos(a) < 0 ? -1 : 1);
+      const pop = plain.alienPop[n];
+      if (pop && !pop.t) continue;   // (barked dead)
+      const c = cityAlien(n, t), x = pop ? pop.x + (t >> 1) % 3 - 1 : c.x;
+      if (c.blob) { const pic = sprite(pop ? 'dg_blob_dizzy' : (t >> 3) & 1 ? 'dg_blob2' : 'dg_blob1'); if (pic) ctx.drawImage(pic, Math.round(x - cam) - (pic.width >> 1), PLAIN_Y - pic.height); }
+      else drawAlien(Math.round(x - cam), c.col, pop ? 0 : (t >> 3) & 1, c.face, !!pop);
     }
   }
   // (a big oval window in a room's wall, looking out on the real planet around this building: the same aliens and
@@ -5382,8 +5421,8 @@
       }
       if (inp.bark && p.barkT < 25) {
         p.barkT = 45; sfx.bark(LOOK[p.id].bark);
-        // (a Martian or a space cop within reach in front of the pug goes dizzy and pops)
-        for (const m of [...g.martians, ...g.cops]) { const d = (m.x - p.x) * p.face; if (!m.pop && d > -8 && d < PLAIN_BARK) { m.pop = 20; sfx.stun(); } }
+        // (a Martian within reach in front of the pug goes dizzy and pops)
+        for (const m of g.martians) { const d = (m.x - p.x) * p.face; if (!m.pop && d > -8 && d < PLAIN_BARK) { m.pop = 20; sfx.stun(); } }
       }
       if (p.barkT > 0) p.barkT--;
     }
@@ -5450,7 +5489,7 @@
       m.t++;
       if (m.pop) {
         if (--m.pop === 0) {
-          m.gone = true; sfx.pop(); callCops();
+          m.gone = true; sfx.pop();
           for (let i = 0; i < 8; i++) g.bits.push({ x: m.x, y: m.y - 6, vx: (Math.random() - 0.5) * 3, vy: -1 - Math.random() * 2, t: 24, col: '#5fc88f' });
         }
         continue;
@@ -5459,14 +5498,14 @@
       for (const p of alive) if (Math.abs(m.x - p.x) < 11 && p.y > m.y - 14) kill(p);   // (its 16 pixels, less a little)
     }
     g.martians = g.martians.filter(m => !m.gone && m.x > g.gloopX - 40);
-    stepCops(alive, kill);
     for (const b of g.bits) { b.vy += 0.2; b.x += b.vx; b.y += b.vy; b.t--; }
     g.bits = g.bits.filter(b => b.t > 0);
     if (!g.endT && !carried.length && alive.every(q => q.dead)) g.endT = 150;
   }
-  // Barking a Martian dead brings the space cops (the user asked): their ship comes in with its siren going, stops over
+  // Barking an alien dead in the city brings the space cops (the user asked): their ship comes in with its siren going, stops over
   // the ground just ahead of the pugs, drops them out one at a time and flies off. On the ground they walk after the
-  // nearest pug and shoot at it. A shot kills, but it flies at where the pug was, so it can be dodged, jumped or outrun.
+  // nearest pug and shoot at it. A shot kills, but it flies at where the pug was, so it can be dodged, jumped or outrun,
+  // and a bark pops them too. They wait outside while you're in a building.
   const COP_COUNT = 2, COP_AHEAD = 70, COP_RANGE = 80, COP_MAX = 4, COP_SHOT = 3.2, COP_WALK = 0.9;
   function callCops() {
     const g = plain;
@@ -5519,7 +5558,7 @@
         tone(1400, 0.12, 'square', 0.03, -900);
       }
     }
-    g.cops = g.cops.filter(c => !c.gone && c.x > g.gloopX - 40);
+    g.cops = g.cops.filter(c => !c.gone && Math.abs(c.x - g.cam - PW / 2) < 600);
     for (const b of g.copShots) {
       b.x += b.vx; b.y += b.vy;
       for (const p of alive) if (!b.gone && Math.abs(b.x - p.x) < 6 && b.y > p.y - PLAIN_H && b.y < p.y) { kill(p); b.gone = true; }
@@ -5646,7 +5685,6 @@
       const pic = sprite(m.pop ? 'dg_blob_dizzy' : (m.t >> 3) & 1 ? 'dg_blob2' : 'dg_blob1');
       if (pic) ctx.drawImage(pic, Math.round(m.x - g.cam) - (pic.width >> 1), Math.round(m.y) - pic.height);
     }
-    drawCops();
     for (const b of g.drops) blit('barrel_roll' + (Math.floor(b.spin / 6) % 4), Math.round(b.x - g.cam) - 5, Math.round(b.y) - 5);
     for (const b of g.bits) { ctx.fillStyle = b.col || '#8a5630'; ctx.fillRect(Math.round(b.x - g.cam), Math.round(b.y), b.s || 2, b.s || 2); }
     for (const p of g.pugs) {
