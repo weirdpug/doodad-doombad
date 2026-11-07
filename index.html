@@ -2922,7 +2922,7 @@
       : view === 'raceOver' ? raceWords().text
       : view === 'digPause' ? 'Mars Dig. Dig for bones and crystals, bark to make the Martians dizzy, then boop them. Look out for falling rocks!'
       : view === 'digOver' ? digWords().text
-      : view === 'plainPause' ? (plain && plain.drop ? (plain.drop.walk ? "In Gloop's shop. Nobody's here." : 'Falling!') : plain && plain.isle ? 'On an island in space.' : plain && plain.space ? 'Out in space.' : 'Somewhere on Jupiter. Gloop is coming.')
+      : view === 'plainPause' ? (plain && plain.stroll ? 'Out on Jupiter.' : plain && plain.drop ? (plain.drop.walk ? "In Gloop's shop. Nobody's here." : 'Falling!') : plain && plain.isle ? 'On an island in space.' : plain && plain.space ? 'Out in space.' : 'Somewhere on Jupiter. Gloop is coming.')
       : view === 'hopPause' ? 'Saturn Scramble. Hop across Saturn\'s rings: dodge the rovers and comets, ride the ice over open space, and keep moving, or an alien will beam you up!'
       : view === 'hopOver' ? hopWords().text
       : view === 'arenaOver' ? arenaWords().text
@@ -3518,14 +3518,14 @@
   }
   // (the space screen: one saucer for each of these pugs, side by side)
   function plainSpace(pugs) {
-    plain.endT = 0; plain.bits = [];
+    plain.endT = 0; plain.bits = []; plain.stroll = false;
     plain.space = pugs.map((p, i) => ({ id: p.id, x: 50, y: PH / 2 + (i - (pugs.length - 1) / 2) * 40, face: 1, aimY: 0, hp: SAUCER_HP, hit: 0, prev: { jump: true, bark: true } }));
   }
   function startPlain() {
     banana = arena = race = dig = hop = null;
     document.body.classList.remove('blackout');
     const spot = PLAIN_SPOTS[Math.floor(Math.random() * PLAIN_SPOTS.length)], x0 = Math.floor(Math.random() * 100000);
-    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300, martians: [], martianT: 420, ships: [], obsCount: 0, shipAt: 25, space: null, shots: [], zaps: [], boss: null, spaceT: 0, nuke: null, hole: null, warp: null, isle: false, isleT: 0, aim: null, thrown: [], isleShot: 0, tauntT: 0, crumble: null, drop: null };
+    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300, martians: [], martianT: 420, ships: [], obsCount: 0, shipAt: 25, space: null, shots: [], zaps: [], boss: null, spaceT: 0, nuke: null, hole: null, warp: null, isle: false, isleT: 0, aim: null, thrown: [], isleShot: 0, tauntT: 0, crumble: null, drop: null, stroll: false };
     const first = kbSlot !== null && joined[kbSlot] ? kbSlot : 0;
     for (let i = 0; i < 4; i++) if (arenaDriven(i) || i === first) plainPug(i);
     try { initAudio(); } catch (e) {}
@@ -3644,6 +3644,7 @@
     }
     if (inp.bark && p.barkT < 25) { p.barkT = 45; sfx.bark(LOOK[p.id].bark); }
     if (p.barkT > 0) p.barkT--;
+    return dx;
   }
   function stepIsle() {
     const g = plain;
@@ -3742,6 +3743,25 @@
       if (!g.endT && g.pugs.every(q => q.dead)) g.endT = 150;
     }
   }
+  // Walking off the right of the shop leads out onto Jupiter: the same flat ground as the chase, with nothing on it and no
+  // Gloop, to walk about on in either direction for as long as you like. (the user asked)
+  function leaveShop() {
+    const g = plain, x0 = g.cam + PW / 2;
+    g.stroll = true; g.drop = null; g.isle = false; g.space = null; g.crumble = null; g.hole = null; g.warp = null; g.boss = null; g.nuke = null;
+    g.obs = []; g.drops = []; g.rovers = []; g.martians = []; g.ships = []; g.bits = []; g.endT = 0;
+    g.pugs = g.pugs.filter(p => !p.dead).map((p, i) => Object.assign(shopPug(p.id, x0 + i * 16 - 8, PLAIN_Y), { ground: true }));
+  }
+  function stepStroll() {
+    const g = plain;
+    for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.pugs.some(p => p.id === i)) g.pugs.push(Object.assign(shopPug(i, g.cam + PW / 2, PLAIN_Y), { ground: true }));
+    g.pugs = g.pugs.filter(p => arenaDriven(p.id));
+    for (const p of g.pugs) floorPug(p, g.cam + 8, g.cam + PW - 8, PLAIN_Y, 1.25, -3.4);
+    g.kbAtk = false;
+    if (g.pugs.length) {
+      const xs = g.pugs.map(p => p.x);
+      g.cam += ((Math.min(...xs) + Math.max(...xs)) / 2 - PW / 2 - g.cam) * 0.1;
+    }
+  }
   function shopPug(id, x, y) {
     return { id, x, y, vy: 0, ground: y === SHOP_Y, face: 1, moving: false, anim: 0, barkT: 0, prev: { jump: true, bark: true } };
   }
@@ -3781,11 +3801,12 @@
       g.pugs = g.pugs.filter(p => arenaDriven(p.id));
       for (const p of g.pugs) if (!p.dead) {
         // (a pug walks in front of the cash register, but can jump up and stand on it, and walks off its ends)
-        const was = p.y;
-        floorPug(p, SHOP_L, SHOP_R, SHOP_Y, 1.6, -4.4);
+        const was = p.y, dx = floorPug(p, SHOP_L, SHOP_R, SHOP_Y, 1.6, -4.4);
         const onTill = p.x >= TILL_L && p.x <= TILL_R;
         if (onTill && !p.ground && p.vy > 0 && was <= TILL_Y && p.y >= TILL_Y) { p.y = TILL_Y; p.vy = 0; p.ground = true; tone(160, 0.08, 'square', 0.04, 60); }
         else if (!onTill && p.ground && p.y < SHOP_Y) { p.ground = false; p.vy = 0; }
+        // (the way out, on the right, once the last burrito has landed)
+        if (dx > 0 && p.x >= SHOP_R && d.fired && !d.burrito) { leaveShop(); g.kbAtk = false; return; }
       }
       shopBurrito();
     }
@@ -4130,6 +4151,7 @@
   function stepPlain() {
     const g = plain;
     g.t++;
+    if (g.stroll) return stepStroll();
     if (g.space) return stepPlainSpace();
     if (g.endT && --g.endT === 0) return leavePlain();
     if (!g.endT) for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.pugs.some(p => p.id === i)) plainPug(i);
@@ -4310,7 +4332,7 @@
       ctx.fillStyle = `rgba(20,10,4,${(0.2 + 0.5 * Math.max(0, b.y) / PLAIN_Y).toFixed(2)})`;
       ctx.fillRect(Math.round(b.x - g.cam) - 6, plainFloor(b.x, b.y + 5) - 2, 12, 2);
     }
-    drawPlainGloop();
+    if (!g.stroll) drawPlainGloop();
     for (const s of g.ships) {
       const pic = sprite('ufo_' + ((g.t >> 3) & 1));
       if (pic) ctx.drawImage(pic, Math.round(s.x - g.cam) - 22, Math.round(s.y), 44, 22);
