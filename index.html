@@ -4073,7 +4073,31 @@
   // foot on the floor, on whether it's in use, t the time; a room with a scene draws that instead of its alien walking)
   const ROOMS = [
     { wall: '#8a78d0', floor: '#4a3a98', things: [
-      { x: 110, say: 'ALIEN CARTOONS!', s: [660, 'square', 120], draw: (b, r, on, t) => { b('#3a2a78', -3, -8, 6, 8); b('#14122a', -20, -40, 40, 32); b(on ? ['#ff6a9a', '#5fd068', '#ffcc3d', '#7ae0ff'][(t >> 3) & 3] : '#2a2a3a', -17, -37, 34, 26); if (on) { r('#ffffff', -6 + ((t >> 2) & 15), -24, 4); } } },
+      { x: 110, names: ['CHANNEL 1: CARTOONS', 'CHANNEL 2: ALIEN NEWS', 'CHANNEL 3: SPACE SHOW', 'CHANNEL 4: ALIEN SOCCER'], s: [660, 'square', 120], draw: (b, r, on, t) => {
+        // (the TV is always on: on is the channel, and whichever one that is plays inside its 34 by 26 screen)
+        b('#3a2a78', -3, -8, 6, 8); b('#14122a', -20, -40, 40, 32);
+        const ch = +on;
+        if (ch === 0) {
+          // (a pink ball bouncing along a green hill under a blue sky)
+          b('#7ae0ff', -17, -37, 34, 26); b('#5fd068', -17, -17, 34, 6); b('#ffffff', -13 + ((t >> 3) % 12), -33, 8, 2);
+          r('#ff6a9a', -13 + (t >> 1) % 26, -20 - Math.abs(Math.sin(t * 0.12)) * 11, 3);
+        } else if (ch === 1) {
+          // (an alien reading the news, with the headlines going by underneath)
+          b('#1d2f8c', -17, -37, 34, 26); b('#8a5a34', -17, -20, 34, 5); b('#5fd068', -9, -32, 10, 8); b('#5fd068', -7, -24, 6, 4);
+          b('#14122a', -7, -30, 2, 3); b('#14122a', -3, -30, 2, 3); b('#14122a', -6, -26 + ((t >> 3) & 1), 4, 1);
+          b('#e8282f', -17, -15, 34, 4); for (let i = 0; i < 3; i++) b('#ffffff', -17 + ((i * 12 + 34 - (t >> 1) % 34) % 34), -14, 6, 2);
+        } else if (ch === 2) {
+          // (stars streaming past a saucer)
+          b('#050614', -17, -37, 34, 26);
+          for (let i = 0; i < 9; i++) b('#ffffff', -17 + ((i * 11 + 34 * 4 - (t >> (i % 2))) % 34), -36 + (i * 7) % 24, 1, 1);
+          b('#b4b8c8', -8, -24 + ((t >> 4) & 1), 16, 3); b('#7ae0ff', -3, -27 + ((t >> 4) & 1), 6, 3);
+        } else {
+          // (two aliens booting a ball up and down a pitch)
+          const u = Math.abs(((t >> 1) % 44) - 22) / 22, x = -13 + u * 26;
+          b('#2f9f4a', -17, -37, 34, 26); b('#ffffff', -1, -37, 1, 26); r('rgba(255,255,255,0.5)', 0, -24, 5);
+          b('#ff9ac0', -15, -26, 3, 6); b('#ffcc3d', 12, -26, 3, 6); r('#ffffff', x, -23, 2);
+        }
+      } },
       { x: 190, sit: true, draw: b => { b('#6a1f2a', -30, -3, 5, 3); b('#6a1f2a', 25, -3, 5, 3); b('#8a1f2a', -28, -30, 56, 18); b('#b0242c', -26, -28, 52, 16); b('#d8384a', -26, -12, 52, 9); b('#8a1f2a', 0, -28, 1, 25); b('#8a1f2a', -33, -17, 9, 14); b('#8a1f2a', 24, -17, 9, 14); } }] },
     { wall: '#5a4ab0', floor: '#2a1f70', things: [
       { x: 110, say: 'YOU CAN SEE EARTH FROM HERE', s: [880, 'sine', -300], draw: (b, r, on) => { b('#55556a', -1, -24, 3, 24); b('#55556a', -8, -2, 18, 2); ctx.save(); ctx.translate(ctxX(b), PLAIN_Y - 26); ctx.rotate(-0.6); ctx.fillStyle = '#c8a040'; ctx.fillRect(-16, -3, 32, 6); ctx.fillStyle = on ? '#7ae0ff' : '#14122a'; ctx.fillRect(16, -4, 3, 8); ctx.restore(); } },
@@ -4161,7 +4185,10 @@
         tone(140, 0.2, 'sine', 0.06, -40);
         continue;
       }
-      r.on[at] = !r.on[at]; r.say = thing.say; r.sayT = 150;
+      // (a thing with names goes on to the next one each time, a TV's channels, and the others go on and off)
+      if (thing.names) { r.on[at] = (+r.on[at] + 1) % thing.names.length; r.say = thing.names[r.on[at]]; }
+      else { r.on[at] = !r.on[at]; r.say = thing.say; }
+      r.sayT = 150;
       tone(thing.s[0], 0.35, thing.s[1], 0.06, thing.s[2]);
     }
     g.kbAtk = false;
