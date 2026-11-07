@@ -3452,6 +3452,12 @@
   // (how near a crater's middle a pug on the ground has to be to fall in, and how near the shop no crater forms, so a door
   // is never over one)
   const CRATER_R = 9, CRATER_CLEAR = 90;
+  // (the ending when the pugs reach the shop with Gloop after them, in frames: when he fires, how long the blast is watched
+  // after it hits, how long he cries, the flight to Saturn, then from the landing when it cracks some more, when it blows
+  // up and when that's over; where on the screen they land; and the crack, then what it adds the second time)
+  const FIN_FIRE = 45, FIN_WATCH = 90, FIN_CRY = 180, FIN_FLY = 130, FIN_MORE = 70, FIN_BLAST = 140, FIN_OVER = 280, FIN_SPOT = [132, 112];
+  const FIN_CRACK = [[[0, 0], [5, -4], [7, -11]], [[0, 0], [-6, -2], [-10, -8]], [[0, 0], [-3, 6], [-9, 9]], [[0, 0], [7, 3], [13, 2]]];
+  const FIN_CRACK2 = [[[7, -11], [12, -14], [14, -21]], [[7, -11], [1, -15]], [[-10, -8], [-17, -10], [-30, -6]], [[-10, -8], [-11, -15]], [[-9, 9], [-12, 15], [-22, 20]], [[13, 2], [19, 7], [30, 10]]];
   const STATION_NEAR = 130, STATION_WAIT = 60, STATION_TALK = [[0, 180, ['HEY I THINK I HEARD', 'A SPACE STATION', 'FROM EARTH']], [300, 480, ['YAYYYYYY!!!']],
     [480, 660, ['WE HAVE TO SEND', 'THEM A MESSAGE']], [780, 960, ['MAYBE IF WE BLOW', 'UP THE SHIP', 'THEY WILL SEE']], [1080, 1260, ['YEAH']]], STATION_END = 1260;
   // (what Gloop says when the last burrito has landed, and for how many frames)
@@ -3574,14 +3580,14 @@
   }
   // (the space screen: one saucer for each of these pugs, side by side)
   function plainSpace(pugs) {
-    plain.endT = 0; plain.bits = []; plain.stroll = false;
+    plain.endT = 0; plain.bits = []; plain.stroll = false; plain.fin = null;
     plain.space = pugs.map((p, i) => ({ id: p.id, x: 50, y: PH / 2 + (i - (pugs.length - 1) / 2) * 40, face: 1, aimY: 0, hp: SAUCER_HP, hit: 0, prev: { jump: true, bark: true } }));
   }
   function startPlain() {
     banana = arena = race = dig = hop = null;
     document.body.classList.remove('blackout');
     const spot = PLAIN_SPOTS[Math.floor(Math.random() * PLAIN_SPOTS.length)], x0 = Math.floor(Math.random() * 100000);
-    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300, martians: [], martianT: 420, ships: [], obsCount: 0, shipAt: 25, space: null, shots: [], zaps: [], boss: null, spaceT: 0, nuke: null, hole: null, warp: null, isle: false, isleT: 0, aim: null, thrown: [], isleShot: 0, tauntT: 0, crumble: null, drop: null, stroll: false };
+    plain = { spot, sky: buildPlainSky(spot), pugs: [], cam: x0 - PW / 2, kbAtk: false, t: 0, gloopX: x0 - 24 - GLOOP_NEAR, gloopY: PLAIN_Y, obs: [], nextObs: x0 + 170, endT: 0, drops: [], bits: [], dropT: 150, rovers: [], roverT: 300, martians: [], martianT: 420, ships: [], obsCount: 0, shipAt: 25, space: null, shots: [], zaps: [], boss: null, spaceT: 0, nuke: null, hole: null, warp: null, isle: false, isleT: 0, aim: null, thrown: [], isleShot: 0, tauntT: 0, crumble: null, drop: null, stroll: false, fin: null };
     const first = kbSlot !== null && joined[kbSlot] ? kbSlot : 0;
     for (let i = 0; i < 4; i++) if (arenaDriven(i) || i === first) plainPug(i);
     try { initAudio(); } catch (e) {}
@@ -3835,7 +3841,7 @@
         continue; }
       // (the shop bars the way on the side it is on: walking into it there goes back in)
       const L = g.cam + 8, R = g.cam + PW - 8, dx = s.side > 0 ? floorPug(p, Math.max(L, door), R, PLAIN_Y, 1.25, -3.4) : floorPug(p, L, Math.min(R, door), PLAIN_Y, 1.25, -3.4);
-      if (dx === -s.side && p.ground && (s.side > 0 ? p.x <= door : p.x >= door)) { backInShop(); g.kbAtk = false; return; }
+      if (dx === -s.side && p.ground && (s.side > 0 ? p.x <= door : p.x >= door)) { if (s.hunt) startFin(); else backInShop(); g.kbAtk = false; return; }
       // (walking into a crater, or landing in one: down it goes, and that's the end of it; jumping over is fine)
       const hole = p.ground ? s.drop.craters.find(x => Math.abs(p.x - x) < CRATER_R) : undefined;
       if (hole !== undefined) {
@@ -3859,6 +3865,121 @@
       g.cam += ((Math.min(...xs) + Math.max(...xs)) / 2 - PW / 2 - g.cam) * 0.1;
     }
     if (s.hunt) stepHunt();
+  }
+  // The pugs get inside with Gloop still after them, so he fires a nuke at the shop itself and blows it up, with them in it.
+  // Then the view zooms in on him crying, and then it's the pugs being blown across space into Saturn, which cracks, cracks
+  // a little more and explodes, and then the main menu. (the user asked)
+  function startFin() {
+    const g = plain;
+    g.fin = { scene: 1, t: 0, shake: 0, flash: 0, balls: [], ids: g.pugs.filter(p => !p.dead).map(p => p.id) };
+    g.pugs = []; g.stroll.hunt.nukes = [];
+  }
+  function stepFin() {
+    const g = plain, f = g.fin, s = g.stroll, h = s.hunt;
+    g.kbAtk = false;
+    f.t++;
+    if (f.shake > 0) f.shake--;
+    if (f.flash > 0) f.flash--;
+    for (const b of g.bits) { b.x += b.vx; b.y += b.vy; b.vy += b.g || 0; b.t--; }
+    g.bits = g.bits.filter(b => b.t > 0);
+    if (f.scene === 1) {
+      // (the view swings round to the shop, and he comes in over it)
+      g.cam += (s.hutX - PW / 2 - g.cam) * 0.08;
+      h.x += clamp(s.hutX + 70 - h.x, -2.4, 2.4); h.face = -1;
+      for (const o of h.balls) o.t++;
+      h.balls = h.balls.filter(o => o.t < o.life);
+      if (f.t === FIN_FIRE) {
+        const x = h.x, y = h.y + 18, tx = s.hutX, ty = PLAIN_Y - 30, d = Math.hypot(tx - x, ty - y), dir = tx < x ? -1 : 1;
+        h.nukes.push({ x, y, vx: (tx - x) / d * HUNT_SPEED, vy: (ty - y) / d * HUNT_SPEED, dir, ang: Math.atan2(ty - y, (tx - x) * dir) });
+        noise(0.5, 0.08, 500, 2000); tone(120, 0.4, 'sawtooth', 0.04, 300);
+      }
+      for (const n of h.nukes) {
+        n.x += n.vx; n.y += n.vy;
+        if (n.y < PLAIN_Y - 30) continue;
+        n.gone = true; s.hutGone = true; f.hit = f.t; f.shake = 45; f.flash = 14; sfx.boom();
+        for (let i = 0; i < 18; i++) h.balls.push({ x: s.hutX - 56 + Math.random() * 112, y: PLAIN_Y - Math.random() * 74, max: 14 + Math.random() * 18, life: 45 + Math.random() * 45, t: 0 });
+        for (let i = 0; i < 36; i++) g.bits.push({ x: s.hutX - 44 + Math.random() * 88, y: PLAIN_Y - Math.random() * 60, vx: (Math.random() - 0.5) * 4, vy: -1 - Math.random() * 4, g: 0.1, t: 90 + Math.random() * 50, s: 2 + Math.floor(Math.random() * 4), col: ['#6b4226', '#3e2414', '#8a5a30', '#c8a040', '#fff6e0'][i % 5] });
+      }
+      h.nukes = h.nukes.filter(n => !n.gone);
+      if (f.hit && f.t === f.hit + FIN_WATCH) { f.scene = 2; f.t = 0; g.bits = []; h.balls = []; [392, 370, 349, 330].forEach((n, i) => tone(n, 0.5, 'sine', 0.05, -20, i * 0.45)); }
+    } else if (f.scene === 2) {
+      if (f.t === FIN_CRY) { f.scene = 3; f.t = 0; tone(1400, 2, 'sine', 0.05, -1100); }
+    } else {
+      const land = FIN_FLY + (f.ids.length - 1) * DROP_GAP;
+      f.ids.forEach((id, i) => {
+        const at = FIN_FLY + i * DROP_GAP;
+        if (f.t === at) { noise(0.4, 0.2, 900, 80); tone(70, 0.5, 'sine', 0.2, -40); for (let k = 0; k < 10; k++) g.bits.push({ x: FIN_SPOT[0], y: FIN_SPOT[1], vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 2, t: 24, col: k % 2 ? '#ffd9a0' : '#a8743a' }); }
+        else if (f.t < at && f.t > i * DROP_GAP) { const q = finPug(i, f.t); g.bits.push({ x: q.x, y: q.y, vx: 0.5, vy: 0.5, t: 26, col: Math.random() < 0.6 ? '#b8bcc8' : '#ff6a50' }); }
+      });
+      const a = f.t - land;
+      if (a === FIN_MORE) { f.shake = 18; noise(0.3, 0.2, 1200, 120); tone(60, 0.4, 'sine', 0.18, -30); }
+      if (a === FIN_BLAST) {
+        // (Saturn goes: the fireballs are given in screen places, so with the view's own place added on for drawBlasts)
+        f.shake = 50; f.flash = 16; f.blown = true; sfx.boom(); sfx.braam(); g.bits = [];
+        for (let i = 0; i < 26; i++) f.balls.push({ x: g.cam + 120 - 70 + Math.random() * 140, y: 140 - 70 + Math.random() * 140, max: 16 + Math.random() * 26, life: 50 + Math.random() * 80, t: 0 });
+        for (let i = 0; i < 60; i++) {
+          const an = Math.random() * Math.PI * 2, v = 0.8 + Math.random() * 2.6;
+          g.bits.push({ x: 120 + Math.cos(an) * 30, y: 140 + Math.sin(an) * 30, vx: Math.cos(an) * v, vy: Math.sin(an) * v, t: 90 + Math.random() * 60, s: 2 + Math.floor(Math.random() * 5), col: ['#ffd9a0', '#e8a05a', '#a8743a', '#f4e9a8', '#c8742f'][i % 5] });
+        }
+      }
+      for (const o of f.balls) o.t++;
+      f.balls = f.balls.filter(o => o.t < o.life);
+      if (a === FIN_OVER) leavePlain();
+    }
+  }
+  // (where pug number i is on its way to Saturn at frame t: tumbling away from the bottom right corner)
+  function finPug(i, t) {
+    const u = clamp((t - i * DROP_GAP) / FIN_FLY, 0, 1), n = plain.fin.ids.length, off = (i - (n - 1) / 2) * 7;
+    return { x: PW + 40 + (FIN_SPOT[0] + off - PW - 40) * u, y: PH + 40 + (FIN_SPOT[1] - PH - 40) * u, size: 0.4 + 4.6 * (1 - u) ** 3, ang: u * Math.PI * 8 };
+  }
+  function drawFin() {
+    const g = plain, f = g.fin, t = f.t, h = g.stroll.hunt;
+    if (f.scene === 2) {
+      // (zooming in from the sky to Gloop's face in the dome, with the tears running down)
+      const e = Math.min(1, t / 50), u = e * e * (3 - 2 * e), z = 1 + 4 * u, sx = h.x - g.cam, sy = h.y, hx = sx + 4.8, hy = sy - 13;
+      ctx.drawImage(g.sky, 0, 0);
+      ctx.save();
+      ctx.translate(PW / 2, PH / 2); ctx.scale(z, z); ctx.translate(-(PW / 2 + (hx - PW / 2) * u), -(PH / 2 + (hy - PH / 2) * u));
+      drawBossShip({ x: sx, y: sy, face: -1, hit: 0, shootT: 99 });
+      ctx.restore();
+      if (t > 50) for (const [dx, wait] of [[-16, 0], [16, 24], [-22, 40], [22, 12]]) {
+        const k = (t + wait) % 48, y = PH / 2 + 2 + k * 1.5;
+        ctx.fillStyle = '#9fd8ff'; ctx.fillRect(PW / 2 + dx, y, 4, 7); ctx.fillStyle = '#ffffff'; ctx.fillRect(PW / 2 + dx, y, 2, 2);
+      }
+      return;
+    }
+    // (Saturn, from the Arcade's picture of space, with its cracks spreading from where they hit; once it's gone, just stars)
+    if (!spaceBgReady) { buildSpaceBg(); spaceBgReady = true; }
+    const k = 2.4, a = t - (FIN_FLY + (f.ids.length - 1) * DROP_GAP);
+    ctx.save();
+    if (f.shake > 0) ctx.translate(f.shake % 4 < 2 ? 3 : -3, f.shake % 6 < 3 ? 2 : -2);
+    if (f.blown) { buildPlainStars(); ctx.drawImage(plainStars, 0, 0); }
+    else {
+      ctx.drawImage(spaceBg, 70 - PW / 2 / k, 122 - PH / 2 / k, PW / k, PH / k, 0, 0, PW, PH);
+      drawCracks(FIN_CRACK, a / 24);
+      drawCracks(FIN_CRACK2, (a - FIN_MORE) / 24);
+    }
+    for (const b of g.bits) { ctx.fillStyle = b.col; ctx.fillRect(Math.round(b.x), Math.round(b.y), b.s || 2, b.s || 2); }
+    if (!f.blown) f.ids.forEach((id, i) => { if (t > i * DROP_GAP) { const q = finPug(i, t); tumblePug(id, q.x, q.y, q.size, q.ang); } });
+    drawBlasts(f.balls);
+    ctx.restore();
+    if (f.flash > 0) { ctx.fillStyle = `rgba(255,255,255,${(f.flash / 16).toFixed(2)})`; ctx.fillRect(0, 0, PW, PH); }
+  }
+  // (cracks in Saturn, each drawn out along its line from the first point, grown from 0 to 1)
+  function drawCracks(paths, grown) {
+    grown = clamp(grown, 0, 1);
+    if (!grown) return;
+    ctx.fillStyle = '#3a2016';
+    for (const path of paths) for (let i = 1; i < path.length; i++) {
+      const [ax, ay] = path[i - 1], [bx, by] = path[i], len = Math.hypot(bx - ax, by - ay), part = clamp(grown * (path.length - 1) - (i - 1), 0, 1);
+      for (let d = 0; d <= len * part; d++) ctx.fillRect(Math.round(FIN_SPOT[0] + ax + (bx - ax) * d / len), Math.round(FIN_SPOT[1] + ay + (by - ay) * d / len), 2, 2);
+    }
+  }
+  // (what's left of the shop: a scorch mark, and burnt planks and the door frame in a heap)
+  function drawHutRubble(x) {
+    const box = (col, a, b, w, h) => { ctx.fillStyle = col; ctx.fillRect(x + a, PLAIN_Y + b, w, h); };
+    box('#2a160a', -60, -1, 120, 3);
+    box('#3e2414', -34, -7, 26, 7); box('#61391f', -18, -11, 30, 5); box('#3e2414', 6, -5, 30, 5); box('#c8a040', 22, -16, 3, 16); box('#6b4226', -40, -4, 14, 4);
   }
   // (he comes for them, from the far side of the station)
   function startHunt() {
@@ -4436,6 +4557,7 @@
   function stepPlain() {
     const g = plain;
     g.t++;
+    if (g.fin) return stepFin();
     if (g.stroll) return stepStroll();
     if (g.space) return stepPlainSpace();
     if (g.endT && --g.endT === 0) return leavePlain();
@@ -4551,6 +4673,7 @@
   }
   function leavePlain() { plain = null; toMainMenu(); }
   function drawPlain() {
+    if (plain.fin && plain.fin.scene > 1) return drawFin();
     if (plain.stroll && plain.stroll.shot) return drawStationShot();
     if (plain.drop) return drawDrop();
     if (plain.isle) return drawIsle();
@@ -4596,7 +4719,7 @@
     }
     const g = plain, off = Math.floor((((g.cam * 0.25 + g.t * 0.1) % PLAIN_SKY_W) + PLAIN_SKY_W) % PLAIN_SKY_W);   // (whole pixels, or a thin line shows where the sky repeats)
     ctx.save();
-    const quake = g.stroll && g.stroll.boom ? g.stroll.boom.shake : 0;
+    const quake = g.fin ? g.fin.shake : g.stroll && g.stroll.boom ? g.stroll.boom.shake : 0;
     if (quake) ctx.translate(quake % 4 < 2 ? 3 : -3, quake % 6 < 3 ? 2 : -2);
     ctx.drawImage(g.sky, -off, 0); ctx.drawImage(g.sky, PLAIN_SKY_W - off, 0);
     // the ground: perfectly flat, with little marks that pass by to show the pugs are moving
@@ -4623,7 +4746,7 @@
     }
     if (g.stroll) {
       for (const c of g.stroll.drop.craters) drawCrater(Math.round(c - g.cam));
-      drawHut(Math.round(g.stroll.hutX - g.cam));
+      (g.stroll.hutGone ? drawHutRubble : drawHut)(Math.round(g.stroll.hutX - g.cam));
       for (const side of [-1, 1]) (g.stroll.drop.blown[side] ? drawWreck : drawStation)(Math.round(g.stroll.hutX + side * STATION_D - g.cam));
     } else drawPlainGloop();
     for (const s of g.ships) {
@@ -4646,6 +4769,7 @@
     if (g.stroll && g.stroll.boom) drawStationBoom();
     if (g.stroll && g.stroll.hunt) drawHunt();
     ctx.restore();
+    if (g.fin && g.fin.flash > 0) { ctx.fillStyle = `rgba(255,255,255,${(g.fin.flash / 14).toFixed(2)})`; ctx.fillRect(0, 0, PW, PH); }
     if (g.stroll && g.stroll.talk) drawStationTalk();
   }
   // (one pug with its feet at X, Y, in its costume, and its bark in the given colour)
