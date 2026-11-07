@@ -2061,7 +2061,7 @@
     kbSlot = free; joinSlot(free);
     return 'joined';
   }
-  const keys = { left: false, right: false, up: false, down: false, jump: false };
+  const keys = { left: false, right: false, up: false, down: false, jump: false, fire: false };
   const kbJp = { jump: false, up: false };   // fresh keyboard/touch presses, handed to the keyboard's pug each step
   // Keys are matched by their physical position (e.code) so a key always lifts the same way it went
   // down, even if Shift or Caps Lock changed in between
@@ -2267,6 +2267,7 @@
       if ((arena || race || dig || hop || plain) && (km || swing) && !e.repeat) claimKeyboard(true);
       if (km) { e.preventDefault(); keys[km] = true; }
       if (swing && !e.repeat) { e.preventDefault(); (arena || dig || plain).kbAtk = true; }
+      if (e.code === 'KeyM' && flyingSaucer()) { e.preventDefault(); claimKeyboard(true); keys.fire = true; }   // (M fires, flying a saucer)
       if ((e.key === 'Escape' || e.key === 'p' || e.key === 'P') && !e.repeat) pauseMini();
       return;
     }
@@ -2325,6 +2326,7 @@
     if ((e.key === 'x' || e.key === 'X') && !e.repeat && claimKeyboard(true) === true) xPower(pById(kbSlot));
   });
   addEventListener('keyup', e => {
+    if (e.code === 'KeyM') keys.fire = false;
     // a menu button with keyboard focus must not also "click" itself when Space or Enter comes up
     // (nor any focused button, like Start, when the Space was typed as part of the coin code)
     if (codeKeys.delete(e.code)) e.preventDefault();
@@ -2433,7 +2435,7 @@
       const ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
       const now = {
         left: b(14) || ax < -STICK, right: b(15) || ax > STICK, up: b(12) || ay < -STICK, down: b(13) || ay > STICK,
-        jump: b(0), bark: b(1), taco: b(5), toss: b(3), start: b(9), mute: b(8),
+        jump: b(0), bark: b(1), taco: b(5), toss: b(3), start: b(9), mute: b(8), fire: b(6) || b(7),
       };
       const prev = padPrev[gp.index] || {};
       padPrev[gp.index] = now;
@@ -3610,7 +3612,7 @@
     const held = k => !!pad[k] || (kb && keys[k]);
     const jump = !!pad.jump || (kb && (keys.jump || (keys.up && !p.upDoor))), bark = !!pad.bark || !!pad.toss;
     const shot = !!pad.jump || (kb && keys.jump);   // (in space Up steers, so only the jump button itself shoots)
-    const inp = { left: held('left'), right: held('right'), up: held('up'), down: held('down'), jump: jump && !p.prev.jump, bark: (bark && !p.prev.bark) || (kb && g.kbAtk), shot: shot && !p.prev.shot };
+    const inp = { left: held('left'), right: held('right'), up: held('up'), down: held('down'), jump: jump && !p.prev.jump, bark: (bark && !p.prev.bark) || (kb && g.kbAtk), shot: shot && !p.prev.shot, fire: !!pad.fire || (kb && keys.fire) };
     p.prev = { jump, bark, shot };
     p.upFresh = inp.up && !p.upWas; p.upWas = inp.up;   // (a fresh press of Up, for doors)
     return inp;
@@ -3940,7 +3942,7 @@
   function enterPlanet() {
     const g = plain, ids = g.fin.ids;
     g.fin = null; g.stroll = false; g.drop = null; g.space = null; g.isle = false; g.crumble = null; g.hole = null; g.warp = null; g.boss = null; g.nuke = null;
-    g.obs = []; g.drops = []; g.rovers = []; g.martians = []; g.cops = []; g.copShip = null; g.copShots = []; g.alienPop = {}; g.ships = []; g.bits = []; g.endT = 0; g.cam = -PW / 2; g.planet = true; g.room = null; g.roomOn = {}; g.statues = []; g.shipAt = {};
+    g.obs = []; g.drops = []; g.rovers = []; g.martians = []; g.cops = []; g.copShip = null; g.copShots = []; g.alienPop = {}; g.wrecked = {}; g.sky = { bolts: [], copBolts: [], booms: [], heat: {}, flash: {}, cop: null, hp: SHIP_HP, hitT: 0, fireT: 0, dead: 0 }; g.ships = []; g.bits = []; g.endT = 0; g.cam = -PW / 2; g.planet = true; g.room = null; g.roomOn = {}; g.statues = []; g.shipAt = {};
     g.pcData = { paint: {}, blob: 0, bars: [3, 5, 2, 6, 4, 7, 3, 5], notes: [false, false, false, false] };
     g.pugs = ids.map((id, i) => shopPug(id, i * 16 - 8, -20));
     tone(600, 0.4, 'sine', 0.06, 300);
@@ -3989,6 +3991,8 @@
   }
   function stepCity(alive) {
     const g = plain;
+    // (outside, a cop ship and any shots in the air are gone; explosions finish)
+    g.sky.cop = null; g.sky.bolts.length = 0; g.sky.copBolts.length = 0; stepBooms();
     for (const n of Object.keys(g.alienPop)) {
       const a = g.alienPop[n];
       if (!a.t || --a.t) continue;
@@ -4390,9 +4394,9 @@
   const buildingX = n => plain.shipAt[n] !== undefined ? plain.shipAt[n] : n * 170 + planetHash(n + 0.25) * 70;
   // (the building whose door a pug at x is in front of, as its number, or null)
   function planetDoor(x) {
-    for (const n of Object.keys(plain.shipAt)) if (Math.abs(x - plain.shipAt[n]) < 20) return +n;
+    for (const n of Object.keys(plain.shipAt)) if (Math.abs(x - plain.shipAt[n]) < 20 && !plain.wrecked[n]) return +n;
     const n0 = Math.round((x - 35) / 170);
-    for (const n of [n0 - 1, n0, n0 + 1]) if (plain.shipAt[n] === undefined && Math.abs(x - buildingX(n)) < 20) return n;
+    for (const n of [n0 - 1, n0, n0 + 1]) if (plain.shipAt[n] === undefined && Math.abs(x - buildingX(n)) < 20 && !plain.wrecked[n]) return n;
     return null;
   }
   function enterRoom(n) {
@@ -4414,11 +4418,13 @@
     if (r.drink) { stepDrink(); g.kbAtk = false; return; }
     if (r.plaque) { stepPlaque(); g.kbAtk = false; return; }
     if (r.pick) { stepPick(); g.kbAtk = false; return; }
+    if (ROOMS[r.kind].window) stepSky();
     if (r.pilot) { stepPilot(); g.kbAtk = false; return; }
     if (r.pc) { stepPc(); g.kbAtk = false; return; }
     if (r.lift) { stepLift(); g.kbAtk = false; return; }
     if (r.alt > 0) r.alt = Math.max(0, r.alt - 2);   // (settling back down once it's stopped)
     for (const p of g.pugs) {
+      if (p.dead) continue;
       // (sitting: any way of moving gets up again, and a pug can still bark from there)
       if (p.sitting) {
         p.upDoor = true;
@@ -4492,6 +4498,129 @@
     r.alt = clamp(r.alt - dy * 2, 0, 130);
     if ((dx || dy) && g.t % 10 === 0) tone(110 + r.alt, 0.1, 'sawtooth', 0.02, dx * 20);
     if (inp.jump) { r.pilot = null; r.on[0] = false; r.say = 'PARKED'; r.sayT = 90; tone(300, 0.3, 'sawtooth', 0.04, -200); }
+    // (the trigger or M fires, the way the ship is being steered, or straight down when it isn't)
+    const k = g.sky;
+    if (k.fireT > 0) k.fireT--;
+    if (inp.fire && !k.fireT && r.pilot) {
+      const [sx, sy] = shipSpot(), ax = dx, ay = dx || dy ? dy : 1, len = Math.hypot(ax, ay);
+      k.bolts.push({ x: sx + ax / len * 12, y: sy + ay / len * 8, vx: ax / len * SKY_BOLT, vy: ay / len * SKY_BOLT, t: 0 });
+      k.fireT = SKY_FIRE; tone(1200, 0.06, 'square', 0.02, -600);
+    }
+  }
+  const flyingSaucer = () => phase === 'mini' && !!plain && !!plain.room && !!plain.room.pilot;
+  // Flying a saucer, the trigger or M shoots (the user asked). Two seconds of hits blows a building up, leaving rubble,
+  // and one hit kills an alien; either brings a cop ship, which stays near the saucer and shoots at it. The saucer takes
+  // 15 hits and then explodes, with everyone in it; the cop ship takes one. Each is { x, y } on the planet, as outside.
+  const SHIP_HP = 15, SKY_BOLT = 5, SKY_FIRE = 7, SKY_HEAT = 120, SKY_COP_SHOT = 2.6;
+  // (each kind of building's half width and height, for what a shot hits)
+  const HOME_BOX = { 0: [34, 40], 1: [26, 100], 2: [22, 26], 3: [28, 62], 4: [44, 64], 5: [34, 80], 6: [36, 36], 7: [30, 50], 8: [32, 74], 9: [32, 90], 11: [40, 60], 12: [20, 88], [MUSEUM]: [42, 72] };
+  // (the saucer flown from inside: the middle of the window is where it is)
+  const shipSpot = () => [buildingX(plain.room.n), PLAIN_Y - 44 - plain.room.alt];
+  const inHome = (n, x, y) => { const [hw, h] = HOME_BOX[homeKind(n)]; return Math.abs(x - buildingX(n)) < hw && y > PLAIN_Y - h; };
+  // (the building at a spot, but not the saucer being flown, nor one already in ruins)
+  function buildingAt(x, y) {
+    const g = plain, own = g.room ? g.room.n : null;
+    for (const key of Object.keys(g.shipAt)) { const n = +key; if (n !== own && !g.wrecked[n] && inHome(n, x, y)) return n; }
+    const n0 = Math.round((x - 35) / 170);
+    for (const n of [n0 - 1, n0, n0 + 1]) if (n !== own && g.shipAt[n] === undefined && !g.wrecked[n] && inHome(n, x, y)) return n;
+    return null;
+  }
+  function callSkyCop() {
+    const k = plain.sky;
+    if (k.cop || k.dead) return;
+    const [sx, sy] = shipSpot(), side = Math.random() < 0.5 ? -1 : 1;
+    k.cop = { x: sx + side * 220, y: sy - 24, t: 0, shotT: 60, side, out: false };
+  }
+  function stepBooms() {
+    const k = plain.sky;
+    if (k.hitT > 0) k.hitT--;
+    for (const n of Object.keys(k.flash)) if (--k.flash[n] <= 0) delete k.flash[n];
+    for (const b of k.booms) b.t++;
+    k.booms = k.booms.filter(b => b.t < (b.big ? 40 : 24));
+  }
+  function stepSky() {
+    const g = plain, r = g.room, k = g.sky, [sx, sy] = shipSpot();
+    stepBooms();
+    if (k.dead) { k.dead++; return; }
+    for (const b of k.bolts) {
+      b.x += b.vx; b.y += b.vy;
+      if (++b.t > 70 || b.y > PLAIN_Y) { b.gone = true; continue; }
+      const c = k.cop;
+      if (c && !c.out && Math.abs(b.x - c.x) < 20 && Math.abs(b.y - c.y) < 10) {   // (the cop ship: one hit)
+        b.gone = true; k.booms.push({ x: c.x, y: c.y, t: 0, big: true }); k.cop = null; sfx.boom(); r.say = 'GOT THE COPS!'; r.sayT = 90;
+        continue;
+      }
+      for (let n = Math.round(b.x / 58) - 2, n1 = n + 4; n <= n1 && !b.gone; n++) {   // (an alien: one hit)
+        if (g.alienPop[n]) continue;
+        const a = cityAlien(n, g.t);
+        if (Math.abs(a.x - b.x) < 6 && b.y > PLAIN_Y - (a.blob ? 16 : 24)) { g.alienPop[n] = { t: 0, x: a.x }; b.gone = true; k.booms.push({ x: a.x, y: PLAIN_Y - 10, t: 0 }); sfx.pop(); callSkyCop(); }
+      }
+      if (b.gone) continue;
+      const m = buildingAt(b.x, b.y);
+      if (m === null) continue;
+      b.gone = true; k.heat[m] = (k.heat[m] || 0) + SKY_FIRE; k.flash[m] = 4; noise(0.05, 0.03, 900, 300);
+      if (k.heat[m] >= SKY_HEAT) {   // (two seconds of it: the building blows up)
+        const h = HOME_BOX[homeKind(m)][1];
+        g.wrecked[m] = true; delete k.flash[m]; k.booms.push({ x: buildingX(m), y: PLAIN_Y - h / 2, t: 0, big: true }); sfx.boom(); callSkyCop();
+      }
+    }
+    k.bolts = k.bolts.filter(b => !b.gone);
+    const c = k.cop;
+    if (c) {
+      c.t++;
+      if (!r.pilot || c.out) {   // (nobody flying: off it goes)
+        c.out = true; c.x += c.side * 2.5; c.y -= 2;
+        if (c.y < -60) k.cop = null;
+      } else {
+        if (c.t % 24 === 1) tone(c.t % 48 === 1 ? 940 : 660, 0.2, 'square', 0.015);
+        const wx = sx + c.side * 80, wy = clamp(sy - 6 + Math.sin(c.t * 0.03) * 22, 30, PLAIN_Y - 30);
+        c.x += clamp(wx - c.x, -2.2, 2.2); c.y += clamp(wy - c.y, -1.5, 1.5);
+        if (--c.shotT <= 0 && Math.abs(c.x - sx) < 150) {
+          c.shotT = 45 + Math.random() * 30;
+          const tx = sx - c.x, ty = sy - c.y, len = Math.hypot(tx, ty) || 1;
+          k.copBolts.push({ x: c.x - c.side * 14, y: c.y, vx: tx / len * SKY_COP_SHOT, vy: ty / len * SKY_COP_SHOT, t: 0 });
+          tone(1400, 0.12, 'square', 0.03, -900);
+        }
+      }
+    }
+    for (const b of k.copBolts) {
+      b.x += b.vx; b.y += b.vy;
+      if (++b.t > 140) b.gone = true;
+      else if (r.pilot && Math.abs(b.x - sx) < 22 && Math.abs(b.y - sy) < 11) {   // (a hit on the saucer)
+        b.gone = true; k.hp--; k.hitT = 14; noise(0.2, 0.08, 400, 80); tone(120, 0.2, 'square', 0.05, -60);
+        if (k.hp <= 0) {   // (15 hits: the saucer explodes, and everyone in it)
+          k.dead = 1; k.cop = null; k.booms.push({ x: sx, y: sy, t: 0, big: true }); sfx.boom(); noise(1.2, 0.12, 300, 40);
+          r.pilot = null; r.on[0] = false; r.say = 'KABOOM'; r.sayT = 200;
+          for (const p of g.pugs) { p.dead = true; p.sitting = false; p.y = PLAIN_Y; p.ground = true; p.barkT = 0; }
+          g.endT = 150;
+        }
+      }
+    }
+    k.copBolts = k.copBolts.filter(b => !b.gone);
+  }
+  // (what the shooting looks like, on the planet: in a saucer's window or outside)
+  function drawSkyFx(cam) {
+    const g = plain, k = g.sky, t = g.t;
+    if (!k) return;
+    for (const n of Object.keys(k.flash)) { const [hw, h] = HOME_BOX[homeKind(+n)]; ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fillRect(Math.round(buildingX(+n) - cam - hw), PLAIN_Y - h, hw * 2, h); }
+    for (const n of Object.keys(k.heat)) if (!g.wrecked[n] && k.heat[n] >= SKY_HEAT / 2) {   // (smoking, half way there)
+      const h = HOME_BOX[homeKind(+n)][1], x = buildingX(+n) - cam;
+      for (let i = 0; i < 3; i++) { const u = ((t + i * 13) % 40) / 40; ctx.fillStyle = `rgba(80,80,90,${(0.6 - u * 0.5).toFixed(2)})`; ctx.beginPath(); ctx.arc(x - 8 + i * 8, PLAIN_Y - h - u * 22, 3 + u * 4, 0, Math.PI * 2); ctx.fill(); }
+    }
+    for (const b of k.bolts) { const x = Math.round(b.x - cam), y = Math.round(b.y); ctx.fillStyle = '#5fd068'; ctx.fillRect(x - 2, y - 2, 5, 5); ctx.fillStyle = '#d8ffe0'; ctx.fillRect(x - 1, y - 1, 3, 3); }
+    for (const b of k.copBolts) { const x = Math.round(b.x - cam), y = Math.round(b.y); ctx.fillStyle = '#ff3e30'; ctx.fillRect(x - 3, y - 2, 7, 5); ctx.fillStyle = '#ffd8c8'; ctx.fillRect(x - 1, y - 1, 3, 3); }
+    if (k.cop) drawCopShip(k.cop, cam);
+    for (const b of k.booms) {
+      const big = b.big ? 1 : 0.45, u = b.t / (b.big ? 40 : 24), x = b.x - cam;
+      ctx.fillStyle = `rgba(255,${Math.round(220 - u * 150)},60,${(1 - u).toFixed(2)})`; ctx.beginPath(); ctx.arc(x, b.y, (8 + u * 30) * big, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = `rgba(255,255,220,${Math.max(0, 1 - u * 2).toFixed(2)})`; ctx.beginPath(); ctx.arc(x, b.y, (5 + u * 14) * big, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  // (what's left of a building that was shot down: a smoking heap)
+  function drawRuins(x) {
+    const box = (col, a, b, w, h) => { ctx.fillStyle = col; ctx.fillRect(x + a, PLAIN_Y + b, w, h); }, t = plain.t;
+    box('#3a3a4a', -30, -6, 60, 6); box('#55556a', -24, -12, 22, 6); box('#6a6e80', 2, -10, 20, 4); box('#2a2a36', -6, -17, 12, 6); box('#8d90a0', 12, -14, 5, 4); box('#6a3e1e', -16, -15, 3, 4);
+    for (let i = 0; i < 2; i++) { const u = ((t + i * 25) % 50) / 50; ctx.fillStyle = `rgba(80,80,90,${(0.5 - u * 0.45).toFixed(2)})`; ctx.beginPath(); ctx.arc(x - 4 + i * 10, PLAIN_Y - 18 - u * 26, 3 + u * 5, 0, Math.PI * 2); ctx.fill(); }
   }
   // (what Up does for a pug in a room: -1 the door, -2 the alien at a counter, 0 up the number of a thing, or null)
   function roomSpot(p) {
@@ -5038,7 +5167,13 @@
     if (r.drink) drawDrink();
     if (r.pick) drawPick();
     if (r.sayT > 0) drawText(r.say, PW / 2, 84, 'gold', 'center');
-    if (r.pilot) drawText('ARROWS FLY  SPACE STOPS', PW / 2, 72, 'cyan', 'center');
+    if (r.pilot) { drawText('ARROWS FLY  SPACE STOPS', PW / 2, 62, 'cyan', 'center'); drawText('M OR A TRIGGER SHOOTS', PW / 2, 73, 'cyan', 'center'); }
+    if (R.window && g.sky && (g.sky.cop || g.sky.hp < SHIP_HP)) {
+      drawText('SHIP', 8, 4, 'cyan');
+      for (let i = 0; i < SHIP_HP; i++) { ctx.fillStyle = i < g.sky.hp ? '#5fd068' : '#3a1418'; ctx.fillRect(38 + i * 7, 4, 5, 7); }
+    }
+    if (R.window && g.sky && g.sky.hitT) { ctx.fillStyle = `rgba(232,40,47,${(g.sky.hitT / 40).toFixed(2)})`; ctx.fillRect(0, 0, PW, PH); }
+    if (R.window && g.sky && g.sky.dead) { ctx.fillStyle = `rgba(255,240,200,${Math.max(0, 1 - g.sky.dead / 60).toFixed(2)})`; ctx.fillRect(0, 0, PW, PH); }
     if (r.pc) drawPc();
     if (r.lift) drawLiftPanel();
     if (r.plaque) drawPlaque();
@@ -5069,8 +5204,8 @@
     ctx.fillStyle = '#7af0c0'; ctx.fillRect(0, PLAIN_Y, PW, 2);
     ctx.fillStyle = '#2fb88a';
     for (let n = Math.floor(cam / 19) - 1; n * 19 < cam + PW + 19; n++) { const h = planetHash(n); ctx.fillRect(Math.round(n * 19 + h * 12 - cam), PLAIN_Y + 10 + Math.floor(h * (PH - PLAIN_Y - 14)), 3 + Math.floor(h * 6), 1); }
-    for (let n = Math.floor((cam - 80) / 170); n * 170 < cam + PW + 80; n++) if (n !== skip && plain.shipAt[n] === undefined) drawAlienHome(Math.round(buildingX(n) - cam), homeKind(n));
-    for (const n of Object.keys(plain.shipAt)) if (+n !== skip) drawAlienHome(Math.round(plain.shipAt[n] - cam), homeKind(+n));   // (parked somewhere else)
+    for (let n = Math.floor((cam - 80) / 170); n * 170 < cam + PW + 80; n++) if (n !== skip && plain.shipAt[n] === undefined) (plain.wrecked[n] ? drawRuins : drawAlienHome)(Math.round(buildingX(n) - cam), homeKind(n));
+    for (const n of Object.keys(plain.shipAt)) if (+n !== skip) (plain.wrecked[n] ? drawRuins : drawAlienHome)(Math.round(plain.shipAt[n] - cam), homeKind(+n));   // (parked somewhere else)
     // (a few saucers going over)
     for (let n = Math.floor((cam - 60) / 260); n * 260 < cam + PW + 60; n++) {
       const pic = sprite('ufo_' + ((t >> 3) & 1)), h = planetHash(n + 0.75);
@@ -5084,6 +5219,7 @@
       if (c.blob) { const pic = sprite(pop ? 'dg_blob_dizzy' : (t >> 3) & 1 ? 'dg_blob2' : 'dg_blob1'); if (pic) ctx.drawImage(pic, Math.round(x - cam) - (pic.width >> 1), PLAIN_Y - pic.height); }
       else drawAlien(Math.round(x - cam), c.col, pop ? 0 : (t >> 3) & 1, c.face, !!pop);
     }
+    drawSkyFx(cam);
   }
   // (a big oval window in a room's wall, looking out on the real planet around this building: the same aliens and
   // buildings, moving as they do outside)
@@ -5935,8 +6071,8 @@
     if (c.flash) box('#ff3e30', 11, -12, 3, 3);
   }
   // (a navy and white saucer with COPS on its side, a cop at the wheel under the dome, and red and blue lights going)
-  function drawCopShip(s) {
-    const X = Math.round(s.x - plain.cam), Y = Math.round(s.y + Math.sin(plain.t / 14) * 2), red = (plain.t >> 3) & 1;
+  function drawCopShip(s, cam = plain.cam) {
+    const X = Math.round(s.x - cam), Y = Math.round(s.y + Math.sin(plain.t / 14) * 2), red = (plain.t >> 3) & 1;
     const box = (col, a, b, w, h) => { ctx.fillStyle = col; ctx.fillRect(X + a, Y + b, w, h); };
     box('#bfeaff', -10, -15, 20, 9); box('#5fd068', -3, -12, 6, 5); box('#1d2f8c', -4, -14, 8, 2);
     box('#1d2f8c', -20, -6, 40, 4); box('#eef0f6', -30, -2, 60, 9); box('#1d2f8c', -30, 7, 60, 2); box('#14122a', -22, 9, 44, 3);
