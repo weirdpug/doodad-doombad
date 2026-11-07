@@ -3450,6 +3450,9 @@
   // (Gloop's ship over Jupiter after that: the frames between its nukes, a nuke's speed, how far off a pug its blast
   // reaches, how far ahead of a walking pug he aims, and the size the nukes are drawn, the bigger the smaller the number)
   const HUNT_GAP = 55, HUNT_SPEED = 5, HUNT_NEAR = 26, HUNT_LEAD = 8, HUNT_Z = 2.6;
+  // (how near a crater's middle a pug on the ground has to be to fall in, and how near the shop no crater forms, so a door
+  // is never over one)
+  const CRATER_R = 9, CRATER_CLEAR = 90;
   const STATION_NEAR = 130, STATION_WAIT = 60, STATION_TALK = [[0, 180, ['HEY I THINK I HEARD', 'A SPACE STATION', 'FROM EARTH']], [300, 480, ['YAYYYYYY!!!']],
     [480, 660, ['WE HAVE TO SEND', 'THEM A MESSAGE']], [780, 960, ['MAYBE IF WE BLOW', 'UP THE SHIP', 'THEY WILL SEE']], [1080, 1260, ['YEAH']]], STATION_END = 1260;
   // (what Gloop says when the last burrito has landed, and for how many frames)
@@ -3803,17 +3806,26 @@
       if (++s.shot.t >= STATION_SHOT) {
         s.shot = null; s.boom = null; g.bits = [];
         // (he comes for them, from the far side of the station)
-        if (!s.hunt) { const side = s.hutX < g.cam + PW / 2 ? 1 : -1; s.hunt = { x: g.cam + PW / 2 + side * 180, y: 54, face: -side, shootT: 80, nukes: [], balls: [], endT: 0 }; noise(1.2, 0.08, 300, 60); }
+        if (!s.hunt) { const side = s.hutX < g.cam + PW / 2 ? 1 : -1; s.hunt = { x: g.cam + PW / 2 + side * 180, y: 54, face: -side, shootT: 80, nukes: [], balls: [] }; noise(1.2, 0.08, 300, 60); }
       }
       return;
     }
+    if (s.endT && --s.endT === 0) return leavePlain();
     for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.pugs.some(p => p.id === i)) g.pugs.push(Object.assign(shopPug(i, g.cam + PW / 2, PLAIN_Y), { ground: true }));
     g.pugs = g.pugs.filter(p => arenaDriven(p.id));
     for (const p of g.pugs) {
-      if (p.dead) continue;
+      if (p.dead) { if (p.sink && p.sink < 26) p.y = PLAIN_Y + ++p.sink;   // (going down the crater)
+        continue; }
       // (the shop bars the way on the side it is on: walking into it there goes back in)
       const L = g.cam + 8, R = g.cam + PW - 8, dx = s.side > 0 ? floorPug(p, Math.max(L, door), R, PLAIN_Y, 1.25, -3.4) : floorPug(p, L, Math.min(R, door), PLAIN_Y, 1.25, -3.4);
       if (dx === -s.side && p.ground && (s.side > 0 ? p.x <= door : p.x >= door)) { backInShop(); g.kbAtk = false; return; }
+      // (walking into a crater, or landing in one: down it goes, and that's the end of it; jumping over is fine)
+      const hole = p.ground ? s.drop.craters.find(x => Math.abs(p.x - x) < CRATER_R) : undefined;
+      if (hole !== undefined) {
+        p.x = hole; p.dead = true; p.sink = 1; p.barkT = 0; p.moving = false;
+        tone(620, 0.6, 'sine', 0.06, -520); sfx.die();
+        if (!s.endT && g.pugs.every(q => q.dead)) s.endT = 150;
+      }
       // (a bark near a space station gets an answer: 44 is the frame a bark starts)
       if (p.barkT === 44 && !s.talk && !s.boom) for (const side of [-1, 1]) if (!s.drop.blown[side] && Math.abs(p.x - (s.hutX + side * STATION_D)) < STATION_NEAR) s.talk = { side, t: -STATION_WAIT };
     }
@@ -3836,8 +3848,7 @@
   // blasts. Reaching the shop ends it. If they all die, it's the explosion picture for 2 seconds, then the main menu.
   // (the user asked)
   function stepHunt() {
-    const g = plain, h = g.stroll.hunt, alive = g.pugs.filter(p => !p.dead);
-    if (h.endT && --h.endT === 0) return leavePlain();
+    const g = plain, s = g.stroll, h = s.hunt, alive = g.pugs.filter(p => !p.dead);
     const prey = alive.length ? alive.reduce((a, p) => Math.abs(p.x - h.x) < Math.abs(a.x - h.x) ? p : a) : null;
     if (prey) {
       h.x += clamp(prey.x - h.x, -1.7, 1.7);
@@ -3853,19 +3864,19 @@
       n.x += n.vx; n.y += n.vy;
       if (n.y < PLAIN_Y - 4) continue;
       n.gone = true; noise(0.6, 0.25, 2400, 150); tone(70, 0.5, 'sine', 0.2, -40);
-      g.stroll.drop.craters.push(n.x);
+      if (Math.abs(n.x - s.hutX) > CRATER_CLEAR) s.drop.craters.push(n.x);
       for (let i = 0; i < 7; i++) h.balls.push({ x: n.x - 24 + Math.random() * 48, y: PLAIN_Y - Math.random() * 34, max: 9 + Math.random() * 11, life: 28 + Math.random() * 26, t: 0 });
       for (const p of g.pugs) if (!p.dead && Math.abs(p.x - n.x) < HUNT_NEAR) {
         p.dead = true; p.barkT = 0; p.moving = false; p.ground = true; p.y = PLAIN_Y; sfx.die();
-        if (!h.endT && g.pugs.every(q => q.dead)) { h.endT = 150; sfx.boom(); boomPic.hidden = false; boomPicT = NUKE.pic; }
+        if (!s.endT && g.pugs.every(q => q.dead)) { s.endT = 150; sfx.boom(); boomPic.hidden = false; boomPicT = NUKE.pic; }
       }
     }
     h.nukes = h.nukes.filter(n => !n.gone);
     for (const o of h.balls) o.t++;
     h.balls = h.balls.filter(o => o.t < o.life);
   }
-  // (a little crater a nuke has left in the ground at screen x: a dark bowl with a raised rim; it's only a mark, and the
-  // pugs walk across it)
+  // (a little crater a nuke has left in the ground at screen x: a dark bowl with a raised rim, deep enough to fall into and
+  // die; see stepStroll)
   function drawCrater(x) {
     if (x < -24 || x > PW + 24) return;
     const [top, mid] = plain.spot.ground;
@@ -4600,7 +4611,12 @@
     }
     for (const b of g.drops) blit('barrel_roll' + (Math.floor(b.spin / 6) % 4), Math.round(b.x - g.cam) - 5, Math.round(b.y) - 5);
     for (const b of g.bits) { ctx.fillStyle = b.col || '#8a5630'; ctx.fillRect(Math.round(b.x - g.cam), Math.round(b.y), b.s || 2, b.s || 2); }
-    for (const p of g.pugs) drawPlainPug(p, Math.round(p.x - g.cam), Math.round(p.y), 'black');
+    for (const p of g.pugs) {
+      // (a pug going down a crater is hidden by the ground as it sinks)
+      if (p.sink) { ctx.save(); ctx.beginPath(); ctx.rect(0, 0, PW, PLAIN_Y + 7); ctx.clip(); }
+      drawPlainPug(p, Math.round(p.x - g.cam), Math.round(p.y), 'black');
+      if (p.sink) ctx.restore();
+    }
     if (g.stroll && g.stroll.boom) drawStationBoom();
     if (g.stroll && g.stroll.hunt) drawHunt();
     ctx.restore();
