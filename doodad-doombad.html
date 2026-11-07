@@ -2079,6 +2079,7 @@
   //   B0SS3     goes straight to the island in space (codeIsle), from any screen
   //   W0RM      goes straight to the island crumbling, the pugs standing on it (codeWorm), from any screen
   //   TAC0      goes straight to Gloop yelling after the last burrito (codeYell), from any screen
+  //   SH0T      goes straight to Gloop's ship hunting the pugs back to the shop (codeShot), from any screen
   //   BYE       the keyboard's player leaves the game (keyboardBye)
   // A code's first key still does its usual job if it is a game key (B barks, ZER0's Z jumps), but once a
   // code has begun, its next keys only type the code: the coin code's S doesn't also climb down or pick a
@@ -2091,7 +2092,8 @@
     { code: 'L0CK2', at: 0, run: () => codeMissions() }, { code: 'YAY!', at: 0, run: () => unlockAll() },
     { code: 'B0SS', at: 0, run: () => codeBoss() }, { code: 'B0SS2', at: 0, run: () => codeSpace() },
     { code: 'B0SS3', at: 0, run: () => codeIsle() }, { code: 'W0RM', at: 0, run: () => codeWorm() },
-    { code: 'TAC0', at: 0, run: () => codeYell() }, { code: 'BYE', at: 0, run: () => keyboardBye() }];
+    { code: 'TAC0', at: 0, run: () => codeYell() }, { code: 'SH0T', at: 0, run: () => codeShot() },
+    { code: 'BYE', at: 0, run: () => keyboardBye() }];
   // The zero code (the user asked for one to reset their coins): every pug's coins are set to 0 and saved.
   // Store things already bought are kept.
   // (the lock code, the user asked 2026-10-31: every unlock forgotten, and a pet that is locked again goes home, and a
@@ -3546,7 +3548,26 @@
     plain.isleT = ISLE_WORDS_END; plain.isleShot = ISLE_BURRITOS; plain.aim = null; plain.thrown = []; plain.tauntT = 0;
     startCrumble();
   }
-  // (w0rm: the same, but past the yell too, straight to the island crumbling under the pugs)
+  // (sh0t: straight to Gloop's ship coming after the pugs out by the right-hand space station, as if they had landed in the
+  // shop, dodged its burrito, walked there and blown the station up)
+  function codeShot() {
+    if (!plain) codeBoss();
+    if (!plain) return;
+    if (plain.stroll) { plain.stroll = false; plain.space = null; }
+    if (!plain.space) plainSpace(plain.pugs);
+    boomPic.hidden = true; boomPicT = 0;
+    const ids = plain.pugs.map(p => p.id);
+    landOnIsle(ids);
+    plain.pugs.forEach(p => { p.dead = false; });
+    plain.drop = { t: DROP_HOLE + DROP_SKY + 100, ids, planks: [], shake: 0, walk: true, walkT: 0, fired: true, sayT: 0 };
+    leaveShop(1);
+    const s = plain.stroll, x0 = s.hutX + STATION_D - 60;
+    s.drop.blown[1] = true;
+    plain.pugs.forEach((p, i) => { p.x = x0 + i * 16; p.face = -1; });
+    plain.cam = x0 - PW / 2;
+    startHunt();
+  }
+  // (w0rm: like tac0, but past the yell too, straight to the island crumbling under the pugs)
   function codeWorm() {
     codeYell();
     if (plain) plain.crumble.t = ISLE_YELL_T - 1;
@@ -3802,8 +3823,7 @@
       g.kbAtk = false;
       if (++s.shot.t >= STATION_SHOT) {
         s.shot = null; s.boom = null; g.bits = [];
-        // (he comes for them, from the far side of the station)
-        if (!s.hunt) { const side = s.hutX < g.cam + PW / 2 ? 1 : -1; s.hunt = { x: g.cam + PW / 2 + side * 180, y: 54, face: -side, shootT: 80, nukes: [], balls: [] }; noise(1.2, 0.08, 300, 60); }
+        if (!s.hunt) startHunt();
       }
       return;
     }
@@ -3839,6 +3859,12 @@
       g.cam += ((Math.min(...xs) + Math.max(...xs)) / 2 - PW / 2 - g.cam) * 0.1;
     }
     if (s.hunt) stepHunt();
+  }
+  // (he comes for them, from the far side of the station)
+  function startHunt() {
+    const g = plain, s = g.stroll, side = s.hutX < g.cam + PW / 2 ? 1 : -1;
+    s.hunt = { x: g.cam + PW / 2 + side * 180, y: 54, face: -side, shootT: 80, nukes: [], balls: [] };
+    noise(1.2, 0.08, 300, 60);
   }
   // On the way back to the shop Gloop tries to kill them: his ship follows them along overhead, firing HOVERACKS nukes that
   // land some in front of a walking pug and some behind it, leaving craters to jump. A pug that stops gets one right on
