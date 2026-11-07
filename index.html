@@ -3940,7 +3940,7 @@
   function enterPlanet() {
     const g = plain, ids = g.fin.ids;
     g.fin = null; g.stroll = false; g.drop = null; g.space = null; g.isle = false; g.crumble = null; g.hole = null; g.warp = null; g.boss = null; g.nuke = null;
-    g.obs = []; g.drops = []; g.rovers = []; g.martians = []; g.ships = []; g.bits = []; g.endT = 0; g.cam = -PW / 2; g.planet = true; g.room = null; g.roomOn = {}; g.shipAt = {};
+    g.obs = []; g.drops = []; g.rovers = []; g.martians = []; g.ships = []; g.bits = []; g.endT = 0; g.cam = -PW / 2; g.planet = true; g.room = null; g.roomOn = {}; g.statueAt = {}; g.shipAt = {};
     g.pcData = { paint: {}, blob: 0, bars: [3, 5, 2, 6, 4, 7, 3, 5], notes: [false, false, false, false] };
     g.pugs = ids.map((id, i) => shopPug(id, i * 16 - 8, -20));
     tone(600, 0.4, 'sine', 0.06, 300);
@@ -4113,7 +4113,7 @@
       labPotion(72, '#e8282f', 0), labPotion(102, '#5fd068', 1), labPotion(132, '#b48ae0', 2), labPotion(162, '#ffcc3d', 0), labPotion(192, '#7ae0ff', 1), labPotion(222, '#ff9ac0', 2)] },
     { wall: '#c8a040', floor: '#6a4a10', things: [
       { x: 110, say: "IT'S LOCKED", s: [150, 'square', -60], draw: b => { b('#6a4a2a', -16, -16, 32, 16); b('#c8a040', -3, -12, 6, 6); b('#8a5a34', -17, -22, 34, 8); } },
-      { x: 190, say: 'IT BLINKED', s: [110, 'sawtooth', -40], draw: (b, r, on, t) => { b('#86838f', -20, -6, 40, 6); b('#a09daa', -20, -6, 40, 1); ctx.drawImage(gloopStatue(on && (t >> 5) & 1 ? 'blink' : on ? 'glow' : 'idle'), ctxX(b) - 17, PLAIN_Y - 60, 33, 54); } }] },
+      { x: 190, watch: true, say: 'IT BLINKED', s: [110, 'sawtooth', -40], draw: (b, r, on, t) => { b('#86838f', -20, -6, 40, 6); b('#a09daa', -20, -6, 40, 1); ctx.drawImage(gloopStatue(statueAwake() ? 'glow' : on && (t >> 5) & 1 ? 'blink' : on ? 'glow' : 'idle', plain.room.look), ctxX(b) - 17, PLAIN_Y - 60, 33, 54); } }] },
     { wall: '#4f6ad0', floor: '#26307a', things: [
       { x: 110, say: 'GOING UP? NO.', s: [523, 'sine', 523], draw: (b, r, on) => { b('#8d90a0', -18, -56, 36, 56); b('#14122a', -16, -54, 32, 54); if (on) { b('#ffe08a', -14, -52, 28, 52); } else { b('#55556a', -16, -54, 15, 54); b('#55556a', 1, -54, 15, 54); } } },
       { x: 190, say: 'SATURN IS MISSING', s: [700, 'sine', -200], draw: (b, r, on, t) => { b('#55556a', -2, -18, 4, 18); b('#55556a', -10, -3, 20, 3); r('#2f5bff', 0, -32, 15); r('#5fd068', on ? Math.sin(t * 0.1) * 9 : -5, -34, 5); r('#ffffff', on ? Math.cos(t * 0.1) * 9 : 6, -28, 2); } }] },
@@ -4139,10 +4139,35 @@
   const ctxX = b => b.x;
   // (Gloop carved in stone for the temple: his own picture in grey, plus one with glowing eyes for when it wakes up)
   const STATUE_COLS = { p: '#b0adb8', r: '#d8d6de', q: '#86838f', o: '#4a4754', v: '#9a97a3', W: '#e8e6ee', K: '#4a4754', Y: '#c8c5d0', R: '#86838f', D: '#6e6b78', N: '#6e6b78', n: '#a09daa', I: '#7a7784', E: '#ff3e30' };
-  let statuePics = null;
-  function gloopStatue(look) {
-    if (!statuePics) statuePics = { idle: bakeWith(GLOOP.idle, STATUE_COLS), blink: bakeWith(GLOOP.blink, STATUE_COLS), glow: bakeWith(GLOOP.idle.map((row, y) => y < 10 ? row.replace(/W/g, 'E') : row), STATUE_COLS) };
-    return statuePics[look];
+  // (his head turning: the face slides over by a few pixels inside the outline of his head, and the antennae go with it)
+  function turnHead(rows, by) {
+    return rows.map((row, y) => {
+      if (y < 3) return by > 0 ? '.'.repeat(by) + row.slice(0, -by) : row.slice(-by) + '.'.repeat(-by);
+      if (y > 13) return row;
+      const cells = [...row], L = row.indexOf('o') + 1, R = row.lastIndexOf('o') - 1;
+      for (let x = L; x <= R; x++) if ('WKE'.includes(row[x])) cells[x] = 'p';
+      for (let x = L; x <= R; x++) if ('WKE'.includes(row[x]) && x + by >= L && x + by <= R) cells[x + by] = row[x];
+      return cells.join('');
+    });
+  }
+  const statuePics = {};
+  function gloopStatue(look, turn) {
+    const key = look + turn;
+    if (!statuePics[key]) {
+      const rows = look === 'blink' ? GLOOP.blink : look === 'glow' ? GLOOP.idle.map((row, y) => y < 10 ? row.replace(/W/g, 'E') : row) : GLOOP.idle;
+      statuePics[key] = bakeWith(turn ? turnHead(rows, turn) : rows, STATUE_COLS);
+    }
+    return statuePics[key];
+  }
+  // (5 seconds after you first touch the statue it wakes up, for good, and its head turns to watch whoever is nearest)
+  const STATUE_WAKE = 300, STATUE_TURN = 3;
+  const statueAwake = () => plain.statueAt[plain.room.n] <= plain.t;
+  function stepStatue() {
+    const g = plain, r = g.room, k = ROOMS[r.kind].things.find(o => o.watch);
+    if (!k || !statueAwake() || !g.pugs.length || g.t % 8) return;
+    const near = g.pugs.reduce((a, p) => Math.abs(p.x - k.x) < Math.abs(a.x - k.x) ? p : a), d = near.x - k.x;
+    const want = Math.sign(d) * Math.min(STATUE_TURN, Math.floor(Math.abs(d) / 12));
+    if (want !== r.look) { r.look += Math.sign(want - r.look); noise(0.1, 0.03, 180, 120); }
   }
   const ROOM_DOOR = 22, ROOM_REACH = 20;
   // (where building n stands: its own spot, or where its saucer has been parked)
@@ -4158,7 +4183,7 @@
     const g = plain;
     const kind = Math.floor(planetHash(n + 0.5) * 13);
     if (ROOMS[kind].refill) g.roomOn[n] = [];   // (the potions are back)
-    g.room = { n, kind, sayT: 0, say: '', alt: 0, pilot: null, on: g.roomOn[n] || (g.roomOn[n] = [false, false]) };
+    g.room = { n, kind, sayT: 0, say: '', alt: 0, pilot: null, look: 0, on: g.roomOn[n] || (g.roomOn[n] = [false, false]) };
     g.pugs = g.pugs.map((p, i) => Object.assign(shopPug(p.id, ROOM_DOOR + 16 + i * 16, PLAIN_Y), { ground: true, upWas: true }));
     tone(420, 0.12, 'sine', 0.05, 200);
   }
@@ -4169,6 +4194,7 @@
     if (r.sayT > 0) r.sayT--;
     for (const b of g.bits) { b.x += b.vx; b.y += b.vy; b.vy += b.g || 0; b.t--; }
     g.bits = g.bits.filter(b => b.t > 0);
+    stepStatue();
     if (r.eat) { stepEat(); g.kbAtk = false; return; }
     if (r.pick) { stepPick(); g.kbAtk = false; return; }
     if (r.pilot) { stepPilot(); g.kbAtk = false; return; }
@@ -4219,6 +4245,7 @@
       // (a thing with names goes on to the next one each time, a TV's channels, and the others go on and off)
       if (thing.names) { r.on[at] = (+r.on[at] + 1) % thing.names.length; r.say = thing.names[r.on[at]]; }
       else { r.on[at] = !r.on[at]; r.say = thing.say; }
+      if (thing.watch && g.statueAt[r.n] === undefined) g.statueAt[r.n] = g.t + STATUE_WAKE;
       r.sayT = 150;
       tone(thing.s[0], 0.35, thing.s[1], 0.06, thing.s[2]);
     }
