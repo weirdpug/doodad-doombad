@@ -4070,7 +4070,7 @@
   // own room with its own two things to play with: Up in front of one uses it (and stays that way, building by building),
   // Up at the door goes back out. A little arrow shows when Up will do something. (the user asked)
   // (a thing's x, what shows at the top when it's used, its sound, and how it's drawn: b a box and r a ball, both from its
-  // foot on the floor, on whether it's in use, t the time)
+  // foot on the floor, on whether it's in use, t the time; a room with a scene draws that instead of its alien walking)
   const ROOMS = [
     { wall: '#8a78d0', floor: '#4a3a98', things: [
       { x: 110, say: 'ALIEN CARTOONS!', s: [660, 'square', 120], draw: (b, r, on, t) => { b('#3a2a78', -3, -8, 6, 8); b('#14122a', -20, -40, 40, 32); b(on ? ['#ff6a9a', '#5fd068', '#ffcc3d', '#7ae0ff'][(t >> 3) & 3] : '#2a2a3a', -17, -37, 34, 26); if (on) { r('#ffffff', -6 + ((t >> 2) & 15), -24, 4); } } },
@@ -4105,9 +4105,7 @@
     { wall: '#ffd9a0', floor: '#c8742f', things: [
       { x: 110, say: 'IT HATCHED!', s: [1046, 'sine', 300], draw: (b, r, on, t) => { b('#a8743a', -14, -8, 28, 8); if (on) { b('#5fd068', -5, -24 - ((t >> 4) & 1), 10, 10); b('#14122a', -3, -22 - ((t >> 4) & 1), 2, 3); b('#14122a', 1, -22 - ((t >> 4) & 1), 2, 3); b('#fff6e0', -9, -14, 18, 6); } else { ctx.fillStyle = '#fff6e0'; ctx.beginPath(); ctx.ellipse(ctxX(b), PLAIN_Y - 20, 10, 13, 0, 0, Math.PI * 2); ctx.fill(); } } },
       { x: 190, say: 'ROCK-A-BYE', s: [392, 'sine', 40], draw: (b, r, on, t) => { const a = on ? Math.sin(t * 0.09) * 5 : 0; b('#8a5a34', -18 + a, -20, 36, 14); b('#ffffff', -15 + a, -22, 30, 4); b('#8a5a34', -14, -6, 4, 6); b('#8a5a34', 10, -6, 4, 6); b('#55556a', -1 + a, -52, 2, 30); for (const c of [-10, 0, 10]) r(['#ff9ac0', '#ffcc3d', '#7ae0ff'][(c + 10) / 10], c + a, -48, 3); } }] },
-    { wall: '#7af0c0', floor: '#e8282f', things: [
-      { x: 110, say: 'ONE SPACE BURGER', s: [180, 'sawtooth', 60], draw: (b, r, on, t) => { b('#55556a', -20, -26, 40, 26); b('#22222c', -18, -28, 36, 3); if (on) { b('#8a5a34', -9, -33, 18, 4); b('#5fd068', -10, -35, 20, 2); b('#ffcc3d', -9, -39, 18, 4); for (let i = 0; i < 4; i++) b((t + i) & 2 ? '#ff6a30' : '#ffcc3d', -14 + i * 9, -6 - ((t + i * 3) & 3), 5, 5); } } },
-      { x: 190, say: 'WHAT A TUNE', s: [659, 'triangle', 330], draw: (b, r, on, t) => { b('#b0242c', -16, -48, 32, 48); r('#ffcc3d', 0, -48, 16); r(on ? ['#ff9ac0', '#7ae0ff', '#5fd068'][(t >> 3) % 3] : '#6a1f1a', 0, -48, 12); for (let i = 0; i < 3; i++) b(on && ((t >> 3) % 3) === i ? '#ffffff' : '#6a1f1a', -12, -28 + i * 7, 24, 4); if (on) b('#14122a', 18 + (t >> 2) % 6, -56 - (t >> 2) % 14, 3, 3); } }] },
+    { wall: '#ffe8c8', floor: '#c8742f', things: [], scene: drawBakery },
     { wall: '#d8dbe4', floor: '#6a6e80', things: [
       { x: 110, say: '3 2 1 ... NOT YET', s: [523, 'square', -200], draw: (b, r, on, t) => { b('#55556a', -18, -40, 36, 40); b('#14122a', -14, -36, 28, 16); if (on) drawText(String(3 - ((t >> 5) % 4)), ctxX(b), PLAIN_Y - 31, 'red', 'center'); for (let i = 0; i < 3; i++) b(['#e8282f', '#ffcc3d', '#5fd068'][i], -12 + i * 9, -14, 6, 6); } },
       { x: 190, say: 'NICE VIEW', s: [1100, 'sine', 200], draw: (b, r, on, t) => { r('#8d90a0', 0, -38, 18); r(on ? '#050614' : '#55556a', 0, -38, 14); if (on) { b('#ffffff', -6, -44, 2, 2); b('#ffffff', 5, -34, 2, 2); b('#9fe0ff', -2 + ((t >> 4) & 3), -30, 2, 2); r('#6ae0c8', 7, -45, 4); } } }] }];
@@ -4155,6 +4153,51 @@
     const i = ROOMS[plain.room.kind].things.findIndex(k => Math.abs(p.x - k.x) < ROOM_REACH);
     return i < 0 ? null : i;
   }
+  // Inside EATS: a bakery counter with a glass case full of treats and bakes, and an alien in a restaurant uniform behind
+  // it. (the user asked)
+  function drawBakery(t) {
+    const box = (col, x, y, w, h) => { ctx.fillStyle = col; ctx.fillRect(x, PLAIN_Y + y, w, h); };
+    const ball = (col, x, y, r) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, PLAIN_Y + y, r, 0, Math.PI * 2); ctx.fill(); };
+    box('#14122a', 118, -134, 64, 15); drawText('EATS', 150, 107, 'gold', 'center');
+    // (the alien, big as the room is close, in a white hat, shirt and bow tie and a red apron, nodding a little)
+    const bob = (t >> 5) & 1, cx = 150;
+    ctx.save(); ctx.translate(cx, PLAIN_Y - 52 - bob); ctx.scale(2.2, 2.2); ctx.translate(-cx, -PLAIN_Y);
+    drawAlien(cx, '#5fd068', 0, 1);
+    const u = (col, a, b, w, h) => { ctx.fillStyle = col; ctx.fillRect(cx + a, PLAIN_Y + b, w, h); };
+    u('#ffffff', -5, -10, 10, 8); u('#e8282f', -3, -8, 6, 6); u('#e8282f', -2, -10, 1, 2); u('#e8282f', 1, -10, 1, 2);
+    u('#14122a', -2, -11, 4, 1); u('#14122a', -1, -12, 2, 2);
+    u('#ffffff', -6, -21, 12, 3); u('#ffffff', -5, -26, 10, 5); u('#e8282f', -6, -20, 12, 1);
+    ctx.restore();
+    // (the counter, and the case on it)
+    const L = 66, R = 232, W = R - L;
+    box('#6a3e1e', L, -22, W, 22); box('#8a5a34', L + 2, -20, W - 4, 18);
+    for (let x = L + 8; x < R - 26; x += 30) box('#6a3e1e', x, -17, 24, 12);
+    box('#c8a040', L, -24, W, 3);
+    box('#fff6e0', L + 3, -56, W - 6, 32);
+    box('#ffd9e6', L + 3, -56, W - 6, 2);
+    box('#c8ccd8', L + 3, -41, W - 6, 2);
+    // (the bakes, two shelves of them)
+    const top = -44, low = -27, at = i => L + 19 + i * 27;
+    const cupcake = (x, y) => { box('#c8742f', x - 5, y - 6, 10, 6); box('#a8541f', x - 3, y - 6, 2, 6); box('#a8541f', x + 2, y - 6, 2, 6); ball('#ff9ac0', x, y - 9, 6); ball('#e8282f', x, y - 15, 2); };
+    const donut = (x, y) => { ball('#d89a5a', x, y - 7, 7); ball('#ff9ac0', x, y - 8, 6); ball('#fff6e0', x, y - 8, 2); box('#7ae0ff', x - 4, y - 11, 2, 1); box('#ffcc3d', x + 3, y - 6, 2, 1); box('#5fd068', x + 2, y - 12, 1, 2); };
+    const cookie = (x, y) => { ball('#c8904a', x, y - 7, 7); for (const [a, b] of [[-3, -9], [2, -10], [3, -5], [-2, -4], [0, -7]]) box('#4a2a18', x + a, y + b, 2, 2); };
+    const eclair = (x, y) => { box('#e8c080', x - 9, y - 7, 18, 7); box('#4a2a18', x - 9, y - 8, 18, 4); box('#fff6e0', x - 5, y - 8, 2, 1); box('#fff6e0', x + 2, y - 7, 2, 1); };
+    const croissant = (x, y) => { for (const [a, b, r] of [[-7, -3, 3], [-4, -6, 4], [0, -7, 5], [4, -6, 4], [7, -3, 3]]) ball('#e0a050', x + a, y + b, r); for (const a of [-4, 0, 4]) box('#b87a30', x + a, y - 10, 1, 7); };
+    const slice = (x, y) => { box('#fff6e0', x - 8, y - 12, 16, 3); box('#ff9ac0', x - 8, y - 9, 16, 3); box('#fff6e0', x - 8, y - 6, 16, 2); box('#ff9ac0', x - 8, y - 4, 16, 4); ball('#e8282f', x, y - 14, 2); };
+    const pie = (x, y) => { box('#c8904a', x - 10, y - 4, 20, 4); box('#7a2a6a', x - 9, y - 7, 18, 3); for (let i = 0; i < 4; i++) box('#e0a050', x - 9 + i * 6, y - 8, 3, 2); };
+    const loaf = (x, y) => { box('#b87a30', x - 10, y - 8, 20, 8); ball('#c8904a', x - 5, y - 8, 5); ball('#c8904a', x + 5, y - 8, 5); for (const a of [-5, 0, 5]) box('#8a5a24', x + a, y - 11, 1, 5); };
+    const tart = (x, y) => { box('#c8904a', x - 8, y - 4, 16, 4); box('#ffe08a', x - 7, y - 6, 14, 2); ball('#e8282f', x - 3, y - 7, 2); ball('#e8282f', x + 3, y - 7, 2); box('#5fd068', x - 1, y - 10, 2, 2); };
+    const macaron = (x, y) => { box('#7af0a0', x - 7, y - 4, 14, 4); box('#fff6e0', x - 6, y - 6, 12, 2); box('#7af0a0', x - 7, y - 10, 14, 4); };
+    const muffin = (x, y) => { box('#e8e0d0', x - 5, y - 6, 10, 6); ball('#e0a050', x, y - 9, 7); for (const [a, b] of [[-3, -11], [2, -12], [1, -8]]) box('#3a4ea8', x + a, y + b, 2, 2); };
+    const roll = (x, y) => { ball('#c8904a', x, y - 7, 7); ball('#e8c080', x, y - 7, 5); ball('#c8904a', x + 1, y - 7, 3); ball('#fff6e0', x, y - 7, 1); };
+    [cupcake, donut, cookie, eclair, croissant, slice].forEach((f, i) => f(at(i), top));
+    [pie, loaf, tart, macaron, muffin, roll].forEach((f, i) => f(at(i), low));
+    // (the glass, with a shine going across it)
+    box('rgba(190,235,255,0.22)', L + 3, -56, W - 6, 32);
+    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    for (const x of [L + 30, L + 40, L + 118]) { ctx.beginPath(); ctx.moveTo(x, PLAIN_Y - 56); ctx.lineTo(x + 7, PLAIN_Y - 56); ctx.lineTo(x - 11, PLAIN_Y - 24); ctx.lineTo(x - 18, PLAIN_Y - 24); ctx.closePath(); ctx.fill(); }
+    box('#d8dbe4', L + 1, -58, W - 2, 2); box('#d8dbe4', L + 1, -58, 2, 34); box('#d8dbe4', R - 3, -58, 2, 34);
+  }
   // (a little arrow, bobbing, to show Up will do something here)
   function drawUpArrow(x, y) {
     y += (plain.t >> 4) & 1;
@@ -4170,7 +4213,8 @@
     ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(0, PLAIN_Y, PW, 2);
     // (the way out)
     ctx.fillStyle = '#14122a'; ctx.fillRect(ROOM_DOOR - 13, PLAIN_Y - 46, 26, 46); ctx.fillStyle = '#c8ffb0'; ctx.fillRect(ROOM_DOOR - 11, PLAIN_Y - 44, 22, 44);
-    drawAlien(Math.round(150 + Math.sin(t * 0.012) * 8), '#5fd068', (t >> 3) & 1, Math.cos(t * 0.012) < 0 ? -1 : 1);
+    if (R.scene) R.scene(t);
+    else drawAlien(Math.round(150 + Math.sin(t * 0.012) * 8), '#5fd068', (t >> 3) & 1, Math.cos(t * 0.012) < 0 ? -1 : 1);
     R.things.forEach((k, i) => {
       const b = (col, a, c, w, h) => { ctx.fillStyle = col; ctx.fillRect(k.x + a, PLAIN_Y + c, w, h); };
       const ball = (col, a, c, rad) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(k.x + a, PLAIN_Y + c, rad, 0, Math.PI * 2); ctx.fill(); };
