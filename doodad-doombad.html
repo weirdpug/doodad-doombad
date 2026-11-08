@@ -5435,6 +5435,7 @@
       if (w) {
         const low = Math.round(w / CELL_FRAME * CELL_FRAME_LOW);
         ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, PW, w); ctx.fillRect(0, PH - low, PW, low); ctx.fillRect(0, 0, w, PH); ctx.fillRect(PW - w, 0, w, PH);
+        if (w === CELL_FRAME) drawText('JAIL ENDING', PW / 2, PH - Math.round((low + 14) / 2), undefined, 'center', 2);   // (in white, on the bottom (the user asked))
       }
       return;
     }
