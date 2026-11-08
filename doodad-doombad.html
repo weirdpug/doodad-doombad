@@ -4454,14 +4454,14 @@
     if (b.over && fade > 0) { ctx.fillStyle = `rgba(0,0,0,${Math.min(1, fade / 30).toFixed(2)})`; ctx.fillRect(0, 0, PW, PH); }
   }
   // The space cop station (the user asked): a room up in space, with a big window on the planet, a cop at a desk and a
-  // jail cell. Everyone the cops bust is put in the cell for JAIL_TIME; then the bars go up, and the door out takes them
-  // back down to where they were caught.
-  const COP_STATION = 19, JAIL_TIME = 600, CELL_L = 106, CELL_R = 228;
+  // jail cell. Everyone the cops bust is locked in the cell for good: there's no letting them go and no way out (the
+  // user asked).
+  const COP_STATION = 19, CELL_L = 106, CELL_R = 228;
   ROOMS[COP_STATION] = { wall: '#2e3350', floor: '#4a4f5f', scene: drawCopStation, front: drawCopBars, things: [] };
   function enterCopStation() {
-    const g = plain, back = g.bust.x;
+    const g = plain;
     g.bust = null; g.cops = []; g.copShots = []; g.copShip = null; g.bits = [];
-    g.room = { n: -1000, kind: COP_STATION, home: COP_STATION, floor: 0, lift: null, sayT: 150, say: 'THE SPACE COP STATION', alt: 0, pilot: null, on: [], jail: JAIL_TIME, open: 0, back };
+    g.room = { n: -1000, kind: COP_STATION, home: COP_STATION, floor: 0, lift: null, sayT: 150, say: 'THE SPACE COP STATION', alt: 0, pilot: null, on: [] };
     g.pugs = g.pugs.map((p, i) => Object.assign(shopPug(p.id, 180 + i * 12, PLAIN_Y), { ground: true, upWas: true }));
     noise(0.3, 0.06, 300, 100); tone(110, 0.3, 'square', 0.05, -30);   // (the cell door clanging shut)
   }
@@ -4489,14 +4489,10 @@
     box('#55556a', 106, -14, 36, 3); box('#55556a', 107, -11, 2, 11); box('#55556a', 139, -11, 2, 11); box('#d8dbe4', 107, -18, 34, 4); box('#ffffff', 108, -21, 9, 3);
     box('#6a6e80', 194, -16, 38, 4); box('#55556a', 196, -12, 3, 12); box('#55556a', 227, -12, 3, 12);
   }
-  // (the cell's bars, in front of whoever's in it, going up into the ceiling once they can go; and the time left)
-  function drawCopBars(t) {
-    const r = plain.room, up = Math.min(1, r.open / 40) * 140;
-    ctx.save(); ctx.beginPath(); ctx.rect(0, PLAIN_Y - 138, PW, 138); ctx.clip();
-    for (let x = 99; x < 238; x += 8) { ctx.fillStyle = '#8d90a0'; ctx.fillRect(x, PLAIN_Y - 96 - up, 2, 96); ctx.fillStyle = '#c8ccd8'; ctx.fillRect(x, PLAIN_Y - 96 - up, 1, 96); }
-    ctx.fillStyle = '#55556a'; ctx.fillRect(98, PLAIN_Y - 98 - up, 142, 4); ctx.fillRect(98, PLAIN_Y - 52 - up, 142, 3);
-    ctx.restore();
-    if (r.jail > 0) drawText('IN JAIL ' + Math.ceil(r.jail / 60), PW / 2, 4, 'red', 'center');
+  // (the cell's bars, in front of whoever's in it)
+  function drawCopBars() {
+    for (let x = 99; x < 238; x += 8) { ctx.fillStyle = '#8d90a0'; ctx.fillRect(x, PLAIN_Y - 96, 2, 96); ctx.fillStyle = '#c8ccd8'; ctx.fillRect(x, PLAIN_Y - 96, 1, 96); }
+    ctx.fillStyle = '#55556a'; ctx.fillRect(98, PLAIN_Y - 98, 142, 4); ctx.fillRect(98, PLAIN_Y - 52, 142, 3);
   }
   function enterRoom(n) {
     const g = plain;
@@ -4517,10 +4513,6 @@
     if (r.drink) { stepDrink(); g.kbAtk = false; return; }
     if (r.plaque) { stepPlaque(); g.kbAtk = false; return; }
     if (r.cops) stepRoomCops();
-    if (r.kind === COP_STATION) {   // (time in jail, and then the bars go up)
-      if (r.jail > 0 && --r.jail === 0) { r.say = 'YOU CAN GO NOW'; r.sayT = 150; tone(523, 0.15, 'square', 0.04); tone(784, 0.3, 'square', 0.04, 0, 0.15); noise(0.6, 0.04, 400, 120); }
-      if (!r.jail && r.open < 40) r.open++;
-    }
     if (g.caught) { startBust(); g.kbAtk = false; return; }
     if (r.pick) { stepPick(); g.kbAtk = false; return; }
     if (r.teller) { stepTeller(); g.kbAtk = false; return; }
@@ -4542,13 +4534,13 @@
       }
       const at = roomSpot(p);
       p.upDoor = at !== null || p.upWas;   // (holding Up after a smash must not hop)
-      const caged = r.kind === COP_STATION && r.open < 30;
+      const caged = r.kind === COP_STATION;
       floorPug(p, caged ? CELL_L : 14, caged ? CELL_R : PW - 14, PLAIN_Y, 1.25, -3.4);
       if (!p.upFresh || at === null) continue;
       if (at === -2) { r.pick = { sel: 0, id: p.id, held: { left: false, right: false, up: true, down: false }, msg: 0 }; p.moving = false; sfx.tick(); break; }
       if (at < 0) {
-        // (back out of the door, in front of the building; out of the space cop station, back where they were caught)
-        const x = r.kind === COP_STATION ? r.back : buildingX(r.n);
+        // (back out of the door, in front of the building)
+        const x = buildingX(r.n);
         g.pugs = g.pugs.map((q, i) => Object.assign(shopPug(q.id, x + i * 8, PLAIN_Y), { ground: true, upWas: true }));
         const chased = r.cops && (r.copsLeft > 0 || r.cops.length > 0);
         g.cam = x - PW / 2; g.room = null; tone(420, 0.12, 'sine', 0.05, -200); g.kbAtk = false;
