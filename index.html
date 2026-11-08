@@ -4210,10 +4210,8 @@
     { wall: '#3a3a4a', floor: '#22222c', things: [
       { x: 110, say: 'ONE SHIP SPOTTED', s: [1000, 'sine', 0], draw: (b, r, on, t) => { b('#55556a', -20, -44, 40, 44); b('#0a1f14', -16, -40, 32, 30); if (on) { const a = t * 0.08, cx = ctxX(b), cy = PLAIN_Y - 25; ctx.strokeStyle = '#5fd068'; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * 14, cy + Math.sin(a) * 14); ctx.stroke(); b('#5fd068', 6, -34, 2, 2); } } },
       { x: 190, say: 'BEEP BOOP BEEP', s: [1320, 'square', -660], draw: (b, r, on, t) => { b('#55556a', -14, -34, 28, 34); r('#14122a', 0, -24, 9); r(on ? '#8d90a0' : '#3a3a4a', 0, -24, on ? 4 + ((t >> 2) & 1) * 2 : 4); if (on) b('#5fd068', -8, -32, 3, 3); } }] },
-    // (8: the police station (the coloured flats were; the user asked): Up at the desk and the cop there says something;
-    // Up at the board goes through its posters)
+    // (8: the police station (the coloured flats were; the user asked): Up at the desk and the cop there says something)
     { wall: '#c8d0e8', floor: '#3a4660', scene: drawPolice, things: [
-      { x: 88, names: ['WANTED: A PUG', 'WANTED: BANK ROBBER', 'MISSING: SATURN'], s: [330, 'square', 0], draw: (b, r, on) => drawWantedBoard(b, r, +on) },
       { x: 176, names: ['MOVE ALONG', 'HELLO CITIZEN', 'NO BARKING IN HERE', 'HAVE YOU SEEN A PUG?'], s: [523, 'square', 0], draw: b => { b('#fff6e0', -20, -27, 8, 3); b('#14122a', -19, -26, 6, 1); } }] },
     { wall: '#3fbfae', floor: '#176a5a', things: [
       { x: 110, say: 'DING DONG', s: [784, 'triangle', -30], draw: (b, r, on, t) => { const a = on ? Math.sin(t * 0.2) * 7 : 0; b('#55556a', -14, -56, 28, 3); b('#55556a', -14, -56, 3, 56); b('#55556a', 11, -56, 3, 56); r('#ffcc3d', a, -38, 11); b('#ffcc3d', -11 + a, -38, 22, 12); r('#c8a040', a * 1.3, -24, 3); } },
@@ -5135,16 +5133,6 @@
     box('#55556a', 142, -24, 68, 3); box('#1d2f8c', 144, -21, 64, 21); box('#2f4bc0', 146, -19, 60, 17);
     bb('#c8a040', 176, PLAIN_Y - 11, 4); bb('#ffcc3d', 176, PLAIN_Y - 11, 3);
     box('#22222c', 190, -38, 14, 11); box((t >> 5) & 1 ? '#5fd068' : '#7ae0ff', 191, -37, 12, 8); box('#55556a', 196, -27, 2, 3);
-  }
-  // (the station's board, with one poster pinned up big: a pug, a robber in a mask, or Saturn as it was)
-  function drawWantedBoard(b, r, i) {
-    b('#6a3e1e', -22, -76, 44, 34); b('#c8904a', -20, -74, 40, 30);
-    b('#fff6e0', -11, -72, 22, 26); b('#e8282f', -11, -72, 22, 4);
-    if (i === 0) { r('#c8904a', 0, -57, 7); r('#2a1a10', 0, -55, 3); r('#14122a', -3, -59, 1.5); r('#14122a', 3, -59, 1.5); b('#2a1a10', -8, -64, 4, 4); b('#2a1a10', 4, -64, 4, 4); }
-    else if (i === 1) { r('#5fd068', 0, -57, 7); b('#14122a', -7, -60, 14, 3); b('#ffffff', -4, -60, 2, 2); b('#ffffff', 2, -60, 2, 2); b('#c8a040', 3, -52, 6, 5); }
-    else { r('#e8c060', 0, -57, 5); ctx.strokeStyle = '#c8a040'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(b.x, PLAIN_Y - 57, 9, 3, -0.2, 0, Math.PI * 2); ctx.stroke(); }
-    for (const [a, c] of [[-17, -71], [14, -71], [-17, -50], [14, -50]]) b('#8a5a34', a, c, 4, 4);
-    r('#e8282f', 0, -73, 1.5);
   }
   function drawPlant(x) {
     const box = (col, a, y, w, h) => { ctx.fillStyle = col; ctx.fillRect(x + a, PLAIN_Y + y, w, h); };
