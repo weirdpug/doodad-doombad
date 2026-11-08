@@ -4767,6 +4767,10 @@
     if (r.report && r.report.stage === 'ask') { stepReportAsk(); g.kbAtk = false; return; }
     if (ROOMS[r.kind].window) stepSky();
     if (r.pilot) { stepPilot(); g.kbAtk = false; return; }
+    if (r.pcCops > 0 && --r.pcCops === 0) {
+      r.pc = null; closeText(); r.say = 'THE COPS ARE COMING!'; r.sayT = 150;
+      r.cops = r.cops || []; r.copShots = r.copShots || []; r.copsLeft = COP_COUNT; r.copT = BANK_COPS_IN;
+    }
     if (r.pc) { stepPc(); g.kbAtk = false; return; }
     if (r.lift) { stepLift(); g.kbAtk = false; return; }
     if (r.alt) r.alt = r.alt > 0 ? Math.max(0, r.alt - 2) : Math.min(0, r.alt + 2);   // (settling back to where it parks once it's stopped)
@@ -5818,8 +5822,9 @@
     if (!k || !d || PC_APPS[k.app] !== 'MAIL') return;
     const chat = d.chats[k.line] = d.chats[k.line] || [], name = PC_MAIL[k.line][0];
     chat.push({ me: true, text });
-    d.wait = { line: k.line, t: 0, text, ai: null, reply: null };
-    if (textAI && name !== 'GLOOP') askText(d.wait, k.line, chat);
+    const crime = lawBroken(text);
+    d.wait = { line: k.line, t: 0, text, ai: null, reply: null, crime };
+    if (textAI && name !== 'GLOOP' && !crime) askText(d.wait, k.line, chat);
     tone(1000, 0.05, 'sine', 0.04, 300);
   }
   // Really reading what you wrote (the user asked): where the game is opened on claude.ai, it asks Claude to answer as
@@ -5900,6 +5905,21 @@
     [/^DO YOU (.+)/, { ZORP: ['DO I {x}? YES! EVERY DAY AFTER LUNCH.', 'I DO! DO YOU?'], 'THE BOSS': ['I DO NOT {x}. I WORK.', 'WHAT I DO IS NONE OF YOUR BUSINESS.'],
       MOM: ['OF COURSE I {x} SWEETIE.', 'I DO. AND I WORRY ABOUT YOU.'], RADAR: ['DO I {x}? AFFIRMATIVE. BEEP.', 'NEGATIVE. I ONLY SCAN.'] }]];
   const TEXT_TURN = { I: 'YOU', ME: 'YOU', MY: 'YOUR', MINE: 'YOURS', AM: 'ARE', "I'M": "YOU'RE", IM: "YOU'RE", YOUR: 'MY', YOURS: 'MINE', YOU: 'ME', "YOU'RE": "I'M", MYSELF: 'YOURSELF' };
+  // Texting about breaking the law (the user asked): whoever you texted says they're calling the cops (Gloop just says
+  // WHY?), and a moment later the computer goes off and the cops come in at the door, like after robbing the bank.
+  const TEXT_CRIME = ['ROB', 'ROBS', 'ROBBING', 'ROBBED', 'ROBBER', 'ROBBERY', 'STEAL', 'STEALS', 'STEALING', 'STOLE', 'STOLEN', 'THIEF',
+    'THIEVES', 'CRIME', 'CRIMES', 'CRIMINAL', 'ILLEGAL', 'ILLEGALLY', 'LAWBREAKER', 'HEIST', 'BURGLAR', 'BURGLE', 'BURGLARY', 'SHOPLIFT',
+    'SHOPLIFTING', 'VANDAL', 'VANDALIZE', 'VANDALISM', 'GRAFFITI', 'HACK', 'HACKING', 'KIDNAP', 'SMUGGLE', 'SMUGGLING', 'TRESPASS',
+    'TRESPASSING', 'JAILBREAK', 'COUNTERFEIT', 'BRIBE', 'KILL', 'KILLING', 'MURDER', 'ARSON', 'BOMB', 'JAYWALK', 'JAYWALKING', 'SPEEDING',
+    'LITTER', 'LITTERING', 'POACH', 'POACHING', 'SCAM', 'FRAUD', 'LOOT', 'LOOTING', 'PICKPOCKET', 'CARJACK', 'STICKUP'];
+  const TEXT_CRIME_SAYINGS = [/BREAK(?:ING)? THE LAW/, /AGAINST THE LAW/, /BREAK(?:ING)? IN(?:TO)?\b/, /BLOW(?:ING)? UP/, /ESCAPE (?:FROM )?(?:THE )?JAIL/, /SPRAY PAINT/];
+  const lawBroken = text => { const w = text.match(/[A-Z]+/g) || []; return w.some(x => TEXT_CRIME.includes(x)) || TEXT_CRIME_SAYINGS.some(re => re.test(text)); };
+  const TEXT_SNITCH = { ZORP: ['UH OH! THAT IS AGAINST THE LAW! COPS!', "I'M TELLING THE COPS! SORRY BUDDY!", 'WHAT?! I AM CALLING THE COPS!'],
+    'THE BOSS': ['I AM CALLING THE COPS. RIGHT NOW.', 'NOT IN MY OFFICE. THE COPS ARE ON THEIR WAY.', 'THAT IS A CRIME. COPS!'],
+    MOM: ["YOUNG ALIEN! I'M CALLING THE POLICE!", 'I DID NOT RAISE A CRIMINAL! COPS!', "THAT'S IT. I'M CALLING THE COPS ON YOU."],
+    RADAR: ['CRIME DETECTED. ALERTING COPS. BEEP.', 'ILLEGAL SIGNAL FOUND. COPS ON THE WAY.', 'BEEP BEEP. COPS DISPATCHED TO YOU.'],
+    GLOOP: ['WHY?'] };
+  const TEXT_COPS_IN = 75;
   // (their reply to text, the nth thing they've said back)
   function textReply(name, text, nth) {
     if (name === 'GLOOP') return 'WHY?';
@@ -5927,9 +5947,11 @@
     const d = plain.pcData, w = d.wait;
     if (!w || ++w.t < TEXT_WAIT || w.ai === 'asking') return;
     const chat = d.chats[w.line], name = PC_MAIL[w.line][0];
-    chat.push({ me: false, text: w.reply || textReply(name, w.text, chat.length) });
+    const snitch = w.crime ? TEXT_SNITCH[name] || TEXT_SNITCH.ZORP : null;
+    chat.push({ me: false, text: snitch ? snitch[Math.floor(Math.random() * snitch.length)] : w.reply || textReply(name, w.text, chat.length) });
     d.wait = null;
     tone(1320, 0.1, 'sine', 0.05); tone(1760, 0.15, 'sine', 0.05, 0, 0.1);
+    if (snitch && plain.room) plain.room.pcCops = TEXT_COPS_IN;   // (and they've called the cops)
   }
   // (the conversation, newest at the bottom: theirs on the left in grey, yours on the right in blue)
   function drawTextChat(k, d) {
