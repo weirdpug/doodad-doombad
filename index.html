@@ -4465,6 +4465,9 @@
   // (the user asked)
   const CELL_ZOOM_AT = 180, CELL_ZOOM_T = 45, CELL_VIEW = [169, 210], CELL_ZOOM_L = 117, CELL_ZOOM_R = 221;
   const cellZoom = r => clamp((r.jailT - CELL_ZOOM_AT) / CELL_ZOOM_T, 0, 1);
+  // (6 seconds in, a thick black outline closes in round the edge of the screen (the user asked))
+  const CELL_FRAME_AT = 360, CELL_FRAME = 16;
+  const cellFrame = r => Math.round(clamp((r.jailT - CELL_FRAME_AT) / 20, 0, 1) * CELL_FRAME);
   ROOMS[COP_STATION] = { wall: '#2e3350', floor: '#4a4f5f', scene: drawCopStation, front: drawCopBars, things: [] };
   function enterCopStation() {
     const g = plain;
@@ -5429,6 +5432,8 @@
       ctx.save(); ctx.translate(PW / 2, PH / 2); ctx.scale(k, k); ctx.translate(-cx, -cy);
       drawRoom();
       ctx.restore();
+      const w = cellFrame(g.room);
+      if (w) { ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, PW, w); ctx.fillRect(0, PH - w, PW, w); ctx.fillRect(0, 0, w, PH); ctx.fillRect(PW - w, 0, w, PH); }
       return;
     }
     drawPlanetScene(cam, null);
