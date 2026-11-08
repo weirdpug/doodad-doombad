@@ -4541,6 +4541,8 @@
     if (r.alt) r.alt = r.alt > 0 ? Math.max(0, r.alt - 2) : Math.min(0, r.alt + 2);   // (settling back to where it parks once it's stopped)
     for (const p of g.pugs) {
       if (p.dead) continue;
+      // (in jail, once the black outline is round the screen, the pugs can't move at all (the user asked))
+      if (r.kind === COP_STATION && cellFrame(r)) { p.moving = false; p.vy = 0; p.y = PLAIN_Y; p.ground = true; p.upDoor = true; continue; }
       // (sitting: any way of moving gets up again, and a pug can still bark from there)
       if (p.sitting) {
         p.upDoor = true;
