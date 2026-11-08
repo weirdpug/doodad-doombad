@@ -9315,7 +9315,7 @@
   // (zooming in or out redoes The Arcade's screen: its title, and Play shown or gone)
   function zoomTo(p) { arcadeZoom = { target: p, p: 0, out: false, ship: null, shop: p.shop ? { p: 0 } : null };
     if (p.shop) { spaceGloop = null; titleGloop = null; gloopOnMenu = false; gloopBruno = false; gloopBrunoNext = false; stopGlitch(); }   // (back in his shop; Bruno back in his job, and no more glitching)
-    if (p.shop) Object.assign(shop, { sad: false, tearT: 0, hitT: 0, whyT: 0, ammo: [], mess: [], bits: [], stains: [], lamp: 'up', lampY: 0, lampV: 0, ko: false, koT: 0, window: 'whole', suck: null, gone: false, wind: [], listOpen: false, potionView: null, potionSpot: 0, potionBy: 0, drank: '', drankSays: '', potionT: 0, bubbles: false }); washGloop();   // (Gloop happy and clean again)
+    if (p.shop) Object.assign(shop, { sad: false, tearT: 0, hitT: 0, whyT: 0, ammo: [], mess: [], bits: [], stains: [], cash: [], tillT: 0, lamp: 'up', lampY: 0, lampV: 0, ko: false, koT: 0, window: 'whole', suck: null, gone: false, wind: [], listOpen: false, potionView: null, potionSpot: 0, potionBy: 0, drank: '', drankSays: '', potionT: 0, bubbles: false }); washGloop();   // (Gloop happy and clean again)
     showPause('arcade', 0); sfx.tick(); }
   function closeShopPaper() { if (shop.potionView === 'drank') shop.potionT = 40; shop.listOpen = false; shop.potionView = null; sfx.tick(); }
   function zoomOut() { if (!arcadeZoom.target || arcadeZoom.out) return; if (arcadeZoom.shop) { washGloop(); shop.bubbles = false; } arcadeZoom.out = true; arcadeZoom.ship = arcadeZoom.deep = null; showPause('arcade', 0); sfx.tick(); }
@@ -10084,7 +10084,7 @@
   // the air, each { t, at } (at: the spot it was thrown at, or null for Gloop); mess: the bits stuck to his face,
   // [x, y, colour] from his top left; bits: bits flying off; stains: splats left on the shop, [x, y, colour])
   // (whyT: frames left of his WHY?)
-  let gloopPics = null, shopBg = null, shop = { sad: false, tearT: 0, hitT: 0, whyT: 0, ammo: [], mess: [], bits: [], stains: [], lamp: 'up', lampY: 0, lampV: 0, lampX: 120, ko: false, koT: 0,
+  let gloopPics = null, shopBg = null, shop = { sad: false, tearT: 0, hitT: 0, whyT: 0, ammo: [], mess: [], bits: [], stains: [], cash: [], tillT: 0, lamp: 'up', lampY: 0, lampV: 0, lampX: 120, ko: false, koT: 0,
     window: 'whole', suck: null, gone: false, wind: [], listOpen: false, potionView: null, potionSpot: 0, potionBy: 0, drank: '', drankSays: '', potionT: 0, bubbles: false };
   // (window: 'whole' or 'broken'; suck: Gloop being sucked out, { t, from }; gone: he has been; wind: streaks of air)
   // (lamp: 'up' on its cord, 'fall' (lampY: how far it has dropped, lampV: how fast; lampX: where it snapped), 'down'
@@ -10314,7 +10314,22 @@
     }
     // (the card says what's for sale, and the till shows nothing rung up)
     drawText('POTION', 191, 169, 'black', 'center'); drawText(POTION_PRICE + ' COIN', 191, 179, 'red', 'center');
-    drawText('000', 47, 152, 'green', 'center');
+    drawText(shop.tillT > 0 ? '999' : '000', 47, 152, 'green', 'center');
+    if (shop.tillT > 0) {
+      shop.tillT--;
+      ctx.fillStyle = '#6a4a10'; ctx.fillRect(22, 184, 50, 9); ctx.fillStyle = '#8a6a20'; ctx.fillRect(23, 185, 48, 7);
+      ctx.fillStyle = '#5fd068'; for (const bx of [26, 38, 50]) ctx.fillRect(bx, 186, 9, 3);
+      ctx.fillStyle = '#ffcc3d'; for (const bx of [61, 65]) ctx.fillRect(bx, 186, 3, 3);
+    }
+    for (const c of shop.cash) {
+      if (!c.rest) {
+        if (c.bill) { c.vy = Math.min(c.vy + 0.12, 1.2); c.x += c.vx * 0.6 + Math.sin((t + c.sway * 10) / 6) * 0.5; } else { c.vy += 0.25; c.x += c.vx; }
+        c.y += c.vy;
+        if (c.vy > 0 && c.y >= 187) { c.y = c.bill ? 188 : 187; c.rest = true; if (!c.bill) tone(2600 + Math.random() * 800, 0.03, 'triangle', 0.012); }
+      }
+      if (c.bill) { ctx.fillStyle = '#2f9f4a'; ctx.fillRect(Math.round(c.x) - 3, Math.round(c.y), 6, 3); ctx.fillStyle = '#7af0a0'; ctx.fillRect(Math.round(c.x) - 1, Math.round(c.y) + 1, 2, 1); }
+      else { ctx.fillStyle = '#c8a040'; ctx.fillRect(Math.round(c.x) - 1, Math.round(c.y), 3, 3); ctx.fillStyle = '#fff6c8'; ctx.fillRect(Math.round(c.x) - 1, Math.round(c.y), 1, 1); }
+    }
     // the thrown burritos: up from the bottom of the screen in an arc, spinning and getting smaller as they go, to
     // the spot each was thrown at (or Gloop's face), where it splats
     for (const a2 of shop.ammo) {
@@ -10338,6 +10353,16 @@
         continue;
       }
       if (onPort) { noise(0.3, 0.06, 900, 200); continue; }   // (into the broken window: sucked out after him)
+      if (a2.at && fx >= TILL_L && fx <= TILL_R + 4 && fy >= 147 && fy <= 191) {
+        // (on the till: ka-ching! its drawer flies open and money spills out over the counter, and stays there; it isn't
+        // yours, so nobody collects it (the user asked))
+        shop.tillT = 45;
+        for (let i = 0; i < 14; i++) shop.cash.push({ x: 47 + (Math.random() - 0.5) * 30, y: 184, vx: (Math.random() - 0.5) * 4, vy: -2 - Math.random() * 3, bill: Math.random() < 0.4, rest: false, sway: Math.random() * 6 });
+        if (shop.cash.length > 220) shop.cash.splice(0, shop.cash.length - 220);
+        tone(1568, 0.08, 'square', 0.04); tone(2093, 0.3, 'square', 0.04, 0, 0.08);   // (ka-ching)
+        for (let i = 0; i < 5; i++) tone(2400 + Math.random() * 1200, 0.05, 'triangle', 0.025, -300, 0.15 + i * 0.06);   // (coins clinking out)
+        continue;
+      }
       if (a2.at && shop.lamp === 'up' && Math.abs(fx - lx) <= 10 && fy >= 62 && fy <= 80) {
         // (on the lamp: its cord snaps and down it comes)
         shop.lamp = 'fall'; shop.lampX = lx; shop.lampY = 0; shop.lampV = 0;
