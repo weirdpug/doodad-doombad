@@ -4125,6 +4125,7 @@
         round('#c8a040', 0, -32, 4); round('#ffcc3d', 0, -32, 3); box('#c8a040', 0, -33, 1, 2);
         box('#14122a', -9, -25, 18, 22); box('#7ae0ff', -8, -24, 7, 21); box('#7ae0ff', 1, -24, 7, 21); box('#bfeaff', -8, -24, 2, 21); box('#bfeaff', 1, -24, 2, 21);
         box('#ffcc3d', -3, -14, 1, 3); box('#ffcc3d', 2, -14, 1, 3);
+        drawWordBoard(x);
         break;
       case 9:   // (a tall shell of rings)
         for (let i = 0; i < 7; i++) box(i % 2 ? '#6ae0c8' : '#3fbfae', -32 + i * 4, -(i + 1) * 12, 64 - i * 8, 12);
@@ -5221,25 +5222,73 @@
     astronaut: '#eef0f6', spaceman: '#eef0f6', vampire: '#2a2a36', dracula: '#2a2a36', cowboy: '#8a5a34', cowgirl: '#8a5a34',
     sheriff: '#8a5a34', knight: '#a8acbc', chef: '#eef0f6', cook: '#eef0f6', baker: '#eef0f6', angel: '#eef0f6', devil: '#e8282f',
     demon: '#e8282f', superhero: '#4f8aff', hero: '#4f8aff', fairy: '#ff9ac0' };
+  // (how big and how wide, and the rest of what it looks like or has: each one, and the words for it)
+  const PERP_BIG = ['big', 'huge', 'giant', 'tall', 'large', 'massive', 'enormous'], PERP_SMALL = ['small', 'tiny', 'little', 'short', 'mini', 'baby', 'smol'];
+  const PERP_FAT = ['fat', 'chubby', 'chunky', 'round', 'plump'], PERP_THIN = ['skinny', 'thin', 'slim'];
+  const PERP_FLAGS = { invisible: ['invisible', 'transparent'], flip: ['upside', 'upsidedown'],
+    crown: ['king', 'queen', 'crown', 'prince', 'princess', 'royal'], wizardHat: ['wizard', 'witch', 'magic'], pirateHat: ['pirate'],
+    cowboyHat: ['cowboy', 'cowgirl', 'sheriff'], chefHat: ['chef', 'cook', 'baker'], partyHat: ['party', 'birthday'], beanie: ['beanie'],
+    knightHelm: ['knight', 'armor', 'armour'], spaceHelm: ['astronaut', 'spaceman', 'helmet'], hat: ['hat', 'tophat', 'fancy'],
+    glasses: ['glasses', 'sunglasses', 'shades', 'nerd', 'nerdy', 'cool'], mask: ['robber', 'thief', 'mask', 'bandit', 'burglar', 'crook'],
+    ninja: ['ninja'], stache: ['mustache', 'moustache', 'beard', 'wizard', 'old'], angry: ['angry', 'mad', 'evil', 'mean', 'bad', 'grumpy'],
+    eyepatch: ['eyepatch', 'patch', 'pirate'], bowtie: ['bowtie', 'bow', 'fancy'], tie: ['tie', 'necktie', 'boss', 'business'],
+    scarf: ['scarf', 'cold', 'winter'], cape: ['cape', 'superhero', 'hero', 'vampire', 'dracula'], horns: ['horn', 'devil', 'demon'],
+    halo: ['halo', 'angel'], wings: ['wing', 'angel', 'fairy'], headphones: ['headphones', 'music', 'dj'], sword: ['sword', 'knight', 'warrior'],
+    money: ['money', 'cash', 'rich', 'loot'], tears: ['crying', 'sad', 'cry'], smile: ['happy', 'smiling', 'smile', 'nice', 'friendly'],
+    sleepy: ['sleepy', 'tired', 'sleeping', 'lazy'], sparkle: ['sparkly', 'shiny', 'glowing', 'magic', 'fairy'],
+    stink: ['stinky', 'smelly', 'stink', 'gross'], clown: ['clown', 'joker'], fangs: ['vampire', 'dracula', 'fang'] };
   function describePerp(text) {
     const w = text.toLowerCase().match(/[a-z]+/g) || [], f = (...k) => k.some(x => w.includes(x) || w.includes(x + 's'));
     const found = PERP_KINDS.find(([, ...words]) => f(...words)), outfit = Object.keys(PERP_OUTFITS).find(k => f(k));
     const kind = found ? found[0] : outfit ? 'human' : 'alien', named = w.find(x => PERP_COLS[x]);
-    return { kind, col: named ? PERP_COLS[named] : outfit && kind === 'human' ? PERP_OUTFITS[outfit] : null,
-      size: f('big', 'huge', 'giant', 'tall', 'large', 'massive', 'enormous') ? 1.5 : f('small', 'tiny', 'little', 'short', 'mini', 'baby', 'smol') ? 0.7 : 1,
-      wide: f('fat', 'chubby', 'chunky', 'round', 'plump') ? 1.3 : f('skinny', 'thin', 'slim') ? 0.75 : 1,
-      invisible: f('invisible', 'transparent'), flip: f('upside', 'upsidedown'),
-      crown: f('king', 'queen', 'crown', 'prince', 'princess', 'royal'), wizardHat: f('wizard', 'witch', 'magic'), pirateHat: f('pirate'),
-      cowboyHat: f('cowboy', 'cowgirl', 'sheriff'), chefHat: f('chef', 'cook', 'baker'), partyHat: f('party', 'birthday'), beanie: f('beanie'),
-      knightHelm: f('knight', 'armor', 'armour'), spaceHelm: f('astronaut', 'spaceman', 'helmet'), hat: f('hat', 'tophat', 'fancy'),
-      glasses: f('glasses', 'sunglasses', 'shades', 'nerd', 'nerdy', 'cool'), mask: f('robber', 'thief', 'mask', 'bandit', 'burglar', 'crook'),
-      ninja: f('ninja'), stache: f('mustache', 'moustache', 'beard', 'wizard', 'old'), angry: f('angry', 'mad', 'evil', 'mean', 'bad', 'grumpy'),
-      eyepatch: f('eyepatch', 'patch', 'pirate'), bowtie: f('bowtie', 'bow', 'fancy'), tie: f('tie', 'necktie', 'boss', 'business'),
-      scarf: f('scarf', 'cold', 'winter'), cape: f('cape', 'superhero', 'hero', 'vampire', 'dracula'), horns: f('horn', 'devil', 'demon'),
-      halo: f('halo', 'angel'), wings: f('wing', 'angel', 'fairy'), headphones: f('headphones', 'music', 'dj'), sword: f('sword', 'knight', 'warrior'),
-      money: f('money', 'cash', 'rich', 'loot'), tears: f('crying', 'sad', 'cry'), smile: f('happy', 'smiling', 'smile', 'nice', 'friendly'),
-      sleepy: f('sleepy', 'tired', 'sleeping', 'lazy'), sparkle: f('sparkly', 'shiny', 'glowing', 'magic', 'fairy'),
-      stink: f('stinky', 'smelly', 'stink', 'gross'), clown: f('clown', 'joker'), fangs: f('vampire', 'dracula', 'fang') };
+    const d = { kind, col: named ? PERP_COLS[named] : outfit && kind === 'human' ? PERP_OUTFITS[outfit] : null,
+      size: f(...PERP_BIG) ? 1.5 : f(...PERP_SMALL) ? 0.7 : 1, wide: f(...PERP_FAT) ? 1.3 : f(...PERP_THIN) ? 0.75 : 1 };
+    for (const [k, words] of Object.entries(PERP_FLAGS)) d[k] = f(...words);
+    return d;
+  }
+  // (every word a report understands, by what kind of word it is, for the board over the police station: each list
+  // without the words an earlier one already has)
+  function perpWordGroups() {
+    const seen = new Set(), only = list => list.filter(x => !seen.has(x) && seen.add(x));
+    return [['WHO', only(PERP_KINDS.flatMap(([, ...words]) => words))], ['DRESSED AS', only(Object.keys(PERP_OUTFITS))],
+      ['COLOURS', only(Object.keys(PERP_COLS))], ['SIZES', only([...PERP_BIG, ...PERP_SMALL, ...PERP_FAT, ...PERP_THIN])],
+      ['LOOKS AND THINGS', only(Object.values(PERP_FLAGS).flat())]];
+  }
+  // (the board's lines: each heading, then its words as many to a line as fit; made once)
+  const WORD_BOARD_CHARS = 32;
+  let wordBoardLines = null;
+  function wordBoard() {
+    if (wordBoardLines) return wordBoardLines;
+    wordBoardLines = [];
+    for (const [title, words] of perpWordGroups()) {
+      wordBoardLines.push([title, 'gold']);
+      let line = '';
+      for (const word of words) {
+        if (line && line.length + 1 + word.length > WORD_BOARD_CHARS) { wordBoardLines.push([line, undefined]); line = ''; }
+        line += (line ? ' ' : '') + word.toUpperCase();
+      }
+      if (line) wordBoardLines.push([line, undefined]);
+      wordBoardLines.push(['', undefined]);
+    }
+    return wordBoardLines;
+  }
+  // A big board on two poles over the police station, with every word a report understands going slowly up it (the
+  // user asked)
+  const WORD_BOARD_W = 200, WORD_BOARD_TOP = -214, WORD_BOARD_BOT = -84, WORD_LINE = 9;
+  function drawWordBoard(x) {
+    const box = (col, a, b, w, h) => { ctx.fillStyle = col; ctx.fillRect(x + a, PLAIN_Y + b, w, h); }, L = -WORD_BOARD_W / 2;
+    box('#55556a', -40, WORD_BOARD_BOT, 3, -60 - WORD_BOARD_BOT); box('#55556a', 37, WORD_BOARD_BOT, 3, -60 - WORD_BOARD_BOT);
+    box('#8d90a0', L - 2, WORD_BOARD_TOP - 2, WORD_BOARD_W + 4, WORD_BOARD_BOT - WORD_BOARD_TOP + 4);
+    box('#14122a', L, WORD_BOARD_TOP, WORD_BOARD_W, WORD_BOARD_BOT - WORD_BOARD_TOP);
+    box('#1d2f8c', L, WORD_BOARD_TOP, WORD_BOARD_W, 12); drawText('REPORT WORDS', x, PLAIN_Y + WORD_BOARD_TOP + 3, 'gold', 'center');
+    const lines = wordBoard(), all = lines.length * WORD_LINE, top = WORD_BOARD_TOP + 14, h = WORD_BOARD_BOT - top - 2;
+    const off = (plain.t * 0.35) % all;
+    ctx.save(); ctx.beginPath(); ctx.rect(x + L, PLAIN_Y + top, WORD_BOARD_W, h); ctx.clip();
+    for (let k = 0; k < 2; k++) lines.forEach(([text, key], i) => {
+      const y = top + 2 + i * WORD_LINE + k * all - off;
+      if (text && y > top - WORD_LINE && y < top + h) drawText(text, x + L + 4, PLAIN_Y + y, key);
+    });
+    ctx.restore();
   }
   // (the two cops walking in with whoever they've caught between them, handcuffed to them)
   function drawPerpGroup(g) {
