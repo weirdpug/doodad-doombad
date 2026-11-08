@@ -3965,7 +3965,7 @@
   function enterPlanet() {
     const g = plain, ids = g.fin.ids;
     g.fin = null; g.stroll = false; g.drop = null; g.space = null; g.isle = false; g.crumble = null; g.hole = null; g.warp = null; g.boss = null; g.nuke = null;
-    g.obs = []; g.drops = []; g.rovers = []; g.martians = []; g.cops = []; g.copShip = null; g.copShots = []; g.alienPop = {}; g.wrecked = {}; g.robbed = {}; g.bust = null; g.caught = false; g.sky = { bolts: [], copBolts: [], booms: [], heat: {}, flash: {}, cop: null, hp: SHIP_HP, hitT: 0, fireT: 0, dead: 0 }; g.ships = []; g.bits = []; g.endT = 0; g.cam = -PW / 2; g.planet = true; g.room = null; g.roomOn = {}; g.statues = []; g.shipAt = {};
+    g.obs = []; g.drops = []; g.rovers = []; g.martians = []; g.cops = []; g.copShip = null; g.copShots = []; g.alienPop = {}; g.wrecked = {}; g.robbed = {}; g.bust = null; g.caught = false; g.talk = null; g.talkCount = {}; g.sky = { bolts: [], copBolts: [], booms: [], heat: {}, flash: {}, cop: null, hp: SHIP_HP, hitT: 0, fireT: 0, dead: 0 }; g.ships = []; g.bits = []; g.endT = 0; g.cam = -PW / 2; g.planet = true; g.room = null; g.roomOn = {}; g.statues = []; g.shipAt = {};
     g.pcData = { paint: {}, blob: 0, bars: [3, 5, 2, 6, 4, 7, 3, 5], notes: [false, false, false, false] };
     g.pugs = ids.map((id, i) => shopPug(id, i * 16 - 8, -20));
     tone(600, 0.4, 'sine', 0.06, 300);
@@ -3981,11 +3981,12 @@
     for (const p of g.pugs) {
       if (p.dead) continue;
       // (Up in front of a building goes in, instead of jumping)
-      const door = p.ground ? planetDoor(p.x) : null, barked = p.barkT;
-      p.upDoor = door !== null;
+      const door = p.ground ? planetDoor(p.x) : null, barked = p.barkT, chat = door === null && p.ground ? alienNear(p.x) : null;
+      p.upDoor = door !== null || chat !== null;   // (Up talks to an alien next to you, instead of jumping)
       floorPug(p, g.cam + 8, g.cam + PW - 8, PLAIN_Y, 1.25, -3.4);
       if (p.barkT > barked) barkCity(p);
       if (door !== null && p.upFresh) { enterRoom(door); g.kbAtk = false; return; }
+      if (chat !== null && p.upFresh) alienTalk(chat);
     }
     g.kbAtk = false;
     const alive = g.pugs.filter(p => !p.dead);
@@ -3996,6 +3997,129 @@
     stepCity(alive);
     if (g.caught) startBust();
     if (!g.endT && g.pugs.length && g.pugs.every(p => p.dead)) g.endT = 150;
+  }
+  // What the city's aliens say (the user asked): Up next to one that's walking about and it says something in a speech
+  // bubble. Each alien is a joker, a know-it-all with facts, or a chatterbox, and every time you talk to it it makes up
+  // a new line out of words picked by a random number from which alien it is and how many times you've asked, so there
+  // is no end to them and no two aliens say the same.
+  const TALK_THINGS = ['SPACE COW', 'BLOB', 'ROBOT', 'MOON ROCK', 'TOASTER', 'SAUCER', 'METEOR', 'SPACE PICKLE', 'TEAPOT', 'RUBBER DUCK',
+    'COMET', 'PIZZA', 'SOCK', 'TACO', 'BANANA', 'JELLYFISH', 'ROCKET', 'CUPCAKE', 'LAMP', 'CACTUS', 'PENGUIN', 'DONUT', 'SNOWMAN',
+    'BURRITO', 'GOLDFISH', 'PILLOW', 'TRUMPET', 'POTATO', 'UNICORN', 'HAMSTER', 'WAFFLE', 'BACKPACK', 'TURTLE', 'BALLOON', 'SANDWICH'];
+  const TALK_PLACES = ['ROAD', 'GALAXY', 'MOON', 'CRATER', 'SLIME RIVER', 'BLACK HOLE', 'PARKING LOT', 'VOLCANO', 'BACKYARD',
+    'FRIDGE', 'MILKY WAY', 'BATHTUB', 'SPACE MALL', 'JUNGLE', 'ROOF', 'BOUNCY CASTLE', 'SWIMMING POOL', 'LIBRARY'];
+  const TALK_ADJS = ['SQUISHY', 'SPARKLY', 'GRUMPY', 'TINY', 'GIANT', 'STICKY', 'FUZZY', 'SHINY', 'SLEEPY', 'CRUNCHY', 'WOBBLY',
+    'INVISIBLE', 'PURPLE', 'SPICY', 'FANCY', 'SNEAKY', 'BOUNCY', 'LOUD', 'SMELLY', 'HAPPY', 'GOOEY', 'FROZEN', 'BACKWARDS', 'POLITE',
+    'SILLY', 'TICKLISH', 'GLOWING', 'DIZZY', 'SPOOKY', 'FLUFFY'];
+  const TALK_VERBS = [['DANCE', 'DANCING', 'DANCED', 'DANCES'], ['SING', 'SINGING', 'SANG', 'SINGS'], ['JUMP', 'JUMPING', 'JUMPED', 'JUMPS'],
+    ['FLY', 'FLYING', 'FLEW', 'FLIES'], ['SNEEZE', 'SNEEZING', 'SNEEZED', 'SNEEZES'], ['BURP', 'BURPING', 'BURPED', 'BURPS'],
+    ['JUGGLE', 'JUGGLING', 'JUGGLED', 'JUGGLES'], ['SKATE', 'SKATING', 'SKATED', 'SKATES'], ['SWIM', 'SWIMMING', 'SWAM', 'SWIMS'],
+    ['WIGGLE', 'WIGGLING', 'WIGGLED', 'WIGGLES'], ['HONK', 'HONKING', 'HONKED', 'HONKS'], ['NAP', 'NAPPING', 'NAPPED', 'NAPS'],
+    ['GIGGLE', 'GIGGLING', 'GIGGLED', 'GIGGLES'], ['TELEPORT', 'TELEPORTING', 'TELEPORTED', 'TELEPORTS'], ['SPIN', 'SPINNING', 'SPUN', 'SPINS'],
+    ['BOUNCE', 'BOUNCING', 'BOUNCED', 'BOUNCES'], ['WHISTLE', 'WHISTLING', 'WHISTLED', 'WHISTLES'], ['BAKE', 'BAKING', 'BAKED', 'BAKES'],
+    ['KNIT', 'KNITTING', 'KNITTED', 'KNITS'], ['MOONWALK', 'MOONWALKING', 'MOONWALKED', 'MOONWALKS'], ['YODEL', 'YODELING', 'YODELED', 'YODELS'],
+    ['HICCUP', 'HICCUPING', 'HICCUPED', 'HICCUPS'], ['SURF', 'SURFING', 'SURFED', 'SURFS'], ['SNORE', 'SNORING', 'SNORED', 'SNORES']];
+  const TALK_PARTS = ['TENTACLES', 'EYES', 'ANTENNAS', 'TOES', 'ELBOWS', 'EARS', 'NOSES', 'KNEES', 'TEETH', 'THUMBS', 'TAILS', 'ARMS'];
+  const TALK_FOODS = ['SLIME PIE', 'MOON CHEESE', 'SPACE NOODLES', 'STAR SOUP', 'COMET COOKIES', 'PLASMA PUDDING', 'GALAXY GUMMIES',
+    'METEOR MUFFINS', 'ROCKET FRIES', 'CRATER CAKE', 'ICE CREAM', 'PICKLES', 'SPAGHETTI', 'PANCAKES', 'NACHOS', 'JELLY BEANS'];
+  const TALK_STUFF = ['CHEESE', 'JELLY', 'GLITTER', 'PUDDING', 'MARSHMALLOWS', 'SOUP', 'BUBBLES', 'SPAGHETTI', 'SOCKS', 'POPCORN',
+    'TOOTHPASTE', 'SLIME', 'SPRINKLES', 'GRAVY', 'CONFETTI', 'LEMONADE'];
+  const TALK_TIMES = ['SECONDS', 'MINUTES', 'HOURS', 'DAYS', 'WEEKS', 'YEARS'];
+  const TALK_DAYS = ['MONDAY', 'TUESDAY', 'BLORPDAY', 'ZORPDAY', 'SLIMEDAY', 'FUNDAY', 'MOONDAY', 'WEDNESDAY'];
+  const TALK_HI = ['HELLO', 'HI', 'GREETINGS', 'HOWDY', 'BLEEP BLOOP', 'ZORP ZORP', 'HEY THERE', 'WELCOME', 'OH HI'];
+  const TALK_SYL = ['ZOR', 'BLIX', 'GLO', 'QUI', 'ZAP', 'MOO', 'FLIB', 'NUB', 'KRA', 'PLOO', 'ZEE', 'VORB', 'SKIB', 'GRUB', 'WOB', 'TIK', 'YUM', 'BLEE', 'SNOR', 'FUZ'];
+  const TALK_END = ['P', 'X', 'B', 'NK', 'ZZ', 'LO', 'BY', 'TRON', 'GO', 'DLE', 'MO', 'RK'];
+  const talkRandom = seed => { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
+  const TALK_JOKES = [
+    w => `WHY DID THE ${w.adj} ${w.t} CROSS THE ${w.p}? TO GET TO THE OTHER ${w.t2}!`,
+    w => `WHY CAN'T ${w.a(w.adj)} ${w.t} ${w.v[0]}? IT HAS NO ${w.bp}!`,
+    w => `KNOCK KNOCK. WHO'S THERE? ${w.name}. ${w.name} WHO? ${w.name} WANTS ${w.adj} ${w.food}!`,
+    w => `I TOLD ${w.a(w.t)} A JOKE. IT LAUGHED SO HARD IT ${w.v[2]} ${w.n(2, 99)} TIMES!`,
+    w => `WHAT IS ${w.a(w.adj)} ${w.t}'S FAVORITE FOOD? ${w.adj2} ${w.food}!`,
+    w => `WHAT DOES ${w.a(w.t)} DO ON ${w.day}? IT ${w.v[3]} ON THE ${w.p}!`,
+    w => `WHAT DO YOU CALL ${w.a(w.adj)} ${w.t} IN SPACE? ${w.name} THE ASTRO ${w.t}!`,
+    w => `WHY WAS THE ${w.t} SO ${w.adj}? IT ATE ${w.n(2, 99)} BOWLS OF ${w.food}!`,
+    w => `HOW DOES ${w.a(w.adj)} ${w.t} SAY HELLO? IT ${w.v[3]} ${w.n(2, 99)} TIMES!`,
+    w => `WHY DID THE ${w.adj} ${w.t} GO TO SCHOOL? TO LEARN HOW TO ${w.v[0]} WITH ${w.a(w.t2)}!`,
+    w => `WHAT IS ${w.adj} AND ${w.adj2} AND ${w.v[3]}? ${w.a(w.t)}!`,
+    w => `I TRIED TO CATCH ${w.a(w.t)} ${w.n(2, 99)} TIMES AT THE ${w.p}. IT WAS TOO ${w.adj}!`,
+    w => `WHAT DID THE ${w.t} SAY TO THE ${w.t2}? NICE ${w.adj} ${w.bp}!`,
+    w => `WHAT DO YOU GET IF YOU MIX ${w.a(w.t)} AND ${w.a(w.t2)}? ${w.n(2, 999)} POUNDS OF ${w.adj} MESS!`];
+  const TALK_FACTS = [
+    w => `FACT: ${w.a(w.t)} CAN ${w.v[0]} FOR ${w.n(2, 99)} ${w.time} STRAIGHT.`,
+    w => `FACT: OUR ${w.n(2, 9)} MOONS ARE MADE OF ${w.adj} ${w.stuff} AND ${w.adj2} ${w.stuff2}.`,
+    w => { const m = w.n(3, 20); return `FACT: ${w.n(1, m - 1)} OUT OF ${m} ALIENS LOVE ${w.adj} ${w.food}.`; },
+    w => `FACT: ALIENS HAVE ${w.n(3, 40)} ${w.bp}. I HAVE ${w.n(2, 9)} ${w.adj} ONES.`,
+    w => `FACT: IT RAINS ${w.adj} ${w.stuff} HERE EVERY ${w.day} AT ${w.n(1, 12)} O'CLOCK.`,
+    w => `DID YOU KNOW? THE ${w.p} IS ${w.n(2, 999)} MILES FROM HERE BY ${w.t}.`,
+    w => `FACT: A ${w.day} ON THIS PLANET LASTS ${w.n(3, 90)} HOURS AND ${w.n(1, 59)} MINUTES.`,
+    w => `FACT: THE BIGGEST ${w.t} EVER WAS ${w.n(10, 900)} FEET TALL.`,
+    w => `FACT: NO ${w.t} HAS EVER BEATEN ${w.a(w.t2)} IN A ${w.v[1]} RACE.`,
+    w => `DID YOU KNOW? BABY ALIENS CAN ${w.v[0]} ${w.n(2, 99)} TIMES BEFORE THEY ARE ${w.n(2, 30)} DAYS OLD.`,
+    w => `FACT: ${w.food} WAS INVENTED BY ${w.a(w.adj)} ${w.t} NAMED ${w.name}.`,
+    w => `FACT: OUR SKY TURNS ${w.adj} EVERY ${w.n(2, 12)} ${w.time} AND SMELLS LIKE ${w.food}.`,
+    w => `FACT: SATURN USED TO BE ${w.n(2, 999)} JUMPS THAT WAY. ${w.name} SAW IT GO BOOM.`,
+    w => `DID YOU KNOW? ${w.a(w.t)} WEIGHS AS MUCH AS ${w.n(2, 500)} ${w.food}.`];
+  const TALK_CHAT = [
+    w => `${w.hi} PUG! I AM ${w.name}.`,
+    w => `MY NAME IS ${w.name} AND I LOVE ${w.food}.`,
+    w => `I THINK THE ${w.t} AT THE ${w.p} IS VERY ${w.adj}.`,
+    w => `ONE DAY I WILL ${w.v[0]} ON ${w.a(w.adj)} ${w.t}.`,
+    w => `HAVE YOU SEEN MY ${w.t} NAMED ${w.name}? IT IS ${w.adj}.`,
+    w => `ALL ${w.n(2, 40)} OF MY ${w.bp} ARE ${w.adj} TODAY.`,
+    w => `I AM ${w.n(2, 999)} YEARS OLD AND MY ${w.t} IS ${w.n(2, 99)}.`,
+    w => `SHH! I AM HIDING FROM ${w.a(w.adj)} ${w.t} IN THE ${w.p}.`,
+    w => `WEATHER FOR ${w.day}: ${w.adj} WITH A CHANCE OF ${w.stuff} AND ${w.stuff2}.`,
+    w => `I JUST ATE ${w.n(2, 99)} BOWLS OF ${w.adj} ${w.food}.`,
+    w => `CAN YOU ${w.v[0]}? I CAN ${w.v2[0]} ON ${w.a(w.t)}!`,
+    w => `YOU ARE A VERY ${w.adj} PUG. I AM ${w.name} THE ${w.adj2}.`,
+    w => `I LOST MY ${w.adj} ${w.t} IN THE ${w.p}.`,
+    w => `MY GRANDMA IS ${w.a(w.adj)} ${w.t} NAMED ${w.name}.`,
+    w => `I AM LATE FOR ${w.v[1]} CLASS WITH ${w.name}!`,
+    w => `DO NOT TELL ANYONE BUT I AM ${w.a(w.adj)} ${w.t} FROM THE ${w.p}.`,
+    w => `${w.hi}! WANT TO GO ${w.v[1]} AT THE ${w.p} WITH ${w.name}?`];
+  function talkLine(n, k) {
+    const r = talkRandom(Math.imul(n | 0, 7919) ^ Math.imul(k + 1, 104729) ^ 0x5bd1e995), pick = l => l[Math.floor(r() * l.length)];
+    const two = l => { const i = Math.floor(r() * l.length), j = (i + 1 + Math.floor(r() * (l.length - 1))) % l.length; return [l[i], l[j]]; };
+    const [t, t2] = two(TALK_THINGS), [adj, adj2] = two(TALK_ADJS), [v, v2] = two(TALK_VERBS), stuff = two(TALK_STUFF);
+    const w = { t, t2, adj, adj2, v, v2, p: pick(TALK_PLACES), bp: pick(TALK_PARTS), food: pick(TALK_FOODS), stuff: stuff[0], stuff2: stuff[1],
+      time: pick(TALK_TIMES), day: pick(TALK_DAYS), hi: pick(TALK_HI), name: pick(TALK_SYL) + (r() < 0.5 ? pick(TALK_SYL) : '') + pick(TALK_END),
+      a: x => (/^[AEIO]/.test(x) ? 'AN ' : 'A ') + x, n: (lo, hi) => lo + Math.floor(r() * (hi - lo + 1)) };
+    const kind = Math.floor(planetHash(n + 0.77) * 3);
+    return pick([TALK_JOKES, TALK_FACTS, TALK_CHAT][kind])(w);
+  }
+  // (as lines that fit a speech bubble)
+  function talkLines(text, max = 22) {
+    const lines = [];
+    let line = '';
+    for (const word of text.split(' ')) {
+      if (line && line.length + 1 + word.length > max) { lines.push(line); line = ''; }
+      line += (line ? ' ' : '') + word;
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+  // (the walking alien within reach of x, if there is one: by its number)
+  function alienNear(x) {
+    const g = plain, n0 = Math.round(x / 58);
+    for (let n = n0 - 2; n <= n0 + 2; n++) if (!g.alienPop[n] && Math.abs(cityAlien(n, g.t).x - x) < 12) return n;
+    return null;
+  }
+  function alienTalk(n) {
+    const g = plain, k = g.talkCount[n] || 0;
+    g.talkCount[n] = k + 1;
+    const text = talkLine(n, k);
+    g.talk = { n, t: 0, end: 150 + text.length * 3, lines: talkLines(text) };
+    for (let i = 0; i < 3; i++) tone(500 + planetHash(n + i) * 500, 0.07, 'square', 0.025, 120, i * 0.08);
+  }
+  // (the speech bubble, over the alien's head as it walks along, kept on the screen)
+  function drawTalk(cam) {
+    const g = plain, k = g.talk;
+    if (!k) return;
+    const a = cityAlien(k.n, g.t), ax = Math.round(a.x - cam), w = Math.max(...k.lines.map(l => l.length)) * 6 + 7, h = k.lines.length * 9 + 5;
+    const x = clamp(ax - (w >> 1), 2, PW - 2 - w), y = PLAIN_Y - 32 - h;
+    ctx.fillStyle = '#14122a'; ctx.fillRect(x - 1, y - 1, w + 2, h + 2); ctx.fillRect(clamp(ax - 3, x, x + w - 6), y + h, 6, 3); ctx.fillRect(clamp(ax - 1, x, x + w - 2), y + h + 3, 2, 2);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y, w, h); ctx.fillRect(clamp(ax - 2, x + 1, x + w - 5), y + h, 4, 2); ctx.fillRect(clamp(ax - 1, x + 1, x + w - 3), y + h + 2, 2, 1);
+    k.lines.forEach((l, i) => drawText(l, x + 4, y + 3 + i * 9, 'black'));
   }
   // (the city's alien number n, at time t: each strolls up and down near its spot, for ever)
   const CITY_COLS = ['#5fd068', '#5fd068', '#5fd068', '#6ae0c8', '#b48ae0', '#ffd060'];
@@ -4015,6 +4139,7 @@
   }
   function stepCity(alive) {
     const g = plain;
+    if (g.talk && (++g.talk.t > g.talk.end || g.alienPop[g.talk.n])) g.talk = null;   // (done talking, or popped)
     // (outside, a cop ship and any shots in the air are gone; explosions finish)
     g.sky.cop = null; g.sky.bolts.length = 0; g.sky.copBolts.length = 0; stepBooms();
     for (const n of Object.keys(g.alienPop)) {
@@ -4555,6 +4680,7 @@
   }
   function enterRoom(n) {
     const g = plain;
+    g.talk = null;
     const kind = homeKind(n);
     if (ROOMS[kind].refill) g.roomOn[n] = [];   // (the potions are back)
     g.room = { n, kind, home: kind, floor: 0, lift: null, sayT: 0, say: '', alt: 0, pilot: null, on: g.roomOn[n] || (g.roomOn[n] = [false, false]) };
@@ -5790,8 +5916,9 @@
     for (const p of g.pugs) {
       if (g.bust && g.bust.lift >= 1) continue;   // (inside the cop ship)
       drawPlainPug(p, Math.round(p.x - cam), Math.round(p.y), 'gold');
-      if (!g.bust && !p.dead && p.ground && planetDoor(p.x) !== null) drawUpArrow(Math.round(p.x - cam), PLAIN_Y - 28);
+      if (!g.bust && !p.dead && p.ground && (planetDoor(p.x) !== null || alienNear(p.x) !== null)) drawUpArrow(Math.round(p.x - cam), PLAIN_Y - 28);
     }
+    drawTalk(cam);
     if (g.bust) drawBust(cam);
   }
   // (the planet with the view at cam, all but the building numbered skip: the outside, and what a window looks out on)
