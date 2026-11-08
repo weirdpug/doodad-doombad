@@ -5760,16 +5760,104 @@
   function sendText(text) {
     const r = plain && plain.room, k = r && r.pc, d = plain && plain.pcData;
     if (!k || !d || PC_APPS[k.app] !== 'MAIL') return;
-    (d.chats[k.line] = d.chats[k.line] || []).push({ me: true, text });
-    d.wait = { line: k.line, t: 0, text };
+    const chat = d.chats[k.line] = d.chats[k.line] || [], name = PC_MAIL[k.line][0];
+    chat.push({ me: true, text });
+    d.wait = { line: k.line, t: 0, text, ai: null, reply: null };
+    if (textAI && name !== 'GLOOP') askText(d.wait, k.line, chat);
     tone(1000, 0.05, 'sine', 0.04, 300);
   }
+  // Really reading what you wrote (the user asked): where the game is opened on claude.ai, it asks Claude to answer as
+  // the character, to exactly what you said, keeping to the letters the game can show; until the answer comes, they're
+  // typing. Anywhere else (or if that can't be used) the answer is made here, from patterns that pick up your own words.
+  let textAI = null;
+  if (window.claude && typeof window.claude.use === 'function') window.claude.use('sample').then(f => { textAI = f || null; }, () => {});
+  const TEXT_WHO = {
+    ZORP: 'ZORP, a cheerful green alien who works in the office and is the player\'s best work friend. Zorp is silly and excited and obsessed with lunch at the EATS diner, especially its cupcakes.',
+    'THE BOSS': 'THE BOSS, the strict but funny alien boss of the office, whose own office is on the top floor. The Boss always wants everyone to work hard and keep typing, and gives short bossy answers.',
+    MOM: 'MOM, the player\'s loving and fussy alien mom. She wants to know if they are eating enough, tells them to wear a jacket, and says they should call their mothership more.',
+    RADAR: 'RADAR, the alien who runs the radar dish. Radar talks like a machine with words like BEEP and SCANNING and is obsessed with finding the planet Saturn, which went missing.' };
+  function askText(w, line, chat) {
+    const m = PC_MAIL[line], name = m[0];
+    const said = [`${name}: ${m[1]} ${m[2]}`, ...chat.slice(-12).map(c => (c.me ? 'PLAYER: ' : name + ': ') + c.text)].join('\n');
+    const prompt = `You are ${TEXT_WHO[name]} This is a kids' video game set in a city on an alien planet, and the player is texting you from the office computer.\n\n`
+      + `Here is the conversation so far, oldest first:\n${said}\n\n`
+      + `Reply to exactly what the player just said, staying in character, as one short text message. Rules: at most 90 characters; `
+      + `only CAPITAL LETTERS, numbers, spaces and these marks: ! - : . ' ? (no commas, no emoji, no other symbols); friendly and fine for kids; `
+      + `never say you are an AI. Reply with only the message text, without your name in front.`;
+    w.ai = 'asking';
+    textAI(prompt, { modelTier: 'quick', cache: false })
+      .then(res => { w.reply = cleanText(res && res.text, name); })
+      .catch(e => { if (e && ['not_granted', 'sampling_disabled', 'not_declared', 'capability_disabled', 'capability_removed'].includes(e.code)) textAI = null; })
+      .finally(() => { w.ai = 'done'; });
+  }
+  // (only what the game's letters can show, and not too long)
+  function cleanText(t, name) {
+    let s = String(t || '').toUpperCase().replace(/[\u2018\u2019]/g, "'").replace(/[^A-Z0-9 !\-:.'?]+/g, ' ').replace(/\s+/g, ' ').trim();
+    if (s.startsWith(name + ':')) s = s.slice(name.length + 1).trim();
+    if (s.length > 100) s = s.slice(0, 100).replace(/ \S*$/, '') + '...';
+    return s;
+  }
+  // (sentences they pick out of what you wrote, and what each of them says back, with {x} the rest of your sentence turned
+  // round: I to YOU, MY to YOUR...)
+  const TEXT_PATTERNS = [
+    [/^(?:WHAT IS|WHAT'S|WHATS) YOUR NAME|^WHO ARE YOU/, { ZORP: ["I'M ZORP! YOUR LUNCH BUDDY!", 'ZORP! Z-O-R-P! LIKE A HAPPY BURP.'],
+      'THE BOSS': ['I AM THE BOSS. THAT IS ALL YOU NEED TO KNOW.', 'MY NAME IS BOSS. MR BOSS TO YOU.'], MOM: ["I'M YOUR MOTHER! DID YOU FORGET?", 'MOM! THE ONE WHO MADE YOU LUNCH FOR 300 YEARS.'],
+      RADAR: ['DESIGNATION: RADAR. BEEP.', 'I AM RADAR. I WATCH THE SKY.'] }],
+    [/^HOW ARE YOU|^HOW'S IT GOING|^HOWS IT GOING|^HOW ARE THINGS|^WHAT'S UP|^WHATS UP/, { ZORP: ["GREAT! I'M THINKING ABOUT LUNCH.", 'SO GOOD! I JUST ATE A CUPCAKE.'],
+      'THE BOSS': ['BUSY. LIKE YOU SHOULD BE.', 'FINE. HOW ARE YOUR REPORTS?'], MOM: ['I MISS YOU SWEETIE! ARE YOU WARM ENOUGH?', "I'M GOOD HONEY. BETTER NOW THAT YOU TEXTED."],
+      RADAR: ['ALL SYSTEMS NORMAL. SATURN STILL MISSING.', 'SCANNING. I AM OK. BEEP.'] }],
+    [/^(?:I AM|I'M|IM) (.+)/, { ZORP: ["YOU'RE {x}? ME TOO! LET'S GET CUPCAKES.", '{x}? WOW! TELL ME MORE AT LUNCH.'],
+      'THE BOSS': ['BEING {x} IS NOT AN EXCUSE. KEEP TYPING.', 'YOU ARE {x}? YOU ARE ALSO AT WORK.'], MOM: ['MY BABY IS {x}? OH SWEETIE.', "YOU'RE {x}? I KNEW IT. MOM KNOWS."],
+      RADAR: ['SCAN COMPLETE: YOU ARE {x}. BEEP.', 'LOGGING: PLAYER IS {x}.'] }],
+    [/^DO YOU (?:LIKE|LOVE) (.+)/, { ZORP: ['I LOVE {x}! ALMOST AS MUCH AS CUPCAKES.', '{x}? YES! DO THEY SELL IT AT EATS?'],
+      'THE BOSS': ['I LIKE {x} IF IT IS IN A REPORT.', 'I ONLY LIKE HARD WORK. AND MAYBE {x}.'], MOM: ['I LIKE {x} IF YOU LIKE {x} SWEETIE.', '{x}? YOUR FATHER LOVES {x}.'],
+      RADAR: ['SCANNING {x}... RESULT: I LIKE IT. BEEP.', 'MY RADAR LIKES {x}. MORE THAN SATURN? NO.'] }],
+    [/^I (?:LIKE|LOVE) (.+)/, { ZORP: ['{x}? YUM! I MEAN COOL!', 'ME TOO! {x} IS THE BEST!'], 'THE BOSS': ['LIKE {x} ON YOUR OWN TIME.', 'I LIKE IT WHEN YOU WORK. NOT {x}.'],
+      MOM: ['YOU ALWAYS LOVED {x} SINCE YOU WERE LITTLE.', "I'LL GET YOU SOME {x} FOR YOUR BIRTHDAY!"], RADAR: ['NOTED: PLAYER LIKES {x}.', '{x} ADDED TO MY RADAR. BEEP.'] }],
+    [/^I (?:HATE|DON'T LIKE|DONT LIKE) (.+)/, { ZORP: ['AWW YOU DON\'T LIKE {x}? MORE FOR ME!', 'NO {x}? OK. HOW ABOUT CUPCAKES?'],
+      'THE BOSS': ['I DO NOT CARE ABOUT {x}. TYPE.', 'NOBODY LIKES {x}. EVERYBODY LIKES WORK.'], MOM: ['YOU USED TO LOVE {x}!', 'DON\'T BE PICKY SWEETIE. {x} IS GOOD FOR YOU.'],
+      RADAR: ['NOTED: NO {x}. BEEP.', 'REMOVING {x} FROM MY RADAR.'] }],
+    [/^(?:CAN YOU|COULD YOU|WILL YOU|WOULD YOU) (.+)/, { ZORP: ['I CAN TRY TO {x}! AFTER LUNCH.', '{x}? FOR YOU? SURE!'],
+      'THE BOSS': ['I CAN {x}. YOU CAN TYPE.', 'I WILL {x} WHEN YOUR REPORT IS DONE.'], MOM: ['OF COURSE I CAN {x} HONEY.', "I'LL {x} IF YOU CALL ME MORE."],
+      RADAR: ['CAN I {x}? CALCULATING... YES.', 'ATTEMPTING TO {x}. BEEP BOOP.'] }],
+    [/^WHERE (?:IS|ARE|'S) (.+)/, { ZORP: ['{x}? I THINK IT IS AT EATS. EVERYTHING GOOD IS AT EATS.', 'NO IDEA! WANT TO LOOK AFTER LUNCH?'],
+      'THE BOSS': ['{x} IS NOT YOUR PROBLEM. TYPING IS.', 'LOOK FOR {x} ON YOUR OWN TIME.'], MOM: ['{x}? DID YOU LOOK UNDER YOUR BED?', 'IT\'S WHERE YOU LEFT IT SWEETIE.'],
+      RADAR: ['{x} IS 42 MILES THAT WAY. PROBABLY.', 'SCANNING FOR {x}... NOT FOUND. LIKE SATURN.'] }],
+    [/^(?:WHAT IS|WHAT'S|WHATS|WHAT ARE) (.+)/, { ZORP: ['{x}? I THINK IT IS A KIND OF CUPCAKE.', 'GOOD QUESTION! ASK ME ABOUT {x} AT LUNCH.'],
+      'THE BOSS': ['{x} IS SOMETHING TO PUT IN A REPORT.', 'LOOK UP {x} AFTER WORK.'], MOM: ['{x}? ASK YOUR FATHER.', 'WHEN I WAS YOUNG WE DIDN\'T HAVE {x}.'],
+      RADAR: ['ANALYZING {x}... IT IS A THING. BEEP.', '{x}: UNKNOWN OBJECT. SCANNING.'] }],
+    [/^I (?:WANT|NEED|WANNA) (.+)/, { ZORP: ['ME TOO! I WANT {x} AND A CUPCAKE.', "LET'S GET {x} TOGETHER!"],
+      'THE BOSS': ['YOU WANT {x}? I WANT REPORTS.', 'YOU NEED TO WORK. NOT {x}.'], MOM: ["I'LL SEND YOU {x} SWEETIE!", 'YOU NEED {x}? AND A JACKET.'],
+      RADAR: ['REQUEST LOGGED: {x}.', 'SEARCHING FOR {x}... BEEP.'] }],
+    [/^(?:ARE YOU) (.+)/, { ZORP: ['AM I {x}? MAYBE! I AM DEFINITELY HUNGRY.', 'HAHA YES! I AM SO {x}.'],
+      'THE BOSS': ['I AM THE BOSS. THAT IS WHAT I AM.', 'AM I {x}? I AM BUSY.'], MOM: ["I'M YOUR MOTHER. I'M ALWAYS {x} FOR YOU.", 'AM I {x}? I AM WORRIED ABOUT YOU.'],
+      RADAR: ['SELF SCAN: {x}? RESULT: MAYBE.', 'NEGATIVE. I AM A RADAR.'] }],
+    [/^(?:YOU ARE|YOU'RE|UR|YOURE) (.+)/, { ZORP: ['AWW! YOU ARE {x} TOO!', "I'M {x}? THANK YOU BUDDY!"],
+      'THE BOSS': ['I KNOW. NOW TYPE.', 'FLATTERY WILL NOT FINISH YOUR REPORT.'], MOM: ["I'M {x}? THAT'S SO SWEET HONEY.", 'YOU GET THAT FROM ME!'],
+      RADAR: ['I AM {x}? UPDATING MY FILES.', 'COMPLIMENT RECEIVED. BEEP BOOP.'] }],
+    [/^WHY (.+)/, { ZORP: ['WHY {x}? BECAUSE CUPCAKES!', 'I DON\'T KNOW WHY! ISN\'T IT FUN?'], 'THE BOSS': ['BECAUSE I SAID SO.', 'BECAUSE IT IS WORK TIME.'],
+      MOM: ['BECAUSE I SAID SO SWEETIE.', 'YOU ALWAYS ASK WHY. JUST LIKE YOUR FATHER.'], RADAR: ['WHY {x}? CALCULATING... NO DATA.', 'REASON: UNKNOWN. LIKE SATURN.'] }],
+    [/^(?:LET'S|LETS) (.+)/, { ZORP: ["YES! LET'S {x}!", "{x}? I'M IN! THEN LUNCH!"], 'THE BOSS': ["LET'S NOT. LET'S WORK.", '{x}? AFTER THE MEETING.'],
+      MOM: ["OH LET'S {x} WHEN YOU VISIT!", "YES! LET'S {x}. WEAR A JACKET."], RADAR: ['PLAN ACCEPTED: {x}.', "LET'S {x}. THEN FIND SATURN."] }],
+    [/^MY (.+)/, { ZORP: ['YOUR {x}? COOL! MY CUPCAKE IS GONE.', 'TELL ME ABOUT YOUR {x} AT LUNCH!'], 'THE BOSS': ['YOUR {x} CAN WAIT. WORK CANNOT.', 'NOTED. NOW TYPE.'],
+      MOM: ['YOUR {x}? OH SWEETIE TELL ME EVERYTHING.', 'IS YOUR {x} OK? DO YOU NEED ME TO COME?'], RADAR: ['YOUR {x} IS ON MY RADAR NOW.', 'SCANNING YOUR {x}... BEEP.'] }],
+    [/^DO YOU (.+)/, { ZORP: ['DO I {x}? YES! EVERY DAY AFTER LUNCH.', 'I DO! DO YOU?'], 'THE BOSS': ['I DO NOT {x}. I WORK.', 'WHAT I DO IS NONE OF YOUR BUSINESS.'],
+      MOM: ['OF COURSE I {x} SWEETIE.', 'I DO. AND I WORRY ABOUT YOU.'], RADAR: ['DO I {x}? AFFIRMATIVE. BEEP.', 'NEGATIVE. I ONLY SCAN.'] }]];
+  const TEXT_TURN = { I: 'YOU', ME: 'YOU', MY: 'YOUR', MINE: 'YOURS', AM: 'ARE', "I'M": "YOU'RE", IM: "YOU'RE", YOUR: 'MY', YOURS: 'MINE', YOU: 'ME', "YOU'RE": "I'M", MYSELF: 'YOURSELF' };
   // (their reply to text, the nth thing they've said back)
   function textReply(name, text, nth) {
+    if (name === 'GLOOP') return 'WHY?';
     const ways = TEXT_WAYS[name] || TEXT_WAYS.ZORP, words = text.match(/[A-Z0-9']+/g) || [];
     let seed = nth * 97 + 13;
     for (const ch of text) seed = Math.imul(seed ^ ch.charCodeAt(0), 16777619);
     const r = talkRandom(seed), pick = l => l[Math.floor(r() * l.length)];
+    const said = text.replace(/^(?:HEY|HI|HELLO|SO|OK|OKAY|WELL|UM)\b[ !.]*/, '').trim();
+    for (const [re, says] of TEXT_PATTERNS) {
+      const m = said.match(re);
+      if (!m || !says[name]) continue;
+      const x = (m[1] || '').replace(/[!.?]+$/, '').split(' ').map(wd => TEXT_TURN[wd] || wd).join(' ').trim() || 'THAT';
+      if (x.length <= 40) return pick(says[name]).replace(/\{x\}/g, x);
+    }
     const found = TEXT_TOPICS.find(([, ...ws]) => ws.some(w => words.includes(w)));
     const topic = found ? found[0] : text.includes('?') ? 'question' : 'other';
     const word = words.filter(w => w.length > 2).sort((a, b) => b.length - a.length)[0] || 'THAT';
@@ -5781,9 +5869,9 @@
   // (the wait for their reply, while the computer is on)
   function stepTextWait() {
     const d = plain.pcData, w = d.wait;
-    if (!w || ++w.t < TEXT_WAIT) return;
+    if (!w || ++w.t < TEXT_WAIT || w.ai === 'asking') return;
     const chat = d.chats[w.line], name = PC_MAIL[w.line][0];
-    chat.push({ me: false, text: textReply(name, w.text, chat.length) });
+    chat.push({ me: false, text: w.reply || textReply(name, w.text, chat.length) });
     d.wait = null;
     tone(1320, 0.1, 'sine', 0.05); tone(1760, 0.15, 'sine', 0.05, 0, 0.1);
   }
