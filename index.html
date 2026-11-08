@@ -4097,11 +4097,17 @@
         ctx.fillStyle = '#8d90a0'; ctx.fillRect(-1, -22, 2, 22); ctx.fillStyle = blink ? '#ff3e30' : '#6a1f1a'; ctx.fillRect(-2, -25, 4, 4);
         ctx.restore();
         break;
-      case 8:   // (flats of coloured blocks)
-        for (const [a, b, w, h2, col] of [[-32, -26, 32, 26, '#ff9ac0'], [0, -26, 32, 26, '#ffd060'], [-22, -52, 36, 26, '#6ae0c8'], [-14, -74, 26, 22, '#b48ae0']]) {
-          box(col, a, b, w, h2); box('#2a1760', a, b, w, 1);
-          for (let i = 0; i < Math.floor(w / 12); i++) box('#3a2a78', a + 4 + i * 12, b + 7, 6, 9);
-        }
+      case 8:   // (a police station, where the coloured flats were (the user asked): navy, with its sign, a gold badge,
+        // glass doors, windows with blinds, and red and blue lights flashing on the roof)
+        box('#a8acbc', -38, -3, 76, 3);
+        box('#1d2f8c', -34, -56, 68, 53); box('#2f4bc0', -32, -54, 64, 51);
+        box('#eef0f6', -36, -60, 72, 4); box('#55556a', -10, -64, 20, 4);
+        box(blink ? '#ff3e30' : '#5a1010', -9, -68, 8, 4); box(blink ? '#14206a' : '#4f8aff', 1, -68, 8, 4);
+        box('#14122a', -21, -53, 42, 9); drawText('POLICE', x, PLAIN_Y - 52, undefined, 'center');
+        for (const a of [-28, -17, 8, 19]) { box('#14122a', a, -40, 10, 12); box('#9fe0ff', a + 1, -39, 8, 10); for (let i = 0; i < 4; i++) box('#c8d0e8', a + 1, -38 + i * 3, 8, 1); }
+        round('#c8a040', 0, -32, 4); round('#ffcc3d', 0, -32, 3); box('#c8a040', 0, -33, 1, 2);
+        box('#14122a', -9, -25, 18, 22); box('#7ae0ff', -8, -24, 7, 21); box('#7ae0ff', 1, -24, 7, 21); box('#bfeaff', -8, -24, 2, 21); box('#bfeaff', 1, -24, 2, 21);
+        box('#ffcc3d', -3, -14, 1, 3); box('#ffcc3d', 2, -14, 1, 3);
         break;
       case 9:   // (a tall shell of rings)
         for (let i = 0; i < 7; i++) box(i % 2 ? '#6ae0c8' : '#3fbfae', -32 + i * 4, -(i + 1) * 12, 64 - i * 8, 12);
@@ -4204,9 +4210,11 @@
     { wall: '#3a3a4a', floor: '#22222c', things: [
       { x: 110, say: 'ONE SHIP SPOTTED', s: [1000, 'sine', 0], draw: (b, r, on, t) => { b('#55556a', -20, -44, 40, 44); b('#0a1f14', -16, -40, 32, 30); if (on) { const a = t * 0.08, cx = ctxX(b), cy = PLAIN_Y - 25; ctx.strokeStyle = '#5fd068'; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * 14, cy + Math.sin(a) * 14); ctx.stroke(); b('#5fd068', 6, -34, 2, 2); } } },
       { x: 190, say: 'BEEP BOOP BEEP', s: [1320, 'square', -660], draw: (b, r, on, t) => { b('#55556a', -14, -34, 28, 34); r('#14122a', 0, -24, 9); r(on ? '#8d90a0' : '#3a3a4a', 0, -24, on ? 4 + ((t >> 2) & 1) * 2 : 4); if (on) b('#5fd068', -8, -32, 3, 3); } }] },
-    { wall: '#ffc4dc', floor: '#b48ae0', things: [
-      { x: 110, say: 'SHHH', s: [220, 'sine', -80], draw: (b, r, on, t) => { b('#6ae0c8', -26, -12, 52, 8); b('#ffffff', -26, -16, 14, 6); b('#8a5a34', -26, -4, 4, 4); b('#8a5a34', 22, -4, 4, 4); if (on) { r('#5fd068', -14, -20, 6); b('#6ae0c8', -6, -18, 28, 6); b('#14122a', 12 + (t >> 4) % 8, -34 - (t >> 3) % 8, 4, 1); } } },
-      { x: 190, say: 'ALL SLIME', s: [140, 'sine', 300], draw: (b, r, on, t) => { b('#eef0f6', -14, -46, 28, 46); if (on) { b('#fff6c8', -12, -44, 24, 42); b('#5fd068', -10, -30, 20, 6); b('#5fd068', -10, -14, 20, 6); r('#5fd068', -6, -7 + ((t >> 3) & 3), 2); } else b('#8d90a0', 9, -30, 2, 12); } }] },
+    // (8: the police station (the coloured flats were; the user asked): Up at the desk and the cop there says something;
+    // Up at the board goes through its posters)
+    { wall: '#c8d0e8', floor: '#3a4660', scene: drawPolice, things: [
+      { x: 88, names: ['WANTED: A PUG', 'WANTED: BANK ROBBER', 'MISSING: SATURN'], s: [330, 'square', 0], draw: (b, r, on) => drawWantedBoard(b, r, +on) },
+      { x: 176, names: ['MOVE ALONG', 'HELLO CITIZEN', 'NO BARKING IN HERE', 'HAVE YOU SEEN A PUG?'], s: [523, 'square', 0], draw: b => { b('#fff6e0', -20, -27, 8, 3); b('#14122a', -19, -26, 6, 1); } }] },
     { wall: '#3fbfae', floor: '#176a5a', things: [
       { x: 110, say: 'DING DONG', s: [784, 'triangle', -30], draw: (b, r, on, t) => { const a = on ? Math.sin(t * 0.2) * 7 : 0; b('#55556a', -14, -56, 28, 3); b('#55556a', -14, -56, 3, 56); b('#55556a', 11, -56, 3, 56); r('#ffcc3d', a, -38, 11); b('#ffcc3d', -11 + a, -38, 22, 12); r('#c8a040', a * 1.3, -24, 3); } },
       { x: 190, say: 'SPLASH', s: [900, 'sine', -600], draw: (b, r, on, t) => { b('#8d90a0', -18, -8, 36, 8); b('#7ae0ff', -16, -8, 32, 3); b('#8d90a0', -2, -24, 4, 16); if (on) for (let i = 0; i < 10; i++) { const u = ((t + i * 7) % 40) / 40, d = i % 2 ? 1 : -1; r('#7ae0ff', d * u * 18, -24 - Math.sin(u * Math.PI) * 18 + u * 14, 1.5); } } }] },
@@ -4661,7 +4669,7 @@
   // how far below where it parks the saucer can fly, so the dot can reach the aliens)
   const SKY_BOLT = 6, SKY_GUN = [73, 44], SKY_LOW = -30;
   // (each kind of building's half width and height, for what a shot hits)
-  const HOME_BOX = { 0: [34, 40], 1: [26, 100], 2: [22, 26], 3: [28, 62], 4: [44, 64], 5: [38, 86], 6: [36, 36], 7: [30, 50], 8: [32, 74], 9: [32, 90], 11: [40, 60], 12: [20, 88], [MUSEUM]: [42, 72] };
+  const HOME_BOX = { 0: [34, 40], 1: [26, 100], 2: [22, 26], 3: [28, 62], 4: [44, 64], 5: [38, 86], 6: [36, 36], 7: [30, 50], 8: [36, 68], 9: [32, 90], 11: [40, 60], 12: [20, 88], [MUSEUM]: [42, 72] };
   // (the saucer flown from inside: the middle of the window is where it is)
   const shipSpot = () => [buildingX(plain.room.n), PLAIN_Y - 44 - plain.room.alt];
   const inHome = (n, x, y) => { const [hw, h] = HOME_BOX[homeKind(n)]; return Math.abs(x - buildingX(n)) < hw && y > PLAIN_Y - h; };
@@ -5113,6 +5121,30 @@
       b('#55586a', -9, -29, 18, 2); b('#55586a', -1, -37, 2, 18); r('#55586a', 0, -28, 4); r('#ffcc3d', 0, -28, 2);
     }
     b('#55556a', -22, -4, 44, 4);
+  }
+  // (inside the police station: its name, a clock, a plant, and the cop on duty behind the front desk)
+  function drawPolice(t) {
+    const box = (col, x, y, w, h) => { ctx.fillStyle = col; ctx.fillRect(x, PLAIN_Y + y, w, h); };
+    box('#1d2f8c', 84, -134, 72, 13); drawText('POLICE', 120, PLAIN_Y - 131, 'gold', 'center');
+    bb('#ffffff', 200, PLAIN_Y - 100, 9); ctx.strokeStyle = '#1d2f8c'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(200, PLAIN_Y - 100, 9, 0, Math.PI * 2); ctx.stroke();
+    box('#22222c', 199, -106, 2, 6); box('#22222c', 200, -101, 5, 2);
+    drawPlant(224);
+    const was = plain.cam; plain.cam = 0;
+    drawCop({ x: 176, y: PLAIN_Y - 12, t, face: -1, walk: false, flash: 0 });
+    plain.cam = was;
+    box('#55556a', 142, -24, 68, 3); box('#1d2f8c', 144, -21, 64, 21); box('#2f4bc0', 146, -19, 60, 17);
+    bb('#c8a040', 176, PLAIN_Y - 11, 4); bb('#ffcc3d', 176, PLAIN_Y - 11, 3);
+    box('#22222c', 190, -38, 14, 11); box((t >> 5) & 1 ? '#5fd068' : '#7ae0ff', 191, -37, 12, 8); box('#55556a', 196, -27, 2, 3);
+  }
+  // (the station's board, with one poster pinned up big: a pug, a robber in a mask, or Saturn as it was)
+  function drawWantedBoard(b, r, i) {
+    b('#6a3e1e', -22, -76, 44, 34); b('#c8904a', -20, -74, 40, 30);
+    b('#fff6e0', -11, -72, 22, 26); b('#e8282f', -11, -72, 22, 4);
+    if (i === 0) { r('#c8904a', 0, -57, 7); r('#2a1a10', 0, -55, 3); r('#14122a', -3, -59, 1.5); r('#14122a', 3, -59, 1.5); b('#2a1a10', -8, -64, 4, 4); b('#2a1a10', 4, -64, 4, 4); }
+    else if (i === 1) { r('#5fd068', 0, -57, 7); b('#14122a', -7, -60, 14, 3); b('#ffffff', -4, -60, 2, 2); b('#ffffff', 2, -60, 2, 2); b('#c8a040', 3, -52, 6, 5); }
+    else { r('#e8c060', 0, -57, 5); ctx.strokeStyle = '#c8a040'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(b.x, PLAIN_Y - 57, 9, 3, -0.2, 0, Math.PI * 2); ctx.stroke(); }
+    for (const [a, c] of [[-17, -71], [14, -71], [-17, -50], [14, -50]]) b('#8a5a34', a, c, 4, 4);
+    r('#e8282f', 0, -73, 1.5);
   }
   function drawPlant(x) {
     const box = (col, a, y, w, h) => { ctx.fillStyle = col; ctx.fillRect(x + a, PLAIN_Y + y, w, h); };
