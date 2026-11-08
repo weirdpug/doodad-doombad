@@ -4411,7 +4411,7 @@
     for (const n of [n0 - 1, n0, n0 + 1]) if (plain.shipAt[n] === undefined && Math.abs(x - buildingX(n)) < 20 && !plain.wrecked[n]) return n;
     return null;
   }
-  // Caught by a cop (the user asked): BUSTED! Everyone freezes, the cop ship flies in over them, beams them all up, and
+  // Caught by a cop (the user asked): everyone freezes, the cop ship flies in over them, beams them all up, and
   // flies off with them to the space cop station. Caught in a building, they're taken out the door first.
   const BUST_BEAM = 20, BUST_LIFT = 70, BUST_AWAY = 60;
   function startBust() {
@@ -4455,7 +4455,6 @@
   function drawBust(cam) {
     const b = plain.bust, u = b.over ? b.t - b.over : 0, fade = u - BUST_BEAM - BUST_LIFT - BUST_AWAY + 30;
     drawCopShip(b.ship, cam);
-    drawText('BUSTED!', PW / 2, 30, 'red', 'center', 2);
     if (b.over && fade > 0) { ctx.fillStyle = `rgba(0,0,0,${Math.min(1, fade / 30).toFixed(2)})`; ctx.fillRect(0, 0, PW, PH); }
   }
   // The space cop station (the user asked): a room up in space, with a big window on the planet, a cop at a desk and a
