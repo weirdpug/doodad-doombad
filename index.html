@@ -4461,11 +4461,15 @@
   // jail cell. Everyone the cops bust is locked in the cell for good: there's no letting them go and no way out (the
   // user asked).
   const COP_STATION = 19, CELL_L = 106, CELL_R = 228;
+  // (3 seconds in, the view zooms in on the cell, twice as big, and the bars fade away; the pugs keep to what's in view)
+  // (the user asked)
+  const CELL_ZOOM_AT = 180, CELL_ZOOM_T = 45, CELL_VIEW = [169, 210], CELL_ZOOM_L = 117, CELL_ZOOM_R = 221;
+  const cellZoom = r => clamp((r.jailT - CELL_ZOOM_AT) / CELL_ZOOM_T, 0, 1);
   ROOMS[COP_STATION] = { wall: '#2e3350', floor: '#4a4f5f', scene: drawCopStation, front: drawCopBars, things: [] };
   function enterCopStation() {
     const g = plain;
     g.bust = null; g.cops = []; g.copShots = []; g.copShip = null; g.bits = [];
-    g.room = { n: -1000, kind: COP_STATION, home: COP_STATION, floor: 0, lift: null, sayT: 150, say: 'THE SPACE COP STATION', alt: 0, pilot: null, on: [] };
+    g.room = { n: -1000, kind: COP_STATION, home: COP_STATION, floor: 0, lift: null, sayT: 150, say: 'THE SPACE COP STATION', alt: 0, pilot: null, on: [], jailT: 0 };
     g.pugs = g.pugs.map((p, i) => Object.assign(shopPug(p.id, 180 + i * 12, PLAIN_Y), { ground: true, upWas: true }));
     noise(0.3, 0.06, 300, 100); tone(110, 0.3, 'square', 0.05, -30);   // (the cell door clanging shut)
   }
@@ -4493,10 +4497,14 @@
     box('#55556a', 106, -14, 36, 3); box('#55556a', 107, -11, 2, 11); box('#55556a', 139, -11, 2, 11); box('#d8dbe4', 107, -18, 34, 4); box('#ffffff', 108, -21, 9, 3);
     box('#6a6e80', 194, -16, 38, 4); box('#55556a', 196, -12, 3, 12); box('#55556a', 227, -12, 3, 12);
   }
-  // (the cell's bars, in front of whoever's in it)
+  // (the cell's bars, in front of whoever's in it, fading away as the view zooms in)
   function drawCopBars() {
+    const z = cellZoom(plain.room);
+    if (z >= 1) return;
+    ctx.save(); ctx.globalAlpha = 1 - z;
     for (let x = 99; x < 238; x += 8) { ctx.fillStyle = '#8d90a0'; ctx.fillRect(x, PLAIN_Y - 96, 2, 96); ctx.fillStyle = '#c8ccd8'; ctx.fillRect(x, PLAIN_Y - 96, 1, 96); }
     ctx.fillStyle = '#55556a'; ctx.fillRect(98, PLAIN_Y - 98, 142, 4); ctx.fillRect(98, PLAIN_Y - 52, 142, 3);
+    ctx.restore();
   }
   function enterRoom(n) {
     const g = plain;
@@ -4518,6 +4526,7 @@
     if (r.plaque) { stepPlaque(); g.kbAtk = false; return; }
     if (r.cops) stepRoomCops();
     if (g.caught) { startBust(); g.kbAtk = false; return; }
+    if (r.kind === COP_STATION) r.jailT++;
     if (r.pick) { stepPick(); g.kbAtk = false; return; }
     if (r.teller) { stepTeller(); g.kbAtk = false; return; }
     if (ROOMS[r.kind].window) stepSky();
@@ -4538,8 +4547,8 @@
       }
       const at = roomSpot(p);
       p.upDoor = at !== null || p.upWas;   // (holding Up after a smash must not hop)
-      const caged = r.kind === COP_STATION;
-      floorPug(p, caged ? CELL_L : 14, caged ? CELL_R : PW - 14, PLAIN_Y, 1.25, -3.4);
+      const caged = r.kind === COP_STATION, tight = caged && cellZoom(r) > 0;
+      floorPug(p, caged ? (tight ? CELL_ZOOM_L : CELL_L) : 14, caged ? (tight ? CELL_ZOOM_R : CELL_R) : PW - 14, PLAIN_Y, 1.25, -3.4);
       if (!p.upFresh || at === null) continue;
       if (at === -2) { r.pick = { sel: 0, id: p.id, held: { left: false, right: false, up: true, down: false }, msg: 0 }; p.moving = false; sfx.tick(); break; }
       if (at < 0) {
@@ -5406,7 +5415,16 @@
   }
   function drawPlanet() {
     const g = plain, cam = g.cam;
-    if (g.room) return drawRoom();
+    if (g.room) {
+      const z = g.room.kind === COP_STATION ? cellZoom(g.room) : 0;
+      if (!z) return drawRoom();
+      // (zooming in on the cell)
+      const e = z * z * (3 - 2 * z), k = 1 + e, cx = PW / 2 + (CELL_VIEW[0] - PW / 2) * e, cy = PH / 2 + (CELL_VIEW[1] - PH / 2) * e;
+      ctx.save(); ctx.translate(PW / 2, PH / 2); ctx.scale(k, k); ctx.translate(-cx, -cy);
+      drawRoom();
+      ctx.restore();
+      return;
+    }
     drawPlanetScene(cam, null);
     drawStatues(cam);
     drawCops();
