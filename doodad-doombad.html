@@ -1942,6 +1942,48 @@
     g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     src.connect(flt).connect(g).connect(actx.destination); src.start(t); src.stop(t + dur + 0.02);
   }
+
+  // ---------- main menu music ----------
+  // A tune with no words for the main menu (the user asked): an original bouncy chiptune, 16 bars round and round, a
+  // square-wave lead over a triangle bass with a little kick, snare and hi-hat, made the same way as the sound effects.
+  // It plays while the main menu (or its Store, Customize or Boss Fight lists) is up and stops as soon as a game starts.
+  // Browsers only let sound start after a click or key press, so it begins with the first one; Sound off mutes it.
+  // (each bar is eight eighth notes: a note, '-' to hold the one before, '.' for a rest)
+  const MENU_TUNE = [
+    'E5 G5 C6 G5 E5 G5 A5 G5', 'A5 . C6 A5 E5 . A5 G5', 'F5 A5 C6 A5 G5 F5 E5 F5', 'G5 . D5 . G5 A5 B5 .',
+    'E5 G5 C6 G5 E5 G5 A5 G5', 'A5 C6 E6 C6 A5 . G5 .', 'F5 . A5 C6 B5 A5 G5 F5', 'G5 . B4 D5 G5 - - .',
+    'C6 . A5 . F5 A5 C6 D6', 'B5 . G5 . D5 G5 B5 D6', 'E6 D6 B5 G5 E5 G5 B5 .', 'C6 B5 A5 E5 C5 E5 A5 .',
+    'A5 . C6 . F6 E6 D6 C6', 'B5 . D6 . G6 F6 E6 D6', 'E6 . C6 . G5 E5 C5 E5', 'G5 - - . C6 - - .'];
+  // (the bass: the root of each bar's chord on beats 1, 2 and 4, its fifth on beat 3)
+  const MENU_BASS = ['C3 G2', 'A2 E2', 'F2 C3', 'G2 D3', 'C3 G2', 'A2 E2', 'F2 C3', 'G2 D3',
+    'F2 C3', 'G2 D3', 'E2 B2', 'A2 E2', 'F2 C3', 'G2 D3', 'C3 G2', 'C3 G2'];
+  const MENU_EIGHTH = 0.25, MENU_AHEAD = 0.3;
+  const noteHz = n => { const m = /^([A-G])(\d)$/.exec(n), semis = { C: -9, D: -7, E: -5, F: -4, G: -2, A: 0, B: 2 }[m[1]]; return 440 * Math.pow(2, (semis + (m[2] - 4) * 12) / 12); };
+  const menuSteps = MENU_TUNE.flatMap(bar => bar.split(' '));
+  let menuNext = 0, menuStep = 0, menuWas = false;
+  const menuMusicOn = () => !muted && !document.hidden && (phase === 'title' || (phase === 'paused' && fromTitle && ['store', 'custom', 'boss'].includes(pauseView)));
+  // (called every frame: schedules the notes due in the next moment, so the beat stays even)
+  function stepMenuMusic() {
+    const on = menuMusicOn() && actx && actx.state === 'running';
+    if (!on) { menuWas = false; return; }
+    if (!menuWas) { menuWas = true; menuNext = actx.currentTime + 0.05; menuStep = 0; }
+    while (menuNext < actx.currentTime + MENU_AHEAD) {
+      const i = menuStep, note = menuSteps[i], wait = Math.max(0, menuNext - actx.currentTime), beat = i % 8;
+      if (note !== '.' && note !== '-') {
+        let len = 1;
+        while (menuSteps[(i + len) % menuSteps.length] === '-') len++;
+        tone(noteHz(note), len * MENU_EIGHTH * 0.92, 'square', 0.022, 0, wait);
+      }
+      if (beat % 2 === 0) {
+        const [root, fifth] = MENU_BASS[Math.floor(i / 8)].split(' ');
+        tone(noteHz(beat === 4 ? fifth : root), MENU_EIGHTH * 1.8, 'triangle', 0.07, 0, wait);
+      }
+      if (beat === 0 || beat === 4) tone(120, 0.12, 'sine', 0.09, -70, wait);   // (kick)
+      if (beat === 2 || beat === 6) noise(0.09, 0.035, 3200, 900, wait);       // (snare)
+      if (beat % 2 === 1) noise(0.03, 0.018, 9000, 6000, wait);                // (hi-hat)
+      menuNext += MENU_EIGHTH; menuStep = (menuStep + 1) % menuSteps.length;
+    }
+  }
   const sfx = {
     jump: () => tone(420, 0.12, 'square', 0.04, 380),
     score: () => { tone(880, 0.06); tone(1320, 0.08, 'square', 0.05, 0, 0.06); },
@@ -12384,6 +12426,7 @@
       acc += Math.min(100, t - lastT); lastT = t;
       while (acc >= 1000 / 60) { step(); acc -= 1000 / 60; }
       draw();
+      stepMenuMusic();
       if (gloopGlitch) drawGlitch();
     } catch (e) {
       acc = 0;
