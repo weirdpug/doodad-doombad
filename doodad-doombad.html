@@ -4732,8 +4732,8 @@
     if (k.msg > 0) drawText('NOT ENOUGH COINS', PW / 2, 62, 'red', 'center');
     drawText('JUMP PICKS  BARK LEAVES', PW / 2, 76, 'pink', 'center');
   }
-  // (the cops in the bank, the same cops as outside: they walk in at the door one at a time with the alarm going, and walk
-  // after the pugs and shoot, and nothing kills them. They're stepped and drawn by the same code as outside, with the
+  // (the cops in the bank, the same cops as outside: they walk in at the door one at a time with the alarm going, and run
+  // after the pugs, and nothing kills them. They're stepped and drawn by the same code as outside, with the
   // bank's own list of them swapped in and the view held still)
   function roomCops(fn) {
     const g = plain, r = g.room, was = [g.cam, g.cops, g.copShots, g.copShip, g.obs];
@@ -6129,10 +6129,11 @@
     if (!g.endT && !carried.length && alive.every(q => q.dead)) g.endT = 150;
   }
   // Barking an alien dead in the city brings the space cops (the user asked): their ship comes in with its siren going, stops over
-  // the ground just ahead of the pugs, drops them out one at a time and flies off. On the ground they walk after the
-  // nearest pug and shoot at it. A shot kills, but it flies at where the pug was, so it can be dodged, jumped or outrun.
-  // Nothing kills them (the user asked). They wait outside while you're in a building.
-  const COP_COUNT = 2, COP_AHEAD = 70, COP_RANGE = 80, COP_MAX = 4, COP_SHOT = 3.2, COP_WALK = 0.9;
+  // the ground just ahead of the pugs, drops them out one at a time and flies off. On the ground they don't shoot: they
+  // run after the nearest pug, nearly as fast as a pug runs, and one that catches a pug gets it (the user asked); a pug
+  // can stay ahead of them or jump over them. Nothing kills them (the user asked). They wait outside while you're in a
+  // building.
+  const COP_COUNT = 2, COP_AHEAD = 70, COP_MAX = 4, COP_WALK = 1.2, COP_CATCH = 8;
   function callCops() {
     const g = plain;
     if (g.copShip || g.cops.length >= COP_MAX) return;
@@ -6175,14 +6176,9 @@
       if (!alive.length || c.pop) continue;
       const near = alive.reduce((a, p) => Math.abs(p.x - c.x) < Math.abs(a.x - c.x) ? p : a), d = near.x - c.x;
       c.face = d < 0 ? -1 : 1;
-      if (Math.abs(d) > COP_RANGE) { c.x += c.face * COP_WALK; c.walk = true; }
-      // (it only shoots from where you can see it)
-      if (--c.shotT <= 0 && c.x > g.cam && c.x < g.cam + PW) {
-        c.shotT = 80 + Math.random() * 50; c.flash = 8;
-        const x = c.x + c.face * 12, y = c.y - 11, tx = near.x - x, ty = near.y - 7 - y, len = Math.hypot(tx, ty) || 1;
-        g.copShots.push({ x, y, vx: tx / len * COP_SHOT, vy: ty / len * COP_SHOT });
-        tone(1400, 0.12, 'square', 0.03, -900);
-      }
+      if (Math.abs(d) > 1) { c.x += c.face * Math.min(COP_WALK, Math.abs(d)); c.walk = true; }
+      // (caught: any pug it runs into, unless it's jumping over)
+      for (const p of alive) if (!p.dead && Math.abs(p.x - c.x) < COP_CATCH && p.y > c.y - 16) kill(p);
     }
     g.cops = g.cops.filter(c => !c.gone && Math.abs(c.x - g.cam - PW / 2) < 600);
     for (const b of g.copShots) {
@@ -6201,8 +6197,7 @@
     box('#5fd068', -5, -20, 10, 7); box('#14122a', -3, -18, 2, 3); box('#14122a', 2, -18, 2, 3); box('#ffffff', -2, c.pop ? -16 : -18, 1, 1); box('#ffffff', c.pop ? 2 : 3, -18, 1, 1);   // (cross-eyed when dizzy)
     box('#5fd068', -3, -27, 1, 3); box('#5fd068', 2, -27, 1, 3); box('#ffcc3d', -4, -28, 2, 2); box('#ffcc3d', 2, -28, 2, 2);
     box('#1d2f8c', -6, -22, 12, 2); box('#1d2f8c', -4, -24, 8, 2); box('#14122a', 2, -21, 6, 1); box('#ffcc3d', -1, -24, 2, 2);
-    box('#5fd068', 3, -11, 3, 2); box('#55556a', 5, -12, 6, 3);
-    if (c.flash) box('#ff3e30', 11, -12, 3, 3);
+    box('#5fd068', 3, -11, 3, 2);
   }
   // (a navy and white saucer with COPS on its side, a cop at the wheel under the dome, and red and blue lights going)
   function drawCopShip(s, cam = plain.cam) {
