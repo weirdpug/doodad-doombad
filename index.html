@@ -4207,9 +4207,9 @@
         box('#8d90a0', 12, -70, 7, 14);
         for (let i = 0; i < 4; i++) { const u = ((plain.t + i * 22) % 88) / 88; round('#7af0a0', 15 + Math.sin(u * 9 + i) * 4, -72 - u * 40, 1 + (1 - u) * 2); }
         break;
-      case 4:   // (a stepped pyramid with an eye)
+      case 4:   // (a stepped pyramid, with its door; no eye on it any more (the user asked))
         for (let i = 0; i < 8; i++) box(i % 2 ? '#c8a040' : '#e8c060', -44 + i * 5, -(i + 1) * 8, 88 - i * 10, 8);
-        box('#6a4a10', -5, -12, 10, 12); round('#ffffff', 0, -40, 7); round('#3fbfae', 0, -40, 4); round('#14122a', 0, -40, 2);
+        box('#6a4a10', -5, -12, 10, 12);
         break;
       case 5: {   // (a bank, where the twin towers were (the user asked): blue stone, cream pillars, barred windows, gold
         // trim, its name, and a big gold coin turning on the roof)
