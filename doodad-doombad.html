@@ -4020,7 +4020,7 @@
   function enterPlanet() {
     const g = plain, ids = g.fin.ids;
     g.fin = null; g.stroll = false; g.drop = null; g.space = null; g.isle = false; g.crumble = null; g.hole = null; g.warp = null; g.boss = null; g.nuke = null;
-    g.obs = []; g.drops = []; g.rovers = []; g.martians = []; g.cops = []; g.copShip = null; g.copShots = []; g.alienPop = {}; g.wrecked = {}; g.robbed = {}; g.bust = null; g.caught = false; g.talk = null; g.talkCount = {}; g.panic = {}; g.sky = { bolts: [], copBolts: [], booms: [], heat: {}, flash: {}, cop: null, hp: SHIP_HP, hitT: 0, fireT: 0, dead: 0 }; g.ships = []; g.bits = []; g.endT = 0; g.cam = -PW / 2; g.planet = true; g.room = null; g.roomOn = {}; g.statues = []; g.shipAt = {};
+    g.obs = []; g.drops = []; g.rovers = []; g.martians = []; g.cops = []; g.copShip = null; g.copShots = []; g.alienPop = {}; g.wrecked = {}; g.robbed = {}; g.bust = null; g.caught = false; g.talk = null; g.talkCount = {}; g.panic = {}; g.roomHurt = {}; g.sky = { bolts: [], copBolts: [], booms: [], heat: {}, flash: {}, cop: null, hp: SHIP_HP, hitT: 0, fireT: 0, dead: 0 }; g.ships = []; g.bits = []; g.endT = 0; g.cam = -PW / 2; g.planet = true; g.room = null; g.roomOn = {}; g.statues = []; g.shipAt = {};
     g.pcData = { paint: {}, blob: 0, bars: [3, 5, 2, 6, 4, 7, 3, 5], notes: [false, false, false, false], chats: {}, wait: null };
     g.pugs = ids.map((id, i) => shopPug(id, i * 16 - 8, -20));
     tone(600, 0.4, 'sine', 0.06, 300);
@@ -4447,7 +4447,7 @@
     // rings the bell on the counter and asks what you want: rob the bank, or give the teller 5 coins)
     { wall: '#e3d9c0', floor: '#8a8e9e', scene: drawBank, things: [
       { x: 72, names: ['LOCKED UP TIGHT', 'SO MUCH GOLD'], s: [90, 'square', -40], draw: (b, r, on, t) => drawVault(b, r, +on, t) },
-      { x: 182, teller: true, draw: b => {
+      { x: 182, teller: true, person: 'teller', draw: b => {
         b('#8a6a20', -17, -26, 10, 2); b('#ffcc3d', -16, -31, 8, 5); b('#ffcc3d', -15, -33, 6, 2); b('#c8a040', -13, -35, 2, 2); b('#fff6c8', -14, -31, 1, 2); } }] },
     { wall: '#bfeee0', floor: '#2fb88a', things: [
       { x: 110, say: 'IT GREW!', s: [330, 'sine', 700], draw: (b, r, on) => { const h = on ? 58 : 18; b('#a8743a', -8, -10, 16, 10); b('#2f9f92', -1, -10 - h, 3, h); r('#ff9ac0', 0, -12 - h, on ? 10 : 5); r('#ffcc3d', 0, -12 - h, on ? 4 : 2); } },
@@ -4516,11 +4516,14 @@
       } }] },
     // (16: the boss's office, at the top, with a big window over the city)
     { wall: '#4a2a5a', floor: '#8a1f2a', upstairs: true, window: true, high: 70, scene: drawBossRoom, things: [LIFT,
-      { x: 160, names: ['WHO LET A DOG IN HERE?', 'GET BACK TO WORK!', "YOU'RE FIRED!", 'JUST KIDDING'], s: [200, 'square', -60], draw: (b, r, on) => {
+      { x: 160, person: 'boss', names: ['WHO LET A DOG IN HERE?', 'GET BACK TO WORK!', "YOU'RE FIRED!", 'JUST KIDDING'], s: [200, 'square', -60], draw: (b, r, on) => {
         b('#3a1a2a', -11, -50, 22, 30);
-        ctx.save(); ctx.translate(0, -16); drawAlien(b.x, '#b48ae0', 0, -1); ctx.restore();
-        b('#ffffff', -3, -26, 6, 4); b('#e8282f', -1, -26, 2, 4);
-        if (+on === 2) { b('#14122a', -5, -34, 4, 1); b('#14122a', 1, -34, 4, 1); }   // (cross)
+        const boss = roomPersonDraw('boss', b.x);
+        if (boss) {
+          ctx.save(); ctx.translate(0, -16); drawAlien(Math.round(boss.x), '#b48ae0', 0, -1, boss.dizzy); ctx.restore();
+          ctx.fillStyle = '#ffffff'; ctx.fillRect(Math.round(boss.x) - 3, PLAIN_Y - 26, 6, 4); ctx.fillStyle = '#e8282f'; ctx.fillRect(Math.round(boss.x) - 1, PLAIN_Y - 26, 2, 4);
+          if (+on === 2 && !boss.dizzy) { b('#14122a', -5, -34, 4, 1); b('#14122a', 1, -34, 4, 1); }   // (cross)
+        }
         b('#6a3e1e', -24, -20, 48, 20); b('#8a5a34', -26, -22, 52, 3); b('#5a3010', -20, -16, 40, 1); b('#ffcc3d', -8, -26, 16, 4);
       } },
       { x: 214, say: 'CLACK CLACK', s: [1500, 'square', -800], draw: (b, r, on, t) => {
@@ -4805,6 +4808,7 @@
     if (r.drink) { stepDrink(); g.kbAtk = false; return; }
     if (r.plaque) { stepPlaque(); g.kbAtk = false; return; }
     if (r.cops) stepRoomCops();
+    stepRoomHurt();
     if (g.caught) { startBust(); g.kbAtk = false; return; }
     if (r.kind === COP_STATION) r.jailT++;
     if (r.report || r.perp) stepReport();
@@ -4836,7 +4840,9 @@
       const at = roomSpot(p);
       p.upDoor = at !== null || p.upWas;   // (holding Up after a smash must not hop)
       const caged = r.kind === COP_STATION, tight = caged && cellZoom(r) > 0;
+      const barked = p.barkT;
       floorPug(p, caged ? (tight ? CELL_ZOOM_L : CELL_L) : 14, caged ? (tight ? CELL_ZOOM_R : CELL_R) : PW - 14, PLAIN_Y, 1.25, -3.4);
+      if (p.barkT > barked) barkRoom(p);
       if (!p.upFresh || at === null) continue;
       if (at === -2) { r.pick = { sel: 0, id: p.id, held: { left: false, right: false, up: true, down: false }, msg: 0 }; p.moving = false; sfx.tick(); break; }
       if (at < 0) {
@@ -5039,12 +5045,53 @@
     box('#3a3a4a', -30, -6, 60, 6); box('#55556a', -24, -12, 22, 6); box('#6a6e80', 2, -10, 20, 4); box('#2a2a36', -6, -17, 12, 6); box('#8d90a0', 12, -14, 5, 4); box('#6a3e1e', -16, -15, 3, 4);
     for (let i = 0; i < 2; i++) { const u = ((t + i * 25) % 50) / 50; ctx.fillStyle = `rgba(80,80,90,${(0.5 - u * 0.45).toFixed(2)})`; ctx.beginPath(); ctx.arc(x - 4 + i * 10, PLAIN_Y - 18 - u * 26, 3 + u * 5, 0, Math.PI * 2); ctx.fill(); }
   }
+  // The people inside buildings can be barked to death too (the user asked), like the aliens outside: in reach in front
+  // of a barking pug, one goes dizzy, then pops. Each room's people by name and where they are now; cops never die.
+  // g.roomHurt holds the barked ones, by room and name: { t: frames left of being dizzy, 0 once dead, x: where it stopped }
+  const roomKey = r => r.n + '/' + (r.floor || 0);
+  function roomPeople(r, t) {
+    const k = r.kind, R = ROOMS[k];
+    if (!R.scene) return [['walker', 150 + Math.sin(t * 0.012) * 8]];
+    if (k === 11) return [['cook', 150]];
+    if (k === 1) return [132, 168, 204].map(x => ['w' + x, x - 4]);
+    if (k === MUSEUM) return [['guard', 150 + Math.sin(t * 0.008) * 70]];
+    if (k === 5) return [['teller', 196]];
+    if (k === 13) return [106, 150, 196].map(x => ['m' + x, x]);
+    if (k === 14) return [['b1', 164]];
+    if (k === 16) return [['boss', 160]];
+    if (k === 3) return [['sci', 150 + Math.sin(t * 0.01) * 70]];
+    return [];
+  }
+  const roomPerson = id => { const r = plain.room; return r ? plain.roomHurt[roomKey(r) + ':' + id] || null : null; };
+  const personDead = id => { const h = roomPerson(id); return !!h && !h.t; };
+  // (where to draw one: where they are, or shaking where they stopped while dizzy; null once they've popped)
+  function roomPersonDraw(id, x) {
+    const h = roomPerson(id);
+    if (!h) return { x, dizzy: false };
+    return h.t ? { x: h.x + (plain.t >> 1) % 3 - 1, dizzy: true } : null;
+  }
+  function barkRoom(p) {
+    const g = plain, r = g.room;
+    for (const [id, x] of roomPeople(r, g.t)) {
+      const key = roomKey(r) + ':' + id, d = (x - p.x) * p.face;
+      if (!g.roomHurt[key] && d > -8 && d < PLAIN_BARK) { g.roomHurt[key] = { t: 20, x }; sfx.stun(); }
+    }
+  }
+  function stepRoomHurt() {
+    const g = plain, pre = roomKey(g.room) + ':';
+    for (const key of Object.keys(g.roomHurt)) {
+      const h = g.roomHurt[key];
+      if (!h.t || !key.startsWith(pre) || --h.t) continue;
+      sfx.pop();
+      for (let i = 0; i < 8; i++) g.bits.push({ x: h.x, y: PLAIN_Y - 14, vx: (Math.random() - 0.5) * 3, vy: -1 - Math.random() * 2, g: 0.15, t: 24, col: i % 2 ? '#5fd068' : '#b48ae0' });
+    }
+  }
   // (what Up does for a pug in a room: -1 the door, -2 the alien at a counter, 0 up the number of a thing, or null)
   function roomSpot(p) {
     if (!p.ground || p.sitting) return null;
     if (p.x < ROOM_DOOR + 12 && !ROOMS[plain.room.kind].upstairs) return -1;
-    if (ROOMS[plain.room.kind].counter && Math.abs(p.x - 150) < 50) return -2;   // (at the counter)
-    const i = ROOMS[plain.room.kind].things.findIndex((k, n) => Math.abs(p.x - thingX(k)) < (k.breaks ? 15 : ROOM_REACH) && !(k.breaks && plain.room.on[n]) && !statueGone(k));
+    if (ROOMS[plain.room.kind].counter && Math.abs(p.x - 150) < 50 && !personDead('cook')) return -2;   // (at the counter)
+    const i = ROOMS[plain.room.kind].things.findIndex((k, n) => Math.abs(p.x - thingX(k)) < (k.breaks ? 15 : ROOM_REACH) && !(k.breaks && plain.room.on[n]) && !statueGone(k) && !(k.person && personDead(k.person)));
     return i < 0 ? null : i;
   }
   // (what EATS sells: a name, a price in coins and how it's drawn, sitting on y and with its middle at x)
@@ -5216,10 +5263,10 @@
     box('#14122a', 118, -94, 64, 15); drawText('EATS', 150, PLAIN_Y - 90, 'gold', 'center');
     // (the alien, the same size as the ones outside, standing up behind the counter in a white hat, shirt and bow tie and a
     // red apron, nodding a little)
-    const bob = (t >> 5) & 1, cx = 150;
+    const cook = roomPersonDraw('cook', 150), bob = (t >> 5) & 1, cx = cook ? Math.round(cook.x) : 150;
     ctx.save(); ctx.translate(0, -22 - bob);
-    drawAlien(cx, '#5fd068', 0, 1);
-    const u = (col, a, b, w, h) => { ctx.fillStyle = col; ctx.fillRect(cx + a, PLAIN_Y + b, w, h); };
+    if (cook) drawAlien(cx, '#5fd068', 0, 1, cook.dizzy);
+    const u = (col, a, b, w, h) => { if (!cook) return; ctx.fillStyle = col; ctx.fillRect(cx + a, PLAIN_Y + b, w, h); };
     u('#ffffff', -5, -10, 10, 8); u('#e8282f', -3, -8, 6, 6); u('#e8282f', -2, -10, 1, 2); u('#e8282f', 1, -10, 1, 2);
     u('#14122a', -2, -11, 4, 1); u('#14122a', -1, -12, 2, 2);
     u('#ffffff', -6, -21, 12, 3); u('#ffffff', -5, -26, 10, 5); u('#e8282f', -6, -20, 12, 1);
@@ -5254,7 +5301,8 @@
     // (the cubicles, each with an alien at a screen)
     for (const x of [132, 168, 204]) {
       const bob = ((t + x) >> 4) & 1;
-      ctx.save(); ctx.translate(0, -22 - bob); drawAlien(x - 4, '#5fd068', 0, 1); ctx.restore();
+      const wk = roomPersonDraw('w' + x, x - 4);
+      if (wk) { ctx.save(); ctx.translate(0, -22 - bob); drawAlien(Math.round(wk.x), '#5fd068', 0, 1, wk.dizzy); ctx.restore(); }
       box('#22222c', x + 4, -40, 12, 9);
       box((((t + x * 3) >> 5) & 1) ? '#7ae0ff' : '#5fd068', x + 5, -39, 10, 7);
     }
@@ -5272,9 +5320,12 @@
     box('#ffcc3d', 157, -108, 14, 4); box('#ffcc3d', 157, -111, 2, 3); box('#ffcc3d', 163, -111, 2, 3); box('#ffcc3d', 169, -111, 2, 3); box('#5fd068', 160, -112, 1, 4); box('#5fd068', 167, -112, 1, 4);
     frame(198, '#1f0e46'); box('#a8743a', 206, -100, 14, 3); box('#7ae0ff', 210, -103, 6, 3); box('#ffffff', 222, -100, 5, 1); box('#ffffff', 223, -97, 4, 1); box('#ffffff', 201, -109, 1, 1); box('#ffffff', 229, -108, 1, 1);
     // (the guard, in a cap, walking slowly up and down behind everything)
-    const gx = Math.round(150 + Math.sin(t * 0.008) * 70), face = Math.cos(t * 0.008) < 0 ? -1 : 1;
-    drawAlien(gx, '#5fd068', (t >> 4) & 1, face);
-    box('#1d2f8c', gx - 6, -22, 12, 2); box('#1d2f8c', gx - 4, -24, 8, 2); box('#ffcc3d', gx - 1, -24, 2, 2); box('#1d2f8c', gx - 3, -10, 6, 5);
+    const gw = roomPersonDraw('guard', Math.round(150 + Math.sin(t * 0.008) * 70)), face = Math.cos(t * 0.008) < 0 ? -1 : 1;
+    if (gw) {
+      const gx = Math.round(gw.x);
+      drawAlien(gx, '#5fd068', gw.dizzy ? 0 : (t >> 4) & 1, face, gw.dizzy);
+      box('#1d2f8c', gx - 6, -22, 12, 2); box('#1d2f8c', gx - 4, -24, 8, 2); box('#ffcc3d', gx - 1, -24, 2, 2); box('#1d2f8c', gx - 3, -10, 6, 5);
+    }
   }
   // (the museum's second floor: a banner, a torch, and old cave paintings: aliens, a blob, the moons and a saucer)
   function drawAncient(t) {
@@ -5340,10 +5391,10 @@
     bb('#ffffff', 212, PLAIN_Y - 98, 9); ctx.strokeStyle = '#c8a040'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(212, PLAIN_Y - 98, 9, 0, Math.PI * 2); ctx.stroke();
     box('#22222c', 211, -104, 2, 6); box('#22222c', 212, -99, 5, 2);
     drawPlant(116);
-    const bob = (t >> 5) & 1, cx = 196, L = 132, R = PW;
+    const teller = roomPersonDraw('teller', 196), bob = (t >> 5) & 1, cx = teller ? Math.round(teller.x) : 196, L = 132, R = PW;
     ctx.save(); ctx.translate(0, -18 - bob);
-    drawAlien(cx, '#5fd068', 0, 1);
-    const u = (col, a, b, w, h) => { ctx.fillStyle = col; ctx.fillRect(cx + a, PLAIN_Y + b, w, h); };
+    if (teller) drawAlien(cx, '#5fd068', 0, 1, teller.dizzy);
+    const u = (col, a, b, w, h) => { if (!teller) return; ctx.fillStyle = col; ctx.fillRect(cx + a, PLAIN_Y + b, w, h); };
     u('rgba(47,184,138,0.8)', -7, -21, 14, 3); u('#1d6a3a', -8, -18, 16, 1);
     u('#ffffff', -3, -10, 6, 3); u('#e8282f', -3, -10, 2, 2); u('#e8282f', 1, -10, 2, 2); u('#b0242c', -1, -10, 2, 2);
     ctx.restore();
@@ -5692,7 +5743,8 @@
     ctx.fillStyle = 'rgba(255,255,220,0.16)'; ctx.beginPath(); ctx.moveTo(152, PLAIN_Y - 24); ctx.lineTo(92, PLAIN_Y - 82); ctx.lineTo(152, PLAIN_Y - 82); ctx.closePath(); ctx.fill();
     for (const [x, col] of [[106, '#5fd068'], [150, '#ffd060'], [196, '#6ae0c8']]) {
       box('#3a3a4a', x - 7, -32, 14, 18);
-      ctx.save(); ctx.translate(0, -12); drawAlien(x, col, 0, x < 196 ? 1 : -1); ctx.restore();
+      const m = roomPersonDraw('m' + x, x);
+      if (m) { ctx.save(); ctx.translate(0, -12); drawAlien(Math.round(m.x), col, 0, x < 196 ? 1 : -1, m.dizzy); ctx.restore(); }
     }
     if (!plain.room.on[2]) { box('#6ae0c8', 192, -28, 8, 4); box('#14122a', 192, -26, 3, 1); box('#14122a', 197, -26, 3, 1); }   // (eyes shut)
     box('#6a3e1e', 90, -18, 144, 4); box('#8a5a34', 90, -18, 144, 1); box('#6a3e1e', 94, -14, 3, 14); box('#6a3e1e', 227, -14, 3, 14);
@@ -5706,8 +5758,8 @@
     box('#14122a', 160, -122, 64, 15); drawText('BREAK TIME', 192, PLAIN_Y - 119, 'gold', 'center');
     box('#eef0f6', 92, -30, 64, 30); box('#8d90a0', 90, -32, 68, 3); box('#c8ccd8', 123, -28, 2, 28); box('#8d90a0', 118, -20, 2, 4); box('#8d90a0', 128, -20, 2, 4);
     box('#eef0f6', 212, -58, 24, 58); box('#c8ccd8', 212, -38, 24, 1); box('#8d90a0', 214, -54, 2, 12); box('#8d90a0', 214, -34, 2, 12); box('#e8282f', 228, -52, 3, 3); box('#ffcc3d', 224, -46, 3, 3);
-    drawAlien(164, '#b48ae0', 0, -1);
-    box('#ffffff', 156, -12, 5, 5); box('#ffffff', 154, -11, 2, 3); box('#5fc88f', 157, -12, 3, 1);
+    const br = roomPersonDraw('b1', 164);
+    if (br) { const bx = Math.round(br.x) - 164; drawAlien(164 + bx, '#b48ae0', 0, -1, br.dizzy); box('#ffffff', 156 + bx, -12, 5, 5); box('#ffffff', 154 + bx, -11, 2, 3); box('#5fc88f', 157 + bx, -12, 3, 1); }
     for (let i = 0; i < 2; i++) box('rgba(255,255,255,0.7)', 157 + i * 2, -16 - ((t >> 3) + i * 4) % 8, 1, 2);
   }
   // (the server room: racks of blinking servers, dark when the big switch is off)
@@ -6167,11 +6219,14 @@
     box('#8a5a34', 160, -96, 70, 3);
     [['#ff9ac0', 166], ['#7ae0ff', 180], ['#5fd068', 194], ['#ffcc3d', 208]].forEach(([col, x]) => { box('#d8f4ff', x, -112, 10, 16); box(col, x + 1, -106, 8, 10); box('#8a5a34', x + 2, -114, 6, 2); });
     // (the scientist behind the bench, in a white coat and goggles, wandering up and down)
-    const a = t * 0.01, x = Math.round(150 + Math.sin(a) * 70), face = Math.cos(a) < 0 ? -1 : 1;
-    ctx.save(); ctx.translate(0, -26); drawAlien(x, '#5fd068', (t >> 3) & 1, face);
-    ctx.fillStyle = '#ffffff'; ctx.fillRect(x - 5, PLAIN_Y - 10, 10, 11); ctx.fillStyle = '#c8ccd8'; ctx.fillRect(x, PLAIN_Y - 10, 1, 11);
-    ctx.fillStyle = '#7ae0ff'; ctx.fillRect(x - 5, PLAIN_Y - 17, 5, 6); ctx.fillRect(x + 1, PLAIN_Y - 17, 5, 6); ctx.fillStyle = '#14122a'; ctx.fillRect(x - 6, PLAIN_Y - 14, 13, 1);
-    ctx.restore();
+    const a = t * 0.01, sc = roomPersonDraw('sci', Math.round(150 + Math.sin(a) * 70)), face = Math.cos(a) < 0 ? -1 : 1;
+    if (sc) {
+      const x = Math.round(sc.x);
+      ctx.save(); ctx.translate(0, -26); drawAlien(x, '#5fd068', sc.dizzy ? 0 : (t >> 3) & 1, face, sc.dizzy);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(x - 5, PLAIN_Y - 10, 10, 11); ctx.fillStyle = '#c8ccd8'; ctx.fillRect(x, PLAIN_Y - 10, 1, 11);
+      ctx.fillStyle = '#7ae0ff'; ctx.fillRect(x - 5, PLAIN_Y - 17, 5, 6); ctx.fillRect(x + 1, PLAIN_Y - 17, 5, 6); ctx.fillStyle = '#14122a'; ctx.fillRect(x - 6, PLAIN_Y - 14, 13, 1);
+      ctx.restore();
+    }
     // (the bench)
     box('#55647a', 50, -26, 186, 4); box('#7a8a98', 50, -26, 186, 1); box('#6a7886', 56, -22, 6, 22); box('#6a7886', 224, -22, 6, 22); box('#6a7886', 140, -22, 6, 22);
   }
@@ -6192,7 +6247,7 @@
     // (the way out)
     if (!R.upstairs) { ctx.fillStyle = '#14122a'; ctx.fillRect(ROOM_DOOR - 13, PLAIN_Y - 46, 26, 46); ctx.fillStyle = '#c8ffb0'; ctx.fillRect(ROOM_DOOR - 11, PLAIN_Y - 44, 22, 44); }
     if (R.scene) R.scene(t);
-    else drawAlien(Math.round(150 + Math.sin(t * 0.012) * 8), '#5fd068', (t >> 3) & 1, Math.cos(t * 0.012) < 0 ? -1 : 1);
+    else { const w = roomPersonDraw('walker', Math.round(150 + Math.sin(t * 0.012) * 8)); if (w) drawAlien(Math.round(w.x), '#5fd068', w.dizzy ? 0 : (t >> 3) & 1, Math.cos(t * 0.012) < 0 ? -1 : 1, w.dizzy); }
     R.things.forEach((k, i) => {
       const b = (col, a, c, w, h) => { ctx.fillStyle = col; ctx.fillRect(k.x + a, PLAIN_Y + c, w, h); };
       const ball = (col, a, c, rad) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(k.x + a, PLAIN_Y + c, rad, 0, Math.PI * 2); ctx.fill(); };
