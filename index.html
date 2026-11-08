@@ -4125,7 +4125,6 @@
         round('#c8a040', 0, -32, 4); round('#ffcc3d', 0, -32, 3); box('#c8a040', 0, -33, 1, 2);
         box('#14122a', -9, -25, 18, 22); box('#7ae0ff', -8, -24, 7, 21); box('#7ae0ff', 1, -24, 7, 21); box('#bfeaff', -8, -24, 2, 21); box('#bfeaff', 1, -24, 2, 21);
         box('#ffcc3d', -3, -14, 1, 3); box('#ffcc3d', 2, -14, 1, 3);
-        drawWordBoard(x);
         break;
       case 9:   // (a tall shell of rings)
         for (let i = 0; i < 7; i++) box(i % 2 ? '#6ae0c8' : '#3fbfae', -32 + i * 4, -(i + 1) * 12, 64 - i * 8, 12);
@@ -5246,7 +5245,7 @@
     for (const [k, words] of Object.entries(PERP_FLAGS)) d[k] = f(...words);
     return d;
   }
-  // (every word a report understands, by what kind of word it is, for the board over the police station: each list
+  // (every word a report understands, by what kind of word it is, for the board in the police station: each list
   // without the words an earlier one already has)
   function perpWordGroups() {
     const seen = new Set(), only = list => list.filter(x => !seen.has(x) && seen.add(x));
@@ -5255,16 +5254,15 @@
       ['LOOKS AND THINGS', only(Object.values(PERP_FLAGS).flat())]];
   }
   // (the board's lines: each heading, then its words as many to a line as fit; made once)
-  const WORD_BOARD_CHARS = 32;
   let wordBoardLines = null;
-  function wordBoard() {
+  function wordBoard(chars) {
     if (wordBoardLines) return wordBoardLines;
     wordBoardLines = [];
     for (const [title, words] of perpWordGroups()) {
       wordBoardLines.push([title, 'gold']);
       let line = '';
       for (const word of words) {
-        if (line && line.length + 1 + word.length > WORD_BOARD_CHARS) { wordBoardLines.push([line, undefined]); line = ''; }
+        if (line && line.length + 1 + word.length > chars) { wordBoardLines.push([line, undefined]); line = ''; }
         line += (line ? ' ' : '') + word.toUpperCase();
       }
       if (line) wordBoardLines.push([line, undefined]);
@@ -5272,16 +5270,15 @@
     }
     return wordBoardLines;
   }
-  // A big board on two poles over the police station, with every word a report understands going slowly up it (the
-  // user asked)
-  const WORD_BOARD_W = 200, WORD_BOARD_TOP = -214, WORD_BOARD_BOT = -84, WORD_LINE = 9;
+  // A board on the police station's wall, inside, with every word a report understands going slowly up it (the user
+  // asked); its middle at x
+  const WORD_BOARD_W = 168, WORD_BOARD_TOP = -118, WORD_BOARD_BOT = -46, WORD_LINE = 9;
   function drawWordBoard(x) {
     const box = (col, a, b, w, h) => { ctx.fillStyle = col; ctx.fillRect(x + a, PLAIN_Y + b, w, h); }, L = -WORD_BOARD_W / 2;
-    box('#55556a', -40, WORD_BOARD_BOT, 3, -60 - WORD_BOARD_BOT); box('#55556a', 37, WORD_BOARD_BOT, 3, -60 - WORD_BOARD_BOT);
     box('#8d90a0', L - 2, WORD_BOARD_TOP - 2, WORD_BOARD_W + 4, WORD_BOARD_BOT - WORD_BOARD_TOP + 4);
     box('#14122a', L, WORD_BOARD_TOP, WORD_BOARD_W, WORD_BOARD_BOT - WORD_BOARD_TOP);
     box('#1d2f8c', L, WORD_BOARD_TOP, WORD_BOARD_W, 12); drawText('REPORT WORDS', x, PLAIN_Y + WORD_BOARD_TOP + 3, 'gold', 'center');
-    const lines = wordBoard(), all = lines.length * WORD_LINE, top = WORD_BOARD_TOP + 14, h = WORD_BOARD_BOT - top - 2;
+    const lines = wordBoard(Math.floor((WORD_BOARD_W - 8) / 6)), all = lines.length * WORD_LINE, top = WORD_BOARD_TOP + 14, h = WORD_BOARD_BOT - top - 2;
     const off = (plain.t * 0.35) % all;
     ctx.save(); ctx.beginPath(); ctx.rect(x + L, PLAIN_Y + top, WORD_BOARD_W, h); ctx.clip();
     for (let k = 0; k < 2; k++) lines.forEach(([text, key], i) => {
@@ -5421,12 +5418,14 @@
     if (d.stink) for (let i = 0; i < 3; i++) { const k = ((t >> 3) + i) % 4; B('#7af0a0', hx - 4 + i * 4 + (k & 1), top - 4 - k * 2, 1, 3); }
     ctx.restore();
   }
-  // (inside the police station: its name, a clock, a plant, and the cop on duty behind the front desk)
+  // (inside the police station: its name, a clock, the board of report words, a plant, and the cop on duty behind the
+  // front desk)
   function drawPolice(t) {
     const box = (col, x, y, w, h) => { ctx.fillStyle = col; ctx.fillRect(x, PLAIN_Y + y, w, h); };
     box('#1d2f8c', 84, -134, 72, 13); drawText('POLICE', 120, PLAIN_Y - 131, 'gold', 'center');
-    bb('#ffffff', 200, PLAIN_Y - 100, 9); ctx.strokeStyle = '#1d2f8c'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(200, PLAIN_Y - 100, 9, 0, Math.PI * 2); ctx.stroke();
-    box('#22222c', 199, -106, 2, 6); box('#22222c', 200, -101, 5, 2);
+    bb('#ffffff', 224, PLAIN_Y - 100, 9); ctx.strokeStyle = '#1d2f8c'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(224, PLAIN_Y - 100, 9, 0, Math.PI * 2); ctx.stroke();
+    box('#22222c', 223, -106, 2, 6); box('#22222c', 224, -101, 5, 2);
+    drawWordBoard(122);
     drawPlant(224);
     const was = plain.cam; plain.cam = 0;
     drawCop({ x: 176, y: PLAIN_Y - 12, t, face: -1, walk: false, flash: 0 });
