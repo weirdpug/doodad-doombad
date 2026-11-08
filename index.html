@@ -5200,20 +5200,46 @@
       }
     }
   }
-  // (what the words say to bring in: what it is, its colour, how big, and what it's wearing)
+  // (what the words say to bring in: what it is, its colour, how big and how wide, and what it's wearing; over a
+  // hundred words count (the user asked for at least 70 more))
   const PERP_COLS = { red: '#e8282f', orange: '#ff8a3d', yellow: '#ffd060', green: '#5fd068', blue: '#4f8aff', purple: '#b48ae0',
     pink: '#ff9ac0', white: '#eef0f6', black: '#2a2a36', brown: '#8a5a34', gray: '#8d90a0', grey: '#8d90a0', gold: '#ffcc3d',
-    golden: '#ffcc3d', teal: '#3fbfae', cyan: '#7ae0ff', silver: '#c8ccd8', rainbow: 'rainbow' };
+    golden: '#ffcc3d', teal: '#3fbfae', cyan: '#7ae0ff', silver: '#c8ccd8', rainbow: 'rainbow',
+    navy: '#1d2f8c', lime: '#a8f060', mint: '#9ff0c8', peach: '#ffc8a0', beige: '#e8dcc0', tan: '#d8b088', maroon: '#7a1a2a',
+    magenta: '#e83ab8', violet: '#8a4ae8', lavender: '#c8b0f0', turquoise: '#30d8c8', crimson: '#b0142c', indigo: '#4c2490',
+    aqua: '#5fe8f0', olive: '#7a8a2a', coral: '#ff7a6a', bronze: '#b8783a', rose: '#e86a8a', lilac: '#d0a8e8', scarlet: '#ff2a1a',
+    neon: '#9aff3a' };
+  // (what it is: the first of these the words name, by the words for each)
+  const PERP_KINDS = [['pug', 'pug', 'dog', 'puppy', 'doggy', 'doggo'], ['blob', 'blob', 'slime'], ['robot', 'robot', 'bot', 'cyborg'],
+    ['cop', 'cop', 'police', 'officer', 'policeman'], ['cat', 'cat', 'kitty', 'kitten'], ['ghost', 'ghost', 'spooky', 'boo', 'phantom'],
+    ['skeleton', 'skeleton', 'bones', 'skull', 'bony'], ['zombie', 'zombie', 'undead'], ['monster', 'monster', 'beast', 'creature', 'ogre', 'troll'],
+    ['dino', 'dinosaur', 'dino', 'trex', 'lizard', 'dragon'], ['bird', 'bird', 'chicken', 'duck', 'parrot', 'birdie', 'hen'],
+    ['frog', 'frog', 'toad'], ['bear', 'bear', 'teddy', 'grizzly'], ['penguin', 'penguin'], ['snowman', 'snowman'], ['mouse', 'mouse', 'rat'],
+    ['human', 'human', 'person', 'man', 'woman', 'guy', 'girl', 'boy', 'kid', 'lady', 'dude', 'people'], ['alien', 'alien', 'martian']];
+  // (dressed up as one of these, they're a person, unless the words say what else, wearing this colour)
+  const PERP_OUTFITS = { ninja: '#2a2a36', pirate: '#8a1f2a', clown: '#ffd060', joker: '#4c2490', wizard: '#4c2490', witch: '#2a2a36',
+    astronaut: '#eef0f6', spaceman: '#eef0f6', vampire: '#2a2a36', dracula: '#2a2a36', cowboy: '#8a5a34', cowgirl: '#8a5a34',
+    sheriff: '#8a5a34', knight: '#a8acbc', chef: '#eef0f6', cook: '#eef0f6', baker: '#eef0f6', angel: '#eef0f6', devil: '#e8282f',
+    demon: '#e8282f', superhero: '#4f8aff', hero: '#4f8aff', fairy: '#ff9ac0' };
   function describePerp(text) {
-    const w = text.toLowerCase().match(/[a-z]+/g) || [], has = (...k) => k.some(x => w.includes(x) || w.includes(x + 's'));
-    const kind = has('pug', 'dog', 'puppy', 'doggy', 'doggo') ? 'pug' : has('blob', 'slime') ? 'blob' : has('robot', 'bot', 'cyborg') ? 'robot'
-      : has('cop', 'police', 'officer', 'policeman') ? 'cop' : has('cat', 'kitty', 'kitten') ? 'cat'
-      : has('human', 'person', 'man', 'woman', 'guy', 'girl', 'boy', 'kid', 'lady', 'dude', 'people') ? 'human' : 'alien';
-    const named = w.find(x => PERP_COLS[x]);
-    return { kind, col: named ? PERP_COLS[named] : null,
-      size: has('big', 'huge', 'giant', 'tall', 'fat', 'large', 'massive', 'chunky') ? 1.5 : has('small', 'tiny', 'little', 'short', 'mini', 'baby', 'smol') ? 0.7 : 1,
-      hat: has('hat', 'tophat'), crown: has('king', 'queen', 'crown', 'prince', 'princess'), glasses: has('glasses', 'sunglasses', 'shades', 'nerd'),
-      mask: has('robber', 'thief', 'mask', 'bandit', 'burglar', 'crook'), stache: has('mustache', 'moustache', 'beard'), angry: has('angry', 'mad', 'evil', 'mean', 'bad') };
+    const w = text.toLowerCase().match(/[a-z]+/g) || [], f = (...k) => k.some(x => w.includes(x) || w.includes(x + 's'));
+    const found = PERP_KINDS.find(([, ...words]) => f(...words)), outfit = Object.keys(PERP_OUTFITS).find(k => f(k));
+    const kind = found ? found[0] : outfit ? 'human' : 'alien', named = w.find(x => PERP_COLS[x]);
+    return { kind, col: named ? PERP_COLS[named] : outfit && kind === 'human' ? PERP_OUTFITS[outfit] : null,
+      size: f('big', 'huge', 'giant', 'tall', 'large', 'massive', 'enormous') ? 1.5 : f('small', 'tiny', 'little', 'short', 'mini', 'baby', 'smol') ? 0.7 : 1,
+      wide: f('fat', 'chubby', 'chunky', 'round', 'plump') ? 1.3 : f('skinny', 'thin', 'slim') ? 0.75 : 1,
+      invisible: f('invisible', 'transparent'), flip: f('upside', 'upsidedown'),
+      crown: f('king', 'queen', 'crown', 'prince', 'princess', 'royal'), wizardHat: f('wizard', 'witch', 'magic'), pirateHat: f('pirate'),
+      cowboyHat: f('cowboy', 'cowgirl', 'sheriff'), chefHat: f('chef', 'cook', 'baker'), partyHat: f('party', 'birthday'), beanie: f('beanie'),
+      knightHelm: f('knight', 'armor', 'armour'), spaceHelm: f('astronaut', 'spaceman', 'helmet'), hat: f('hat', 'tophat', 'fancy'),
+      glasses: f('glasses', 'sunglasses', 'shades', 'nerd', 'nerdy', 'cool'), mask: f('robber', 'thief', 'mask', 'bandit', 'burglar', 'crook'),
+      ninja: f('ninja'), stache: f('mustache', 'moustache', 'beard', 'wizard', 'old'), angry: f('angry', 'mad', 'evil', 'mean', 'bad', 'grumpy'),
+      eyepatch: f('eyepatch', 'patch', 'pirate'), bowtie: f('bowtie', 'bow', 'fancy'), tie: f('tie', 'necktie', 'boss', 'business'),
+      scarf: f('scarf', 'cold', 'winter'), cape: f('cape', 'superhero', 'hero', 'vampire', 'dracula'), horns: f('horn', 'devil', 'demon'),
+      halo: f('halo', 'angel'), wings: f('wing', 'angel', 'fairy'), headphones: f('headphones', 'music', 'dj'), sword: f('sword', 'knight', 'warrior'),
+      money: f('money', 'cash', 'rich', 'loot'), tears: f('crying', 'sad', 'cry'), smile: f('happy', 'smiling', 'smile', 'nice', 'friendly'),
+      sleepy: f('sleepy', 'tired', 'sleeping', 'lazy'), sparkle: f('sparkly', 'shiny', 'glowing', 'magic', 'fairy'),
+      stink: f('stinky', 'smelly', 'stink', 'gross'), clown: f('clown', 'joker'), fangs: f('vampire', 'dracula', 'fang') };
   }
   // (the two cops walking in with whoever they've caught between them, handcuffed to them)
   function drawPerpGroup(g) {
@@ -5225,53 +5251,125 @@
     ctx.moveTo(g.x - gap + 6, PLAIN_Y - 11); ctx.lineTo(g.x - 3 * s, PLAIN_Y - 9 * s); ctx.moveTo(g.x + 3 * s, PLAIN_Y - 9 * s); ctx.lineTo(g.x + gap - 5, PLAIN_Y - 11); ctx.stroke();
     drawPerp(g.x, g.d, g.t, walk);
   }
+  // (where each kind's head and neck are, for what it wears: head middle, top and eyes, head width, neck middle and height,
+  // body width; yo lifts a floating ghost)
+  function perpAnchor(kind, yo) {
+    const H = { hx: 0, top: -25, ey: -22, hw: 8, nx: 0, ny: -17, bw: 8 };
+    return ({
+      pug: { hx: 8, top: -16, ey: -13, hw: 10, nx: 4, ny: -9, bw: 12 }, blob: { hx: 0, top: -17, ey: -10, hw: 14, nx: 0, ny: -6, bw: 16 },
+      robot: { hx: 0, top: -23, ey: -19, hw: 10, nx: 0, ny: -15, bw: 12 }, cop: { hx: 0, top: -24, ey: -17, hw: 10, nx: 0, ny: -13, bw: 8 },
+      cat: { hx: 7, top: -17, ey: -13, hw: 10, nx: 3, ny: -9, bw: 12 }, ghost: { hx: 0, top: -23 + yo, ey: -16 + yo, hw: 12, nx: 0, ny: -11 + yo, bw: 14 },
+      skeleton: { hx: 0, top: -23, ey: -19, hw: 8, nx: 0, ny: -15, bw: 6 }, monster: { hx: 0, top: -19, ey: -12, hw: 16, nx: 0, ny: -5, bw: 18 },
+      dino: { hx: 8, top: -23, ey: -21, hw: 10, nx: 3, ny: -13, bw: 12 }, bird: { hx: 4, top: -19, ey: -16, hw: 8, nx: 2, ny: -12, bw: 12 },
+      frog: { hx: 0, top: -14, ey: -11, hw: 12, nx: 0, ny: -5, bw: 14 }, bear: { hx: 0, top: -24, ey: -20, hw: 10, nx: 0, ny: -15, bw: 12 },
+      penguin: { hx: 1, top: -22, ey: -18, hw: 10, nx: 0, ny: -13, bw: 12 }, snowman: { hx: 0, top: -25, ey: -23, hw: 7, nx: 0, ny: -19, bw: 9 },
+      mouse: { hx: 6, top: -10, ey: -8, hw: 6, nx: 3, ny: -6, bw: 10 }, human: H, zombie: H,
+      alien: { hx: 0, top: -20, ey: -15, hw: 12, nx: 0, ny: -10, bw: 6 } })[kind] || H;
+  }
   // (someone who fits the description, feet on the floor at x, facing right)
   function drawPerp(x, d, t, walk) {
-    const s = d.size, leg = walk ? (t >> 3) & 1 : 0;
-    const B = (col, a, b, w, h) => { ctx.fillStyle = col === 'rainbow' ? ['#e8282f', '#ff8a3d', '#ffd060', '#5fd068', '#4f8aff', '#b48ae0'][Math.abs((t >> 3) + a + b) % 6] : col; ctx.fillRect(a, PLAIN_Y + b, w, h); };
-    const O = (col, a, b, r) => { ctx.fillStyle = col === 'rainbow' ? '#ff8a3d' : col; ctx.beginPath(); ctx.arc(a, PLAIN_Y + b, r, 0, Math.PI * 2); ctx.fill(); };
-    ctx.save(); ctx.translate(x, PLAIN_Y); ctx.scale(s, s); ctx.translate(0, -PLAIN_Y);
-    let A;   // (where its head is, for what it wears: middle, top, eyes, width)
-    if (d.kind === 'pug') {
-      const c = d.col || '#c8904a', dk = '#2a1a10';
-      B(c, -8, -10, 14, 7); B(dk, -7, -3 - leg, 3, 3 + leg); B(dk, 3, -3 - (1 - leg), 3, 3 - leg + 1); O(c, -9, -10, 2);
-      B(c, 3, -16, 10, 9); B(dk, 9, -13, 4, 5); B('#14122a', 7, -14, 2, 2); B('#ffffff', 7, -14, 1, 1); B(dk, 3, -17, 3, 3); B(dk, 10, -17, 3, 2);
-      A = { hx: 8, top: -16, ey: -13, hw: 10 };
-    } else if (d.kind === 'blob') {
-      const c = d.col || '#5fc88f';
-      O(c, 0, -8, 9); B(c, -9, -8, 18, 8); B('#ffffff', -5, -12, 4, 4); B('#ffffff', 2, -12, 4, 4); B('#14122a', -3, -11, 2, 2); B('#14122a', 4, -11, 2, 2);
-      A = { hx: 0, top: -17, ey: -10, hw: 14 };
-    } else if (d.kind === 'robot') {
-      const c = d.col || '#8d90a0';
-      B('#55556a', -4, -6 + leg, 3, 6 - leg); B('#55556a', 1, -6 + (1 - leg), 3, 5 + leg); B(c, -6, -15, 12, 9); B('#ffcc3d', -2, -12, 4, 3);
-      B('#a8acbc', -5, -23, 10, 8); B('#ff3e30', -3, -20, 2, 2); B('#ff3e30', 1, -20, 2, 2); B('#55556a', 0, -26, 1, 3); O('#ff3e30', 0.5, -27, 1.2);
-      A = { hx: 0, top: -23, ey: -19, hw: 10 };
-    } else if (d.kind === 'cop') {
-      const was = plain.cam; plain.cam = 0;
-      drawCop({ x: 0, y: PLAIN_Y, t, face: 1, walk, flash: 0 });
-      plain.cam = was;
-      A = { hx: 0, top: -24, ey: -17, hw: 10 };
-    } else if (d.kind === 'cat') {
-      const c = d.col || '#ff8a3d';
-      B(c, -7, -9, 13, 6); B(c, -6, -3, 2, 3 - leg); B(c, 3, -3, 2, 2 + leg); B(c, -9, -16, 2, 9);
-      O(c, 7, -12, 5); B(c, 3, -18, 3, 3); B(c, 9, -18, 3, 3); B('#5fd068', 5, -13, 2, 2); B('#5fd068', 9, -13, 2, 2); B('#14122a', 8, -10, 1, 1);
-      A = { hx: 7, top: -17, ey: -13, hw: 10 };
-    } else if (d.kind === 'human') {
-      const c = d.col || '#e8282f';
-      B('#2a3a6a', -3, -9, 2, 9 - leg); B('#2a3a6a', 1, -9, 2, 8 + leg); B(c, -4, -17, 8, 8); B(c, -6, -16, 2, 6); B(c, 4, -16, 2, 6);
-      O('#f0c8a0', 0, -21, 4); B('#6a3e1e', -4, -25, 8, 2); B('#14122a', -2, -22, 1, 1); B('#14122a', 1, -22, 1, 1);
-      A = { hx: 0, top: -25, ey: -22, hw: 8 };
-    } else {
-      drawAlien(0, d.col === 'rainbow' ? '#5fd068' : d.col || '#5fd068', leg, 1);
-      A = { hx: 0, top: -20, ey: -15, hw: 12 };
+    const s = d.size, leg = walk ? (t >> 3) & 1 : 0, yo = d.kind === 'ghost' ? -3 + Math.round(Math.sin(t * 0.1) * 1.5) : 0;
+    const rb = ['#e8282f', '#ff8a3d', '#ffd060', '#5fd068', '#4f8aff', '#b48ae0'], dk = '#14122a';
+    const B = (col, a, b, w, h) => { ctx.fillStyle = col === 'rainbow' ? rb[Math.abs((t >> 3) + Math.round(a + b)) % 6] : col; ctx.fillRect(a, PLAIN_Y + b, w, h); };
+    const O = (col, a, b, r) => { ctx.fillStyle = col === 'rainbow' ? rb[(t >> 4) % 6] : col; ctx.beginPath(); ctx.arc(a, PLAIN_Y + b, r, 0, Math.PI * 2); ctx.fill(); };
+    const { hx, top, ey, hw, nx, ny, bw } = perpAnchor(d.kind, yo), c0 = d.col, solid = c0 === 'rainbow' ? rb[(t >> 4) % 6] : c0;
+    ctx.save(); ctx.translate(x, PLAIN_Y); ctx.scale(s * d.wide, s); ctx.translate(0, -PLAIN_Y);
+    if (d.flip) { ctx.translate(0, PLAIN_Y - 12); ctx.scale(1, -1); ctx.translate(0, 12 - PLAIN_Y); }
+    if (d.invisible) ctx.globalAlpha = 0.3;
+    // (behind it: a cape, and wings flapping)
+    if (d.cape) { B('#b0242c', nx - bw / 2 - 2, ny, bw + 4, -ny - 1); B('#6a1018', nx - bw / 2 - 2, ny, 2, -ny - 1); }
+    if (d.wings) { const up = (t >> 3) & 1; for (const sd of [-1, 1]) { O('#eef0f6', nx + sd * (bw / 2 + 3), ny + 2 - up, 4); O('#bfeaff', nx + sd * (bw / 2 + 4), ny + 3 - up, 2); } }
+    switch (d.kind) {
+      case 'pug': { const c = c0 || '#c8904a', k = '#2a1a10';
+        B(c, -8, -10, 14, 7); B(k, -7, -3 - leg, 3, 3 + leg); B(k, 3, -4 + leg, 3, 4 - leg); O(c, -9, -10, 2);
+        B(c, 3, -16, 10, 9); B(k, 9, -13, 4, 5); B(dk, 7, -14, 2, 2); B('#ffffff', 7, -14, 1, 1); B(k, 3, -17, 3, 3); B(k, 10, -17, 3, 2); break; }
+      case 'blob': { const c = c0 || '#5fc88f';
+        O(c, 0, -8, 9); B(c, -9, -8, 18, 8); B('#ffffff', -5, -12, 4, 4); B('#ffffff', 2, -12, 4, 4); B(dk, -3, -11, 2, 2); B(dk, 4, -11, 2, 2); break; }
+      case 'robot': { const c = c0 || '#8d90a0';
+        B('#55556a', -4, -6 + leg, 3, 6 - leg); B('#55556a', 1, -5 - leg, 3, 5 + leg); B(c, -6, -15, 12, 9); B('#ffcc3d', -2, -12, 4, 3);
+        B('#a8acbc', -5, -23, 10, 8); B('#ff3e30', -3, -20, 2, 2); B('#ff3e30', 1, -20, 2, 2); B('#55556a', 0, -26, 1, 3); O('#ff3e30', 0.5, -27, 1.2); break; }
+      case 'cop': { const was = plain.cam; plain.cam = 0; drawCop({ x: 0, y: PLAIN_Y, t, face: 1, walk, flash: 0 }); plain.cam = was; break; }
+      case 'cat': { const c = c0 || '#ff8a3d';
+        B(c, -7, -9, 13, 6); B(c, -6, -3, 2, 3 - leg); B(c, 3, -3, 2, 2 + leg); B(c, -9, -16, 2, 9);
+        O(c, 7, -12, 5); B(c, 3, -18, 3, 3); B(c, 9, -18, 3, 3); B('#5fd068', 5, -13, 2, 2); B('#5fd068', 9, -13, 2, 2); B(dk, 8, -10, 1, 1); break; }
+      case 'ghost': { const c = c0 || '#eef0f6';
+        O(c, 0, -16 + yo, 7); B(c, -7, -16 + yo, 14, 10);
+        for (let i = 0; i < 4; i++) B(c, -7 + i * 4, -6 + yo, 2, 2 + ((i + (t >> 3)) & 1));
+        B(dk, -3, -18 + yo, 2, 3); B(dk, 2, -18 + yo, 2, 3); O(dk, 0, -12 + yo, 1.5); break; }
+      case 'skeleton': { const c = c0 || '#eef0f6';
+        B(c, -3, -8, 1, 8 - leg); B(c, 2, -8, 1, 7 + leg); B(c, -3, -9, 6, 2); B(c, 0, -15, 1, 6); B(c, -3, -14, 7, 1); B(c, -3, -12, 7, 1);
+        B(c, -5, -14, 1, 5); B(c, 5, -14, 1, 5); O(c, 0.5, -19, 4); B(dk, -2, -20, 2, 2); B(dk, 1, -20, 2, 2); B(dk, -1, -17, 3, 1); break; }
+      case 'monster': { const c = c0 || '#b48ae0';
+        B(c, -7, -4 + leg, 4, 4 - leg); B(c, 3, -4 + (1 - leg), 4, 3 + leg); O(c, 0, -10, 9); B(c, -9, -10, 18, 6);
+        B('#eef0f6', -6, -21, 2, 3); B('#eef0f6', 4, -21, 2, 3); O('#ffffff', 0, -12, 4); O(dk, 1, -12, 2);
+        B(dk, -4, -6, 8, 2); B('#ffffff', -3, -6, 1, 1); B('#ffffff', 2, -6, 1, 1); break; }
+      case 'dino': { const c = c0 || '#5fd068';
+        B(c, -14, -10, 8, 3); B(c, -7, -13, 12, 9); B(c, -5, -4, 3, 4 - leg); B(c, 1, -4, 3, 3 + leg); B(c, 2, -19, 5, 7); B(c, 2, -23, 11, 6);
+        B(dk, 9, -22, 1, 1); B('#ffffff', 8, -18, 1, 1); B('#ffffff', 11, -18, 1, 1); B(c, 6, -11, 2, 1);
+        for (const a of [-12, -7, -3]) B('rgba(0,0,0,0.25)', a, -15 + (a === -12 ? 3 : 0), 2, 2); break; }
+      case 'bird': { const c = c0 || '#ffd060';
+        B('#ff8a3d', -2, -3, 1, 3); B('#ff8a3d', 1, -3, 1, 3); O(c, 0, -9, 6); B(c, -9, -12, 4, 3); O(c, 4, -15, 4);
+        B('#ff8a3d', 8, -15, 3, 2); B(dk, 5, -16, 1, 1); B('rgba(0,0,0,0.18)', -4, -10 + leg, 6, 4); break; }
+      case 'frog': { const c = c0 || '#5fd068';
+        O(c, 0, -5, 7); B(c, -7, -5, 14, 5); O(c, -4, -11, 3); O(c, 4, -11, 3); O('#ffffff', -4, -11, 2); O('#ffffff', 4, -11, 2);
+        B(dk, -4, -11, 1, 1); B(dk, 4, -11, 1, 1); B(dk, -4, -6, 8, 1); B(c, -9, -1, 3, 1); B(c, 6, -1, 3, 1); break; }
+      case 'bear': { const c = c0 || '#8a5a34';
+        B(c, -5, -5, 4, 5 - leg); B(c, 1, -5, 4, 4 + leg); O(c, 0, -10, 6); O('#d8b088', 0, -10, 3); O(c, 0, -19, 5);
+        O(c, -4, -23, 2); O(c, 4, -23, 2); O('#d8b088', 0, -18, 2); B(dk, -1, -19, 2, 1); B(dk, -3, -21, 1, 1); B(dk, 2, -21, 1, 1); break; }
+      case 'penguin': { const c = c0 || '#2a2a36';
+        B('#ff8a3d', -3, -1, 3, 1); B('#ff8a3d', 1, -1, 3, 1); O(c, 0, -9, 6); B(c, -6, -9, 12, 7); O(c, 0, -17, 5);
+        O('#eef0f6', 1, -8, 4); O('#eef0f6', 1, -17, 3); B(dk, 2, -18, 1, 1); B('#ff8a3d', 4, -17, 3, 1); B(c, -7, -12 + leg, 2, 6); break; }
+      case 'snowman': {
+        O('#eef0f6', 0, -6, 6); O('#eef0f6', 0, -15, 4.5); O('#eef0f6', 0, -22, 3.5); B(dk, -2, -23, 1, 1); B(dk, 1, -23, 1, 1);
+        B('#ff8a3d', 2, -22, 3, 1); B(dk, 0, -16, 1, 1); B(dk, 0, -13, 1, 1); B('#6a3e1e', 4, -17, 5, 1); B('#6a3e1e', -9, -17, 5, 1);
+        if (c0) B(c0, -4, -19, 8, 2); break; }
+      case 'mouse': { const c = c0 || '#8d90a0';
+        O(c, 0, -5, 5); B(c, -5, -5, 10, 5); O(c, 6, -7, 3); O(c, 4, -10, 2); O('#ff9ac0', 4, -10, 1);
+        B('#ff9ac0', 9, -7, 1, 1); B(dk, 7, -8, 1, 1); B('#ff9ac0', -9, -4, 4, 1); break; }
+      case 'human': case 'zombie': {
+        const c = c0 || (d.kind === 'zombie' ? '#6a5a8a' : '#e8282f'), skin = d.kind === 'zombie' ? '#7ab868' : '#f0c8a0', pants = d.ninja ? '#2a2a36' : '#2a3a6a';
+        B(pants, -3, -9, 2, 9 - leg); B(pants, 1, -9, 2, 8 + leg); B(c, -4, -17, 8, 8);
+        if (d.kind === 'zombie') { B(skin, 3, -16, 7, 2); B(skin, 3, -13, 7, 2); B('rgba(0,0,0,0.3)', -2, -12, 2, 3); }
+        else { B(c, -6, -16, 2, 6); B(c, 4, -16, 2, 6); }
+        O(skin, 0, -21, 4); B(d.clown ? 'rainbow' : d.kind === 'zombie' ? '#3a4a2a' : '#6a3e1e', -4, -25, 8, 2); B(dk, -2, -22, 1, 1); B(dk, 1, -22, 1, 1); break; }
+      default: drawAlien(0, solid || '#5fd068', leg, 1);
     }
-    const { hx, top, ey, hw } = A, dk = '#14122a';
+    // (what it wears and how it looks)
     if (d.angry) { B(dk, hx - 5, ey - 4, 3, 1); B(dk, hx + 2, ey - 4, 3, 1); }
+    if (d.sleepy) { B(c0 && d.kind !== 'human' ? solid : '#c8a080', hx - 4, ey - 1, 8, 2); B(dk, hx - 4, ey, 3, 1); B(dk, hx + 1, ey, 3, 1); drawText('Z', hx + 5, PLAIN_Y + top - 9 - ((t >> 4) % 3), undefined); }
+    if (d.ninja) { B('#2a2a36', hx - hw / 2, top - 1, hw, ey - top - 1); B('#2a2a36', hx - hw / 2, ey + 1, hw, 4); B('#2a2a36', hx - hw / 2 - 3, top + 1, 3, 1); }
     if (d.mask) { B(dk, hx - hw / 2, ey - 2, hw, 4); B('#ffffff', hx - 3, ey - 1, 2, 2); B('#ffffff', hx + 1, ey - 1, 2, 2); }
+    if (d.eyepatch) { B(dk, hx - hw / 2, ey - 3, hw, 1); B(dk, hx + 1, ey - 2, 3, 3); }
     if (d.glasses) { B(dk, hx - 5, ey - 1, 4, 3); B(dk, hx + 1, ey - 1, 4, 3); B(dk, hx - 1, ey, 2, 1); B('#7ae0ff', hx - 4, ey, 1, 1); B('#7ae0ff', hx + 2, ey, 1, 1); }
-    if (d.stache) { B('#3a2a1a', hx - 3, ey + 3, 6, 1); B('#3a2a1a', hx - 4, ey + 4, 2, 1); B('#3a2a1a', hx + 2, ey + 4, 2, 1); }
+    if (d.tears) { const k = (t >> 3) % 4; B('#7ae0ff', hx - 3, ey + 2 + k, 1, 2); B('#7ae0ff', hx + 2, ey + 3 + ((k + 2) % 4), 1, 2); }
+    if (d.smile && !d.angry) { B(dk, hx - 2, ey + 3, 4, 1); B(dk, hx - 3, ey + 2, 1, 1); B(dk, hx + 2, ey + 2, 1, 1); }
+    if (d.fangs) { B('#ffffff', hx - 2, ey + 3, 1, 2); B('#ffffff', hx + 1, ey + 3, 1, 2); }
+    if (d.clown) O('#e8282f', hx + 1, ey + 2, 1.8);
+    if (d.stache) { B('#3a2a1a', hx - 3, ey + 3, 6, 1); B('#3a2a1a', hx - 4, ey + 4, 2, 1); B('#3a2a1a', hx + 2, ey + 4, 2, 1); if (d.wizardHat) B('#eef0f6', hx - 3, ey + 4, 6, 5); }
+    if (d.bowtie) { B('#e8282f', nx - 3, ny, 2, 2); B('#e8282f', nx + 1, ny, 2, 2); B('#b0242c', nx - 1, ny, 2, 2); }
+    else if (d.tie) { B('#e8282f', nx - 1, ny, 2, 5); B('#b0242c', nx - 1, ny, 2, 1); }
+    if (d.scarf) { B('#e8282f', nx - bw / 2, ny - 1, bw, 2); B('#e8282f', nx - bw / 2 + 1, ny + 1, 2, 4); B('#ffffff', nx - 1, ny - 1, 1, 2); }
+    if (d.headphones) { B(dk, hx - hw / 2 - 1, ey - 2, 2, 4); B(dk, hx + hw / 2 - 1, ey - 2, 2, 4); B(dk, hx - hw / 2, top - 1, hw, 1); }
+    if (d.horns) { B('#e8282f', hx - 4, top - 3, 2, 3); B('#e8282f', hx + 2, top - 3, 2, 3); }
+    if (d.clown) { O('#ff9ac0', hx - hw / 2 - 1, top + 2, 2.5); O('#7ae0ff', hx + hw / 2 + 1, top + 2, 2.5); O('#ffd060', hx, top - 1, 2.5); }
+    // (one thing on its head, the grandest first)
     if (d.crown) { B('#ffcc3d', hx - 5, top - 4, 10, 3); B('#ffcc3d', hx - 5, top - 6, 2, 2); B('#ffcc3d', hx - 1, top - 7, 2, 3); B('#ffcc3d', hx + 3, top - 6, 2, 2); B('#e8282f', hx, top - 3, 1, 1); }
+    else if (d.wizardHat) { B('#4c2490', hx - hw / 2 - 1, top - 2, hw + 2, 2); B('#4c2490', hx - 4, top - 6, 8, 4); B('#4c2490', hx - 3, top - 10, 6, 4); B('#4c2490', hx - 2, top - 14, 4, 4); B('#4c2490', hx - 1, top - 17, 2, 3); B('#ffcc3d', hx - 1, top - 8, 1, 1); B('#ffcc3d', hx + 1, top - 12, 1, 1); }
+    else if (d.pirateHat) { B(dk, hx - hw / 2 - 2, top - 3, hw + 4, 3); B(dk, hx - 4, top - 6, 8, 3); B('#ffffff', hx - 1, top - 5, 2, 2); }
+    else if (d.cowboyHat) { B('#8a5a34', hx - hw / 2 - 3, top - 1, hw + 6, 2); B('#8a5a34', hx - hw / 2 + 1, top - 6, hw - 2, 5); B('#3a2a1a', hx - hw / 2 + 1, top - 3, hw - 2, 1); }
+    else if (d.chefHat) { B('#ffffff', hx - 4, top - 4, 8, 4); O('#ffffff', hx - 3, top - 6, 3); O('#ffffff', hx + 3, top - 6, 3); O('#ffffff', hx, top - 8, 3); }
+    else if (d.partyHat) { B('#ff9ac0', hx - 3, top - 3, 6, 3); B('#7ae0ff', hx - 2, top - 6, 4, 3); B('#ff9ac0', hx - 1, top - 9, 2, 3); O('#ffd060', hx, top - 10, 1.5); }
+    else if (d.beanie) { B('#4f8aff', hx - hw / 2, top - 3, hw, 4); B('#2f4bc0', hx - hw / 2, top, hw, 1); O('#eef0f6', hx, top - 4, 1.5); }
+    else if (d.knightHelm) { B('#a8acbc', hx - hw / 2, top - 1, hw, ey - top + 4); B(dk, hx - hw / 2 + 1, ey - 1, hw - 2, 1); B('#e8282f', hx - 1, top - 4, 2, 3); }
     else if (d.hat) { B(dk, hx - hw / 2 - 1, top - 2, hw + 2, 2); B(dk, hx - hw / 2 + 2, top - 10, hw - 4, 8); B('#e8282f', hx - hw / 2 + 2, top - 4, hw - 4, 1); }
+    if (d.halo) { ctx.strokeStyle = '#ffcc3d'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(hx, PLAIN_Y + top - 5, 5, 1.5, 0, 0, Math.PI * 2); ctx.stroke(); }
+    if (d.spaceHelm) { ctx.fillStyle = 'rgba(160,225,255,0.3)'; ctx.strokeStyle = '#d8f4ff'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(hx, PLAIN_Y + (top + ey) / 2 + 1, hw / 2 + 3, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+    // (in its hands: a sword, or a bag of money)
+    if (d.sword) { B('#c8ccd8', nx + bw / 2 + 2, ny - 10, 1, 11); B('#8a5a34', nx + bw / 2, ny + 1, 5, 1); B('#8a5a34', nx + bw / 2 + 2, ny + 2, 1, 2); }
+    if (d.money) { O('#c8a070', nx + bw / 2 + 4, ny + 7, 3.5); B('#8a6a40', nx + bw / 2 + 3, ny + 2, 2, 2); B('#ffcc3d', nx + bw / 2 + 3, ny + 6, 2, 2); }
+    // (around it: sparkles, or a stink)
+    if (d.sparkle) for (let i = 0; i < 3; i++) { const a = t * 0.05 + i * 2.1, px = Math.round(Math.cos(a) * (bw / 2 + 5)), py = Math.round(top / 2 + Math.sin(a) * 8); B('#ffffff', px, py, 1, 1); B('#fff6c8', px - 1, py, 3, 1); B('#fff6c8', px, py - 1, 1, 3); }
+    if (d.stink) for (let i = 0; i < 3; i++) { const k = ((t >> 3) + i) % 4; B('#7af0a0', hx - 4 + i * 4 + (k & 1), top - 4 - k * 2, 1, 3); }
     ctx.restore();
   }
   // (inside the police station: its name, a clock, a plant, and the cop on duty behind the front desk)
