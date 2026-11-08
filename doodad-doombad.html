@@ -3970,7 +3970,7 @@
   function enterPlanet() {
     const g = plain, ids = g.fin.ids;
     g.fin = null; g.stroll = false; g.drop = null; g.space = null; g.isle = false; g.crumble = null; g.hole = null; g.warp = null; g.boss = null; g.nuke = null;
-    g.obs = []; g.drops = []; g.rovers = []; g.martians = []; g.cops = []; g.copShip = null; g.copShots = []; g.alienPop = {}; g.wrecked = {}; g.robbed = {}; g.bust = null; g.caught = false; g.talk = null; g.talkCount = {}; g.sky = { bolts: [], copBolts: [], booms: [], heat: {}, flash: {}, cop: null, hp: SHIP_HP, hitT: 0, fireT: 0, dead: 0 }; g.ships = []; g.bits = []; g.endT = 0; g.cam = -PW / 2; g.planet = true; g.room = null; g.roomOn = {}; g.statues = []; g.shipAt = {};
+    g.obs = []; g.drops = []; g.rovers = []; g.martians = []; g.cops = []; g.copShip = null; g.copShots = []; g.alienPop = {}; g.wrecked = {}; g.robbed = {}; g.bust = null; g.caught = false; g.talk = null; g.talkCount = {}; g.panic = {}; g.sky = { bolts: [], copBolts: [], booms: [], heat: {}, flash: {}, cop: null, hp: SHIP_HP, hitT: 0, fireT: 0, dead: 0 }; g.ships = []; g.bits = []; g.endT = 0; g.cam = -PW / 2; g.planet = true; g.room = null; g.roomOn = {}; g.statues = []; g.shipAt = {};
     g.pcData = { paint: {}, blob: 0, bars: [3, 5, 2, 6, 4, 7, 3, 5], notes: [false, false, false, false], chats: {}, wait: null };
     g.pugs = ids.map((id, i) => shopPug(id, i * 16 - 8, -20));
     tone(600, 0.4, 'sine', 0.06, 300);
@@ -4130,7 +4130,56 @@
   const CITY_COLS = ['#5fd068', '#5fd068', '#5fd068', '#6ae0c8', '#b48ae0', '#ffd060'];
   function cityAlien(n, t) {
     const h = planetHash(n + 0.1), a = t * (0.008 + h * 0.012) + h * 6, kind = planetHash(n + 0.3);
-    return { x: n * 58 + h * 30 + Math.sin(a) * 34, face: Math.cos(a) < 0 ? -1 : 1, blob: kind > 0.85, col: CITY_COLS[Math.floor(kind * CITY_COLS.length)] };
+    let x = n * 58 + h * 30 + Math.sin(a) * 34, face = Math.cos(a) < 0 ? -1 : 1, scared = false;
+    // (panicking after one near it was killed: running madly up and down around its spot, then calming down)
+    const p = plain && plain.panic && plain.panic[n];
+    if (p && t < p.until) {
+      const u = t - p.start, env = Math.max(0, Math.min(1, u / 12, (p.until - t) / 60)), ph = u * 0.14 + p.ph;
+      x += Math.sin(ph) * 50 * env; scared = env > 0.3;
+      if (scared) face = Math.cos(ph) < 0 ? -1 : 1;
+    }
+    return { x, face, blob: kind > 0.85, col: CITY_COLS[Math.floor(kind * CITY_COLS.length)], scared };
+  }
+  // Killing an alien in the city sends every alien near it into a panic (the user asked): they run about screaming and
+  // yelling things, then calm down after a few seconds. Kill another nearby and they keep going.
+  const PANIC_NEAR = 260, PANIC_TIME = 300;
+  const PANIC_YELLS = ['AAAAH!', 'RUN!', 'HELP!', 'EEEK!', 'NOOO!', 'MOMMY!', 'COPS!', 'THE PUG!', 'SAVE ME!', 'OH NO!', 'HIDE!',
+    'WAAAH!', 'AIEEE!', 'YIKES!', 'GO GO GO!', 'FLEE!', 'NOT ME!', 'RUN AWAY!', 'IT BARKS!', 'HELP US!'];
+  function startPanic(x0) {
+    const g = plain, n0 = Math.round(x0 / 58);
+    for (let n = n0 - 6; n <= n0 + 6; n++) {
+      if (g.alienPop[n] || Math.abs(cityAlien(n, g.t).x - x0) > PANIC_NEAR) continue;
+      const old = g.panic[n], going = old && g.t < old.until;
+      g.panic[n] = { start: going ? old.start : g.t, until: g.t + PANIC_TIME + Math.floor(Math.random() * 120), ph: going ? old.ph : Math.random() * 6,
+        yell: Math.floor(Math.random() * PANIC_YELLS.length) };
+    }
+    for (let i = 0; i < 3; i++) tone(700 + Math.random() * 500, 0.45, 'sawtooth', 0.02, 400 + Math.random() * 300, i * 0.14);
+  }
+  // (the panicking ones' screams now and then, while any are on screen; and forgetting old panics)
+  function stepPanic() {
+    const g = plain, mid = g.cam + PW / 2;
+    let near = false;
+    for (const k of Object.keys(g.panic)) {
+      const p = g.panic[k];
+      if (g.t >= p.until || g.alienPop[k]) { delete g.panic[k]; continue; }
+      if (Math.abs(cityAlien(+k, g.t).x - mid) < PW / 2 + 20) near = true;
+    }
+    if (near && g.t % 40 === 0) tone(800 + Math.random() * 600, 0.3, 'sawtooth', 0.015, 300 + Math.random() * 400);
+  }
+  // (what each one is yelling, over its head, changing every second or so)
+  function drawPanic(cam) {
+    const g = plain, t = g.t;
+    for (const k of Object.keys(g.panic)) {
+      const n = +k, p = g.panic[k], a = cityAlien(n, t);
+      if (!a.scared || g.alienPop[n] || (g.talk && g.talk.n === n)) continue;
+      const ax = Math.round(a.x - cam);
+      if (ax < -40 || ax > PW + 40) continue;
+      const text = PANIC_YELLS[(p.yell + Math.floor((t - p.start) / 70)) % PANIC_YELLS.length], w = text.length * 6 + 5;
+      const x = clamp(ax - (w >> 1), 1, PW - 1 - w), y = PLAIN_Y - 42 - (((n % 3) + 3) % 3) * 11 - (a.blob ? -6 : 0);
+      ctx.fillStyle = '#14122a'; ctx.fillRect(x - 1, y - 1, w + 2, 11);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y, w, 9);
+      drawText(text, x + 3, y + 1, 'red');
+    }
   }
   // (a bark in the city: every alien within reach in front of the pug goes dizzy, then pops; the cops don't. g.alienPop is
   // the aliens barked at, by number: { t: frames left of being dizzy, 0 once dead, x: the spot it stopped at })
@@ -4144,13 +4193,14 @@
   }
   function stepCity(alive) {
     const g = plain;
+    stepPanic();
     if (g.talk && (++g.talk.t > g.talk.end || g.alienPop[g.talk.n])) g.talk = null;   // (done talking, or popped)
     // (outside, a cop ship and any shots in the air are gone; explosions finish)
     g.sky.cop = null; g.sky.bolts.length = 0; g.sky.copBolts.length = 0; stepBooms();
     for (const n of Object.keys(g.alienPop)) {
       const a = g.alienPop[n];
       if (!a.t || --a.t) continue;
-      sfx.pop(); callCops();
+      sfx.pop(); callCops(); startPanic(a.x);
       const c = cityAlien(+n, g.t);
       for (let i = 0; i < 8; i++) g.bits.push({ x: a.x, y: PLAIN_Y - 10, vx: (Math.random() - 0.5) * 3, vy: -1 - Math.random() * 2, t: 24, col: c.blob ? '#5fc88f' : c.col });
     }
@@ -4856,7 +4906,7 @@
       for (let n = Math.round(sx / 58) - 2, n1 = n + 4; n <= n1 && !hit; n++) {   // (an alien: one hit)
         if (g.alienPop[n]) continue;
         const a = cityAlien(n, g.t);
-        if (Math.abs(a.x - sx) < 7 && sy > PLAIN_Y - (a.blob ? 16 : 24)) { g.alienPop[n] = { t: 0, x: a.x }; hit = true; k.booms.push({ x: a.x, y: PLAIN_Y - 10, t: 0 }); sfx.pop(); callSkyCop(); }
+        if (Math.abs(a.x - sx) < 7 && sy > PLAIN_Y - (a.blob ? 16 : 24)) { g.alienPop[n] = { t: 0, x: a.x }; startPanic(a.x); hit = true; k.booms.push({ x: a.x, y: PLAIN_Y - 10, t: 0 }); sfx.pop(); callSkyCop(); }
       }
       if (hit) continue;
       const m = buildingAt(sx, sy);
@@ -6138,6 +6188,7 @@
       if (!g.bust && !p.dead && p.ground && (planetDoor(p.x) !== null || alienNear(p.x) !== null)) drawUpArrow(Math.round(p.x - cam), PLAIN_Y - 28);
     }
     drawTalk(cam);
+    drawPanic(cam);
     if (g.bust) drawBust(cam);
   }
   // (the planet with the view at cam, all but the building numbered skip: the outside, and what a window looks out on)
@@ -6165,9 +6216,11 @@
     for (let n = Math.floor((cam - 90) / 58); n * 58 < cam + PW + 90; n++) {
       const pop = plain.alienPop[n];
       if (pop && !pop.t) continue;   // (barked dead)
-      const c = cityAlien(n, t), x = pop ? pop.x + (t >> 1) % 3 - 1 : c.x;
-      if (c.blob) { const pic = sprite(pop ? 'dg_blob_dizzy' : (t >> 3) & 1 ? 'dg_blob2' : 'dg_blob1'); if (pic) ctx.drawImage(pic, Math.round(x - cam) - (pic.width >> 1), PLAIN_Y - pic.height); }
-      else drawAlien(Math.round(x - cam), c.col, pop ? 0 : (t >> 3) & 1, c.face, !!pop);
+      const c = cityAlien(n, t), x = pop ? pop.x + (t >> 1) % 3 - 1 : c.x, step = c.scared ? (t >> 2) & 1 : (t >> 3) & 1, hop = c.scared && !pop ? step * 2 : 0;
+      if (hop) { ctx.save(); ctx.translate(0, -hop); }
+      if (c.blob) { const pic = sprite(pop ? 'dg_blob_dizzy' : step ? 'dg_blob2' : 'dg_blob1'); if (pic) ctx.drawImage(pic, Math.round(x - cam) - (pic.width >> 1), PLAIN_Y - pic.height); }
+      else drawAlien(Math.round(x - cam), c.col, pop ? 0 : step, c.face, !!pop);
+      if (hop) ctx.restore();
     }
     drawSkyFx(cam);
   }
