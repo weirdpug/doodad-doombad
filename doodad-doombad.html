@@ -6784,6 +6784,7 @@
     for (const b of g.drops) blit('barrel_roll' + (Math.floor(b.spin / 6) % 4), Math.round(b.x - g.cam) - 5, Math.round(b.y) - 5);
     for (const b of g.bits) { ctx.fillStyle = b.col || '#8a5630'; ctx.fillRect(Math.round(b.x - g.cam), Math.round(b.y), b.s || 2, b.s || 2); }
     for (const p of g.pugs) {
+      if (p.dead && g.stroll && g.stroll.hunt) continue;   // (on the run from the HOVERACKS, a pug that dies just disappears (the user asked))
       // (a pug going down a crater is hidden by the ground as it sinks)
       if (p.sink) { ctx.save(); ctx.beginPath(); ctx.rect(0, 0, PW, PLAIN_Y + 7); ctx.clip(); }
       drawPlainPug(p, Math.round(p.x - g.cam), Math.round(p.y), 'black');
