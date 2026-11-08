@@ -4461,7 +4461,7 @@
   // The space cop station (the user asked): a room up in space, with a big window on the planet, a cop at a desk and a
   // jail cell. Everyone the cops bust is put in the cell for JAIL_TIME; then the bars go up, and the door out takes them
   // back down to where they were caught.
-  const COP_STATION = 19, JAIL_TIME = 600, CELL_L = 160, CELL_R = 228;
+  const COP_STATION = 19, JAIL_TIME = 600, CELL_L = 106, CELL_R = 228;
   ROOMS[COP_STATION] = { wall: '#2e3350', floor: '#4a4f5f', scene: drawCopStation, front: drawCopBars, things: [] };
   function enterCopStation() {
     const g = plain, back = g.bust.x;
@@ -4472,33 +4472,34 @@
   }
   function drawCopStation(t) {
     const box = (col, x, y, w, h) => { ctx.fillStyle = col; ctx.fillRect(x, PLAIN_Y + y, w, h); };
-    // (its name, and the big window: stars, the pink moon, and the planet's edge below)
-    box('#1d2f8c', 38, -136, 108, 13); drawText('SPACE COP STATION', 92, PLAIN_Y - 133, 'gold', 'center');
-    box('#8d90a0', 40, -120, 104, 64); box('#050614', 43, -117, 98, 58);
-    ctx.save(); ctx.beginPath(); ctx.rect(43, PLAIN_Y - 117, 98, 58); ctx.clip();
-    for (let i = 0; i < 18; i++) box((t + i * 20) % 90 < 6 ? '#9fe0ff' : '#ffffff', 44 + Math.floor(planetHash(i + 0.7) * 96), -116 + Math.floor(planetHash(i + 0.9) * 40), 1, 1);
-    bb('#ff9ac0', 126, PLAIN_Y - 104, 4); bb('#ffc4dc', 125, PLAIN_Y - 105, 2);
-    bb('#6230a4', 92, PLAIN_Y + 26, 92); bb('#3fbfae', 92, PLAIN_Y + 26, 89); bb('#2fb88a', 80, PLAIN_Y + 30, 70);
+    // (its name, and a window: stars, the pink moon, and the planet's edge below)
+    box('#1d2f8c', 66, -136, 108, 13); drawText('SPACE COP STATION', 120, PLAIN_Y - 133, 'gold', 'center');
+    box('#8d90a0', 40, -118, 52, 50); box('#050614', 43, -115, 46, 44);
+    ctx.save(); ctx.beginPath(); ctx.rect(43, PLAIN_Y - 115, 46, 44); ctx.clip();
+    for (let i = 0; i < 10; i++) box((t + i * 20) % 90 < 6 ? '#9fe0ff' : '#ffffff', 44 + Math.floor(planetHash(i + 0.7) * 44), -114 + Math.floor(planetHash(i + 0.9) * 30), 1, 1);
+    bb('#ff9ac0', 80, PLAIN_Y - 106, 3); bb('#ffc4dc', 79, PLAIN_Y - 107, 1.5);
+    bb('#6230a4', 66, PLAIN_Y - 20, 60); bb('#3fbfae', 66, PLAIN_Y - 20, 57); bb('#2fb88a', 58, PLAIN_Y - 16, 46);
     ctx.restore();
-    box('#8d90a0', 91, -117, 2, 58);
+    box('#8d90a0', 65, -115, 2, 44);
     // (the cop on duty at a desk with a computer, watching the cell)
     const was = plain.cam; plain.cam = 0;
-    drawCop({ x: 92, y: PLAIN_Y - 8, t, face: 1, walk: false, flash: 0 });
+    drawCop({ x: 60, y: PLAIN_Y - 8, t, face: 1, walk: false, flash: 0 });
     plain.cam = was;
-    box('#55556a', 70, -22, 56, 3); box('#3a3a4a', 72, -19, 52, 19); box('#2a2a36', 76, -15, 18, 10);
-    box('#22222c', 104, -36, 16, 12); box((t >> 5) & 1 ? '#5fd068' : '#7ae0ff', 105, -35, 14, 9); box('#55556a', 111, -24, 2, 2);
-    // (the cell: a darker back, a bench, and a little barred window)
-    box('#22253a', 150, -96, 90, 96); box('#3a3f5a', 150, -98, 90, 2);
-    box('#050614', 200, -82, 22, 14); box('#ffffff', 205, -79, 1, 1); box('#ffffff', 216, -74, 1, 1);
-    for (const x of [205, 211, 217]) box('#8d90a0', x, -82, 1, 14);
+    box('#55556a', 40, -22, 54, 3); box('#3a3a4a', 42, -19, 50, 19); box('#2a2a36', 46, -15, 16, 10);
+    box('#22222c', 74, -36, 16, 12); box((t >> 5) & 1 ? '#5fd068' : '#7ae0ff', 75, -35, 14, 9); box('#55556a', 81, -24, 2, 2);
+    // (the cell, big enough to walk around in (the user asked): a darker back, a cot, a bench, and a little barred window)
+    box('#22253a', 98, -96, 142, 96); box('#3a3f5a', 98, -98, 142, 2);
+    box('#050614', 150, -82, 22, 14); box('#ffffff', 155, -79, 1, 1); box('#ffffff', 166, -74, 1, 1);
+    for (const x of [155, 161, 167]) box('#8d90a0', x, -82, 1, 14);
+    box('#55556a', 106, -14, 36, 3); box('#55556a', 107, -11, 2, 11); box('#55556a', 139, -11, 2, 11); box('#d8dbe4', 107, -18, 34, 4); box('#ffffff', 108, -21, 9, 3);
     box('#6a6e80', 194, -16, 38, 4); box('#55556a', 196, -12, 3, 12); box('#55556a', 227, -12, 3, 12);
   }
   // (the cell's bars, in front of whoever's in it, going up into the ceiling once they can go; and the time left)
   function drawCopBars(t) {
     const r = plain.room, up = Math.min(1, r.open / 40) * 140;
     ctx.save(); ctx.beginPath(); ctx.rect(0, PLAIN_Y - 138, PW, 138); ctx.clip();
-    for (let x = 151; x < 238; x += 8) { ctx.fillStyle = '#8d90a0'; ctx.fillRect(x, PLAIN_Y - 96 - up, 2, 96); ctx.fillStyle = '#c8ccd8'; ctx.fillRect(x, PLAIN_Y - 96 - up, 1, 96); }
-    ctx.fillStyle = '#55556a'; ctx.fillRect(150, PLAIN_Y - 98 - up, 90, 4); ctx.fillRect(150, PLAIN_Y - 52 - up, 90, 3);
+    for (let x = 99; x < 238; x += 8) { ctx.fillStyle = '#8d90a0'; ctx.fillRect(x, PLAIN_Y - 96 - up, 2, 96); ctx.fillStyle = '#c8ccd8'; ctx.fillRect(x, PLAIN_Y - 96 - up, 1, 96); }
+    ctx.fillStyle = '#55556a'; ctx.fillRect(98, PLAIN_Y - 98 - up, 142, 4); ctx.fillRect(98, PLAIN_Y - 52 - up, 142, 3);
     ctx.restore();
     if (r.jail > 0) drawText('IN JAIL ' + Math.ceil(r.jail / 60), PW / 2, 4, 'red', 'center');
   }
