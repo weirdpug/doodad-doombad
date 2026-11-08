@@ -4135,18 +4135,19 @@
   function cityAlien(n, t) {
     const h = planetHash(n + 0.1), a = t * (0.008 + h * 0.012) + h * 6, kind = planetHash(n + 0.3);
     let x = n * 58 + h * 30 + Math.sin(a) * 34, face = Math.cos(a) < 0 ? -1 : 1, scared = false;
-    // (panicking after one near it was killed: running madly up and down around its spot, then calming down)
+    // (panicking after one near it was killed: running up and down around its spot, at about a pug's running speed (the
+    // user asked), then calming down)
     const p = plain && plain.panic && plain.panic[n];
     if (p && t < p.until) {
-      const u = t - p.start, env = Math.max(0, Math.min(1, u / 12, (p.until - t) / 60)), ph = u * 0.14 + p.ph;
-      x += Math.sin(ph) * 50 * env; scared = env > 0.3;
+      const u = t - p.start, env = Math.max(0, Math.min(1, (p.until - t) / PANIC_CALM)), ph = u * PANIC_PACE + p.ph;
+      x += Math.sin(ph) * PANIC_RUN * env; scared = env > 0.3;
       if (scared) face = Math.cos(ph) < 0 ? -1 : 1;
     }
     return { x, face, blob: kind > 0.85, col: CITY_COLS[Math.floor(kind * CITY_COLS.length)], scared };
   }
   // Killing an alien in the city sends every alien near it into a panic (the user asked): they run about screaming and
   // yelling things, then calm down after a few seconds. Kill another nearby and they keep going.
-  const PANIC_NEAR = 260, PANIC_TIME = 300;
+  const PANIC_NEAR = 260, PANIC_TIME = 300, PANIC_RUN = 50, PANIC_PACE = 0.024, PANIC_CALM = 150;   // (50 px either way, at most 1.2 px a frame; slowing back to a stroll over the last 150 frames)
   const PANIC_YELLS = ['AAAAH!', 'RUN!', 'HELP!', 'EEEK!', 'NOOO!', 'MOMMY!', 'COPS!', 'THE PUG!', 'SAVE ME!', 'OH NO!', 'HIDE!',
     'WAAAH!', 'AIEEE!', 'YIKES!', 'GO GO GO!', 'FLEE!', 'NOT ME!', 'RUN AWAY!', 'IT BARKS!', 'HELP US!'];
   function startPanic(x0) {
@@ -4154,7 +4155,8 @@
     for (let n = n0 - 6; n <= n0 + 6; n++) {
       if (g.alienPop[n] || Math.abs(cityAlien(n, g.t).x - x0) > PANIC_NEAR) continue;
       const old = g.panic[n], going = old && g.t < old.until;
-      g.panic[n] = { start: going ? old.start : g.t, until: g.t + PANIC_TIME + Math.floor(Math.random() * 120), ph: going ? old.ph : Math.random() * 6,
+      g.panic[n] = { start: going ? old.start : g.t, until: g.t + PANIC_TIME + Math.floor(Math.random() * 120), ph: going ? old.ph : Math.random() < 0.5 ? 0 : Math.PI,   // (setting off from where it is, one way or the other)
+       
         yell: Math.floor(Math.random() * PANIC_YELLS.length) };
     }
     for (let i = 0; i < 3; i++) tone(700 + Math.random() * 500, 0.45, 'sawtooth', 0.02, 400 + Math.random() * 300, i * 0.14);
@@ -6220,7 +6222,7 @@
     for (let n = Math.floor((cam - 90) / 58); n * 58 < cam + PW + 90; n++) {
       const pop = plain.alienPop[n];
       if (pop && !pop.t) continue;   // (barked dead)
-      const c = cityAlien(n, t), x = pop ? pop.x + (t >> 1) % 3 - 1 : c.x, step = c.scared ? (t >> 2) & 1 : (t >> 3) & 1, hop = c.scared && !pop ? step * 2 : 0;
+      const c = cityAlien(n, t), x = pop ? pop.x + (t >> 1) % 3 - 1 : c.x, step = (t >> 3) & 1, hop = c.scared && !pop ? step * 2 : 0;
       if (hop) { ctx.save(); ctx.translate(0, -hop); }
       if (c.blob) { const pic = sprite(pop ? 'dg_blob_dizzy' : step ? 'dg_blob2' : 'dg_blob1'); if (pic) ctx.drawImage(pic, Math.round(x - cam) - (pic.width >> 1), PLAIN_Y - pic.height); }
       else drawAlien(Math.round(x - cam), c.col, pop ? 0 : step, c.face, !!pop);
