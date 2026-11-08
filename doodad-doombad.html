@@ -3938,7 +3938,7 @@
   function enterPlanet() {
     const g = plain, ids = g.fin.ids;
     g.fin = null; g.stroll = false; g.drop = null; g.space = null; g.isle = false; g.crumble = null; g.hole = null; g.warp = null; g.boss = null; g.nuke = null;
-    g.obs = []; g.drops = []; g.rovers = []; g.martians = []; g.cops = []; g.copShip = null; g.copShots = []; g.alienPop = {}; g.wrecked = {}; g.robbed = {}; g.sky = { bolts: [], copBolts: [], booms: [], heat: {}, flash: {}, cop: null, hp: SHIP_HP, hitT: 0, fireT: 0, dead: 0 }; g.ships = []; g.bits = []; g.endT = 0; g.cam = -PW / 2; g.planet = true; g.room = null; g.roomOn = {}; g.statues = []; g.shipAt = {};
+    g.obs = []; g.drops = []; g.rovers = []; g.martians = []; g.cops = []; g.copShip = null; g.copShots = []; g.alienPop = {}; g.wrecked = {}; g.robbed = {}; g.bust = null; g.caught = false; g.sky = { bolts: [], copBolts: [], booms: [], heat: {}, flash: {}, cop: null, hp: SHIP_HP, hitT: 0, fireT: 0, dead: 0 }; g.ships = []; g.bits = []; g.endT = 0; g.cam = -PW / 2; g.planet = true; g.room = null; g.roomOn = {}; g.statues = []; g.shipAt = {};
     g.pcData = { paint: {}, blob: 0, bars: [3, 5, 2, 6, 4, 7, 3, 5], notes: [false, false, false, false] };
     g.pugs = ids.map((id, i) => shopPug(id, i * 16 - 8, -20));
     tone(600, 0.4, 'sine', 0.06, 300);
@@ -3947,6 +3947,7 @@
     const g = plain;
     if (g.endT && --g.endT === 0) return leavePlain();
     stepStatues();
+    if (g.bust) return stepBust();
     if (g.room) return stepRoom();
     for (let i = 0; i < 4; i++) if (arenaDriven(i) && !g.pugs.some(p => p.id === i)) g.pugs.push(shopPug(i, g.cam + PW / 2, -20));
     g.pugs = g.pugs.filter(p => arenaDriven(p.id));
@@ -3966,6 +3967,7 @@
       g.cam += ((Math.min(...xs) + Math.max(...xs)) / 2 - PW / 2 - g.cam) * 0.1;
     }
     stepCity(alive);
+    if (g.caught) startBust();
     if (!g.endT && g.pugs.length && g.pugs.every(p => p.dead)) g.endT = 150;
   }
   // (the city's alien number n, at time t: each strolls up and down near its spot, for ever)
@@ -3997,7 +3999,7 @@
     }
     for (const b of g.bits) { b.vy += 0.2; b.x += b.vx; b.y += b.vy; b.t--; }
     g.bits = g.bits.filter(b => b.t > 0);
-    stepCops(alive, p => { if (p.dead) return; p.dead = true; p.y = PLAIN_Y; p.ground = true; p.barkT = 0; sfx.die(); });
+    stepCops(alive, () => { g.caught = true; });
   }
   // (the same each time for the same number, so the planet stays put as you walk)
   const planetHash = n => Math.abs(Math.sin(n * 12.9898) * 43758.5453) % 1;
@@ -4357,7 +4359,7 @@
   const statueStomp = () => { noise(0.08, 0.05, 160, 70); tone(70, 0.1, 'sine', 0.05, -20); };
   function stepStatues() {
     const g = plain, here = g.room ? g.room.n : null;
-    if (!g.pugs.length) return;
+    if (!g.pugs.length || (g.room && g.room.kind === COP_STATION)) return;
     for (const s of g.statues) {
       if (g.t < s.wake) continue;
       if (s.where === here) {
@@ -4405,6 +4407,97 @@
     for (const n of [n0 - 1, n0, n0 + 1]) if (plain.shipAt[n] === undefined && Math.abs(x - buildingX(n)) < 20 && !plain.wrecked[n]) return n;
     return null;
   }
+  // Caught by a cop (the user asked): BUSTED! Everyone freezes, the cop ship flies in over them, beams them all up, and
+  // flies off with them to the space cop station. Caught in a building, they're taken out the door first.
+  const BUST_BEAM = 20, BUST_LIFT = 70, BUST_AWAY = 60;
+  function startBust() {
+    const g = plain;
+    g.caught = false;
+    if (g.room) {
+      const x = buildingX(g.room.n);
+      g.pugs = g.pugs.map((q, i) => Object.assign(shopPug(q.id, x + i * 8, PLAIN_Y), { ground: true, upWas: true }));
+      g.cam = x - PW / 2; g.room = null;
+    }
+    const xs = g.pugs.map(p => p.x), mid = xs.length ? (Math.min(...xs) + Math.max(...xs)) / 2 : g.cam + PW / 2;
+    for (const p of g.pugs) { p.moving = false; p.sitting = false; p.barkT = 0; p.vy = 0; }
+    g.bust = { t: 0, x: mid, over: 0, lift: 0, from: g.pugs.map(p => [p.x, p.y]), ship: { x: g.copShip ? g.copShip.x : g.cam + PW + 50, y: PLAIN_Y - 104, t: 0 } };
+    g.copShip = null;
+    tone(330, 0.15, 'square', 0.05); tone(220, 0.35, 'square', 0.05, 0, 0.15);
+  }
+  function stepBust() {
+    const g = plain, b = g.bust, s = b.ship;
+    b.t++; s.t++;
+    if (s.t % 24 === 1 && b.lift < 1) tone(s.t % 48 === 1 ? 940 : 660, 0.2, 'square', 0.02);   // (the siren)
+    if (!b.over) {   // (flying in, to just over them)
+      s.x += clamp(b.x - s.x, -3, 3);
+      if (Math.abs(b.x - s.x) < 1) { b.over = b.t; tone(160, 1.5, 'sine', 0.04, 260); }
+      return;
+    }
+    const u = b.t - b.over;
+    b.lift = clamp((u - BUST_BEAM) / BUST_LIFT, 0, 1);
+    const e = b.lift * b.lift * (3 - 2 * b.lift);
+    g.pugs.forEach((p, i) => { const [x0, y0] = b.from[i] || [s.x, PLAIN_Y]; p.x = x0 + (s.x - x0) * e; p.y = y0 + (s.y + 4 - y0) * e; p.ground = !b.lift; });
+    if (u > BUST_BEAM + BUST_LIFT) { s.y -= 2.4; s.x += 1.2; }   // (and away)
+    if (u > BUST_BEAM + BUST_LIFT + BUST_AWAY) enterCopStation();
+  }
+  // (the beam: a cone of light from under the cop ship to the ground)
+  function drawBustBeam(cam) {
+    const b = plain.bust, s = b.ship, u = b.over ? b.t - b.over : -1;
+    if (u < 0 || u > BUST_BEAM + BUST_LIFT + 6) return;
+    const x = s.x - cam, top = s.y + 10;
+    ctx.fillStyle = `rgba(255,250,170,${(0.22 + 0.08 * Math.sin(plain.t * 0.4)).toFixed(2)})`;
+    ctx.beginPath(); ctx.moveTo(x - 12, top); ctx.lineTo(x + 12, top); ctx.lineTo(x + 30, PLAIN_Y); ctx.lineTo(x - 30, PLAIN_Y); ctx.closePath(); ctx.fill();
+  }
+  function drawBust(cam) {
+    const b = plain.bust, u = b.over ? b.t - b.over : 0, fade = u - BUST_BEAM - BUST_LIFT - BUST_AWAY + 30;
+    drawCopShip(b.ship, cam);
+    drawText('BUSTED!', PW / 2, 30, 'red', 'center', 2);
+    if (b.over && fade > 0) { ctx.fillStyle = `rgba(0,0,0,${Math.min(1, fade / 30).toFixed(2)})`; ctx.fillRect(0, 0, PW, PH); }
+  }
+  // The space cop station (the user asked): a room up in space, with a big window on the planet, a cop at a desk and a
+  // jail cell. Everyone the cops bust is put in the cell for JAIL_TIME; then the bars go up, and the door out takes them
+  // back down to where they were caught.
+  const COP_STATION = 19, JAIL_TIME = 600, CELL_L = 160, CELL_R = 228;
+  ROOMS[COP_STATION] = { wall: '#2e3350', floor: '#4a4f5f', scene: drawCopStation, front: drawCopBars, things: [] };
+  function enterCopStation() {
+    const g = plain, back = g.bust.x;
+    g.bust = null; g.cops = []; g.copShots = []; g.copShip = null; g.bits = [];
+    g.room = { n: -1000, kind: COP_STATION, home: COP_STATION, floor: 0, lift: null, sayT: 150, say: 'THE SPACE COP STATION', alt: 0, pilot: null, on: [], jail: JAIL_TIME, open: 0, back };
+    g.pugs = g.pugs.map((p, i) => Object.assign(shopPug(p.id, 180 + i * 12, PLAIN_Y), { ground: true, upWas: true }));
+    noise(0.3, 0.06, 300, 100); tone(110, 0.3, 'square', 0.05, -30);   // (the cell door clanging shut)
+  }
+  function drawCopStation(t) {
+    const box = (col, x, y, w, h) => { ctx.fillStyle = col; ctx.fillRect(x, PLAIN_Y + y, w, h); };
+    // (its name, and the big window: stars, the pink moon, and the planet's edge below)
+    box('#1d2f8c', 38, -136, 108, 13); drawText('SPACE COP STATION', 92, PLAIN_Y - 133, 'gold', 'center');
+    box('#8d90a0', 40, -120, 104, 64); box('#050614', 43, -117, 98, 58);
+    ctx.save(); ctx.beginPath(); ctx.rect(43, PLAIN_Y - 117, 98, 58); ctx.clip();
+    for (let i = 0; i < 18; i++) box((t + i * 20) % 90 < 6 ? '#9fe0ff' : '#ffffff', 44 + Math.floor(planetHash(i + 0.7) * 96), -116 + Math.floor(planetHash(i + 0.9) * 40), 1, 1);
+    bb('#ff9ac0', 126, PLAIN_Y - 104, 4); bb('#ffc4dc', 125, PLAIN_Y - 105, 2);
+    bb('#6230a4', 92, PLAIN_Y + 26, 92); bb('#3fbfae', 92, PLAIN_Y + 26, 89); bb('#2fb88a', 80, PLAIN_Y + 30, 70);
+    ctx.restore();
+    box('#8d90a0', 91, -117, 2, 58);
+    // (the cop on duty at a desk with a computer, watching the cell)
+    const was = plain.cam; plain.cam = 0;
+    drawCop({ x: 92, y: PLAIN_Y - 8, t, face: 1, walk: false, flash: 0 });
+    plain.cam = was;
+    box('#55556a', 70, -22, 56, 3); box('#3a3a4a', 72, -19, 52, 19); box('#2a2a36', 76, -15, 18, 10);
+    box('#22222c', 104, -36, 16, 12); box((t >> 5) & 1 ? '#5fd068' : '#7ae0ff', 105, -35, 14, 9); box('#55556a', 111, -24, 2, 2);
+    // (the cell: a darker back, a bench, and a little barred window)
+    box('#22253a', 150, -96, 90, 96); box('#3a3f5a', 150, -98, 90, 2);
+    box('#050614', 200, -82, 22, 14); box('#ffffff', 205, -79, 1, 1); box('#ffffff', 216, -74, 1, 1);
+    for (const x of [205, 211, 217]) box('#8d90a0', x, -82, 1, 14);
+    box('#6a6e80', 194, -16, 38, 4); box('#55556a', 196, -12, 3, 12); box('#55556a', 227, -12, 3, 12);
+  }
+  // (the cell's bars, in front of whoever's in it, going up into the ceiling once they can go; and the time left)
+  function drawCopBars(t) {
+    const r = plain.room, up = Math.min(1, r.open / 40) * 140;
+    ctx.save(); ctx.beginPath(); ctx.rect(0, PLAIN_Y - 138, PW, 138); ctx.clip();
+    for (let x = 151; x < 238; x += 8) { ctx.fillStyle = '#8d90a0'; ctx.fillRect(x, PLAIN_Y - 96 - up, 2, 96); ctx.fillStyle = '#c8ccd8'; ctx.fillRect(x, PLAIN_Y - 96 - up, 1, 96); }
+    ctx.fillStyle = '#55556a'; ctx.fillRect(150, PLAIN_Y - 98 - up, 90, 4); ctx.fillRect(150, PLAIN_Y - 52 - up, 90, 3);
+    ctx.restore();
+    if (r.jail > 0) drawText('IN JAIL ' + Math.ceil(r.jail / 60), PW / 2, 4, 'red', 'center');
+  }
   function enterRoom(n) {
     const g = plain;
     const kind = homeKind(n);
@@ -4424,6 +4517,11 @@
     if (r.drink) { stepDrink(); g.kbAtk = false; return; }
     if (r.plaque) { stepPlaque(); g.kbAtk = false; return; }
     if (r.cops) stepRoomCops();
+    if (r.kind === COP_STATION) {   // (time in jail, and then the bars go up)
+      if (r.jail > 0 && --r.jail === 0) { r.say = 'YOU CAN GO NOW'; r.sayT = 150; tone(523, 0.15, 'square', 0.04); tone(784, 0.3, 'square', 0.04, 0, 0.15); noise(0.6, 0.04, 400, 120); }
+      if (!r.jail && r.open < 40) r.open++;
+    }
+    if (g.caught) { startBust(); g.kbAtk = false; return; }
     if (r.pick) { stepPick(); g.kbAtk = false; return; }
     if (r.teller) { stepTeller(); g.kbAtk = false; return; }
     if (ROOMS[r.kind].window) stepSky();
@@ -4444,12 +4542,13 @@
       }
       const at = roomSpot(p);
       p.upDoor = at !== null || p.upWas;   // (holding Up after a smash must not hop)
-      floorPug(p, 14, PW - 14, PLAIN_Y, 1.25, -3.4);
+      const caged = r.kind === COP_STATION && r.open < 30;
+      floorPug(p, caged ? CELL_L : 14, caged ? CELL_R : PW - 14, PLAIN_Y, 1.25, -3.4);
       if (!p.upFresh || at === null) continue;
       if (at === -2) { r.pick = { sel: 0, id: p.id, held: { left: false, right: false, up: true, down: false }, msg: 0 }; p.moving = false; sfx.tick(); break; }
       if (at < 0) {
-        // (back out of the door, in front of the building)
-        const x = buildingX(r.n);
+        // (back out of the door, in front of the building; out of the space cop station, back where they were caught)
+        const x = r.kind === COP_STATION ? r.back : buildingX(r.n);
         g.pugs = g.pugs.map((q, i) => Object.assign(shopPug(q.id, x + i * 8, PLAIN_Y), { ground: true, upWas: true }));
         const chased = r.cops && (r.copsLeft > 0 || r.cops.length > 0);
         g.cam = x - PW / 2; g.room = null; tone(420, 0.12, 'sine', 0.05, -200); g.kbAtk = false;
@@ -4748,7 +4847,7 @@
     }
     if ((r.copsLeft > 0 || r.cops.length) && g.t % 24 === 1) tone(g.t % 48 === 1 ? 940 : 660, 0.2, 'square', 0.02);   // (the alarm)
     const alive = g.pugs.filter(p => !p.dead);
-    roomCops(() => stepCops(alive, p => { if (p.dead) return; p.dead = true; p.sitting = false; p.y = PLAIN_Y; p.ground = true; p.barkT = 0; sfx.die(); }));
+    roomCops(() => stepCops(alive, () => { g.caught = true; }));
     if (!g.endT && g.pugs.length && g.pugs.every(p => p.dead)) g.endT = 150;
   }
   // Up at the break room's coffee machine or water cooler pours a cup, then the pug takes it, leans back with it up to
@@ -5292,6 +5391,7 @@
       if (at !== null && !r.pick && !r.teller && !r.eat && !r.drink && !r.plaque && !r.pilot && !r.lift) drawUpArrow(at === -2 ? 150 : at < 0 ? ROOM_DOOR : thingX(R.things[at]), PLAIN_Y - (at === -2 ? 56 : at < 0 ? 52 : 66));
     }
     for (const b of g.bits) { ctx.fillStyle = b.col; ctx.fillRect(Math.round(b.x), Math.round(b.y), 2, 2); }
+    if (R.front) R.front(t);
     if (r.eat) drawEat();
     if (r.drink) drawDrink();
     if (r.pick) drawPick();
@@ -5314,11 +5414,14 @@
     drawPlanetScene(cam, null);
     drawStatues(cam);
     drawCops();
+    if (g.bust) drawBustBeam(cam);
     for (const b of g.bits) { ctx.fillStyle = b.col; ctx.fillRect(Math.round(b.x - cam), Math.round(b.y), 2, 2); }
     for (const p of g.pugs) {
+      if (g.bust && g.bust.lift >= 1) continue;   // (inside the cop ship)
       drawPlainPug(p, Math.round(p.x - cam), Math.round(p.y), 'gold');
-      if (!p.dead && p.ground && planetDoor(p.x) !== null) drawUpArrow(Math.round(p.x - cam), PLAIN_Y - 28);
+      if (!g.bust && !p.dead && p.ground && planetDoor(p.x) !== null) drawUpArrow(Math.round(p.x - cam), PLAIN_Y - 28);
     }
+    if (g.bust) drawBust(cam);
   }
   // (the planet with the view at cam, all but the building numbered skip: the outside, and what a window looks out on)
   function drawPlanetScene(cam, skip) {
@@ -6130,8 +6233,9 @@
   }
   // Barking an alien dead in the city brings the space cops (the user asked): their ship comes in with its siren going, stops over
   // the ground just ahead of the pugs, drops them out one at a time and flies off. On the ground they don't shoot: they
-  // run after the nearest pug, nearly as fast as a pug runs, and one that catches a pug gets it (the user asked); a pug
-  // can stay ahead of them or jump over them. Nothing kills them (the user asked). They wait outside while you're in a
+  // run after the nearest pug, nearly as fast as a pug runs, and one that catches a pug busts everyone: the cop ship
+  // beams them all up and takes them to the space cop station (the user asked). A pug can stay ahead of them or jump
+  // over them. Nothing kills them (the user asked). They wait outside while you're in a
   // building.
   const COP_COUNT = 2, COP_AHEAD = 70, COP_MAX = 4, COP_WALK = 1.2, COP_CATCH = 8;
   function callCops() {
