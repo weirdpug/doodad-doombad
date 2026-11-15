@@ -323,7 +323,8 @@
   /* (the user's soto AI symbol above the words, its colours inverted (the user asked): white head and eyes, see-through face) */
   #intro span { display: flex; flex-direction: column; align-items: center; gap: clamp(14px, 3.6vw, 26px); animation: intro-in 1.8s ease .8s both, intro-words-out 1.1s ease 3.8s forwards; }
   #intro.skip { animation: intro-out .4s ease both; }
-  #intro img { display: block; width: clamp(64px, 17vw, 132px); height: auto; }
+  /* (bigger (the user asked): about 1.7 times the first size, kept short enough to fit a wide, short window) */
+  #intro img { display: block; width: clamp(104px, min(30vw, 36vh), 230px); height: auto; }
   @keyframes intro-in { from { opacity: 0; } to { opacity: 1; } }
   @keyframes intro-out { from { opacity: 1; } to { opacity: 0; visibility: hidden; } }
   @keyframes intro-words-out { from { opacity: 1; } to { opacity: 0; } }
