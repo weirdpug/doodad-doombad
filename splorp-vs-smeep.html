@@ -50,7 +50,26 @@ footer kbd{font:inherit;font-weight:700;color:var(--fg);background:var(--panel);
 .intro .cap{font-family:var(--display);font-weight:700;color:#fff;font-size:clamp(18px,3vw,28px);text-shadow:0 2px 10px rgba(0,0,0,.5)}
 .intro .sub{color:rgba(255,255,255,.8);font-size:13px}
 .intro .row{width:100%;justify-content:space-between;align-items:center}
-@media (prefers-reduced-motion: reduce){ #banner,.pip{transition:none} }
+/* Theater: a dark cinema around a glowing screen, velvet curtains at the sides, seat silhouettes in front. */
+.btn.dim{background:#3a1a22;color:#ffd98a;border:1px solid #6a2a38}
+#theaterView{pointer-events:auto}
+.theater{position:absolute;inset:0;overflow:hidden;border-radius:18px;background:radial-gradient(ellipse at 50% 35%,#3a1a22 0%,#1a0b10 50%,#090406 100%)}
+.theater::before,.theater::after{content:"";position:absolute;top:0;bottom:0;width:13%;background:repeating-linear-gradient(90deg,#8c1328 0 10px,#b61a36 10px 20px,#6a0d1f 20px 32px);box-shadow:inset 0 0 40px rgba(0,0,0,.75);z-index:1}
+.theater::before{left:0;border-right:5px solid #3d0812}
+.theater::after{right:0;border-left:5px solid #3d0812}
+.valance{position:absolute;top:0;left:0;right:0;height:10%;background:repeating-linear-gradient(90deg,#8c1328 0 14px,#b61a36 14px 28px,#6a0d1f 28px 44px);border-bottom:7px dotted #e0b24a;box-shadow:0 12px 30px rgba(0,0,0,.65);z-index:2}
+.tmain{position:relative;z-index:3;height:100%;box-sizing:border-box;width:min(72%,780px);margin:0 auto;padding-top:12%;padding-bottom:25%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
+.tcap{font-family:var(--display);font-weight:600;color:#ffd98a;text-shadow:0 0 14px rgba(255,200,100,.55);letter-spacing:.4px;font-size:clamp(12px,2vw,18px);text-align:center}
+.tscreen{width:100%;aspect-ratio:16/9;min-height:0;flex:0 1 auto;background:#000;border:5px solid #15090c;border-radius:6px;box-shadow:0 0 60px 12px rgba(255,235,200,.16),0 30px 60px rgba(0,0,0,.6);animation:glow 3.2s ease-in-out infinite alternate}
+.tscreen video{width:100%;height:100%;object-fit:contain;display:block;background:#000}
+@keyframes glow{from{box-shadow:0 0 50px 8px rgba(255,235,200,.12),0 30px 60px rgba(0,0,0,.6)}to{box-shadow:0 0 75px 16px rgba(255,235,200,.22),0 30px 60px rgba(0,0,0,.6)}}
+.tctl{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.tctl .btn{font-size:14px;padding:8px 14px}
+.seats{position:absolute;left:0;right:0;z-index:4;background-repeat:repeat-x}
+.seats.back{bottom:13%;height:11%;background-image:radial-gradient(ellipse 46% 58% at 50% 45%,#2a161c 0 56%,transparent 58%);background-size:68px 100%;opacity:.9}
+.seats.front{bottom:-3%;height:17%;background-image:radial-gradient(ellipse 46% 58% at 50% 45%,#1b0d11 0 56%,transparent 58%);background-size:104px 100%}
+.aisle{position:absolute;left:14%;right:14%;bottom:3.5%;height:4px;z-index:5;background:radial-gradient(circle,#ffcf7a 0 1.5px,transparent 2.2px) 0 0/36px 4px repeat-x;opacity:.75}
+@media (prefers-reduced-motion: reduce){ #banner,.pip{transition:none} .tscreen{animation:none} }
 </style>
 
 <header>
@@ -69,8 +88,8 @@ footer kbd{font:inherit;font-weight:700;color:var(--fg);background:var(--panel);
     <div class="card">
       <h2>Pillow Fight</h2>
       <p>Shove the other one off the pillow. First to three rounds keeps it. Tap shove for a quick push, hold it to charge a big one. Each round opens with a different fight clip on loop; tap it or hit Skip when you're ready.</p>
-      <div class="row"><button class="btn" id="one">1 Player</button><button class="btn alt" id="two">2 Players</button></div>
-      <p id="menuNote">In 1 Player you are Smeep. Splorp plays itself.</p>
+      <div class="row"><button class="btn" id="one">1 Player</button><button class="btn alt" id="two">2 Players</button><button class="btn dim" id="theater">Theater</button></div>
+      <p id="menuNote">In 1 Player you are Smeep. Splorp plays itself. Theater plays all five fight clips in a row, on repeat.</p>
     </div>
   </div>
   <div class="overlay" id="intro" hidden>
@@ -78,6 +97,24 @@ footer kbd{font:inherit;font-weight:700;color:var(--fg);background:var(--panel);
       <div class="cap" id="introCap">Round 1</div>
       <video id="introVideo" playsinline preload="auto" loop></video>
       <div class="row"><span class="sub">Loops until you skip. Tap anywhere or press Space.</span><button class="btn" id="skip">Skip</button></div>
+    </div>
+  </div>
+  <div class="overlay" id="theaterView" hidden>
+    <div class="theater">
+      <div class="valance"></div>
+      <div class="tmain">
+        <div class="tcap" id="theaterCap">Now showing</div>
+        <div class="tscreen"><video id="theaterVideo" playsinline preload="auto"></video></div>
+        <div class="tctl">
+          <button class="btn dim" id="tPrev">&#9664; Prev</button>
+          <button class="btn dim" id="tPlay">Pause</button>
+          <button class="btn dim" id="tNext">Next &#9654;</button>
+          <button class="btn" id="tMenu">Menu</button>
+        </div>
+      </div>
+      <div class="seats back"></div>
+      <div class="seats front"></div>
+      <div class="aisle"></div>
     </div>
   </div>
   <div class="overlay" id="over" hidden>
@@ -100,6 +137,9 @@ const intro = $('intro'), vid = $('introVideo');
 // One clip per round; round 6+ would wrap around, but a match ends by round 5.
 const CLIPS = ['splorp-vs-smeep.mp4', 'splorp-vs-smeep-2.mp4', 'splorp-vs-smeep-3.mp4', 'splorp-vs-smeep-4.mp4', 'splorp-vs-smeep-5.mp4'];
 let clipBase = null; const prefetched = new Set();
+const tview = $('theaterView'), tvid = $('theaterVideo');
+const TITLES = ['Morning Wrestle', 'Night Tumble', 'Headboard Dive', 'Pillow Tug of War', 'Slow-Motion Finale'];
+const T = { i: 0, fails: 0, token: 0 };
 const NAME = { splorp: 'Splorp', smeep: 'Smeep' };
 const COLOR = { splorp: '#7bd03a', smeep: '#8d84ea' };
 const P = { x: 120, y: 112, w: 720, h: 386, r: 160 };
@@ -212,6 +252,12 @@ function handleShoveKey(code, down) {
 }
 window.addEventListener('keydown', e => {
   if (e.code === 'Escape' && S.mode === 'play') { toMenu(); return; }
+  if (S.mode === 'theater') {
+    if (e.code === 'Escape') { leaveTheater(); return; }
+    if (e.code === 'Space') { e.preventDefault(); theaterToggle(); return; }
+    if (e.code === 'ArrowRight') { e.preventDefault(); theaterShow(T.i + 1); return; }
+    if (e.code === 'ArrowLeft') { e.preventDefault(); theaterShow(T.i - 1); return; }
+  }
   if (S.mode === 'play' && S.roundState === 'intro' && (e.code === 'Space' || e.code === 'Enter')) { e.preventDefault(); endIntro(); return; }
   if (document.activeElement && document.activeElement.tagName === 'BUTTON') return;
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
@@ -388,6 +434,7 @@ function updateMute() { const b = $('mute'); b.innerHTML = S.muted ? '&#128263;'
 function setHint() {
   const coarse = matchMedia('(pointer: coarse)').matches; let h;
   if (S.mode === 'menu') h = 'Pick a mode. Fall off the pillow and you lose the round.';
+  else if (S.mode === 'theater') h = 'Theater: the five clips play in a row and repeat. <kbd>&larr;</kbd> <kbd>&rarr;</kbd> change clip, <kbd>Space</kbd> pauses, <kbd>Esc</kbd> returns to the menu.';
   else if (S.players === 1) h = coarse
     ? 'Drag on the left half to move Smeep. Tap the right half to shove, hold it to charge.'
     : '<kbd>WASD</kbd> or arrow keys move Smeep. <kbd>Space</kbd> shoves; hold it to charge a big shove. <kbd>Esc</kbd> for the menu.';
@@ -398,23 +445,51 @@ function startRound() {
   S.round++; S.roundT = 0; placeFighters(); flakes.length = 0; ai.think = 0; hideBanner();
   S.roundState = 'intro'; $('introCap').textContent = 'Round ' + S.round; intro.hidden = false;
   try { vid.pause(); } catch (e) {}
-  loadClip(CLIPS[(S.round - 1) % CLIPS.length]);
   vid.muted = S.muted;
-  const p = vid.play();
-  if (p && p.catch) p.catch(() => { vid.muted = true; const q = vid.play(); if (q && q.catch) q.catch(() => endIntro()); });
+  setSources(vid, CLIPS[(S.round - 1) % CLIPS.length], () => endIntro());
+  playVideo(vid, () => endIntro());
 }
 function endIntro() {
   if (S.roundState !== 'intro') return;
   intro.hidden = true; try { vid.pause(); } catch (e) {}
   S.roundState = 'ready'; S.roundT = 0; banner('Round ' + S.round, 800);
 }
-function loadClip(name) {
+function setSources(v, name, onFail) {
   // Two sources so the file is found both next to the page (artifact) and one folder up (GitHub Pages).
-  while (vid.firstChild) vid.removeChild(vid.firstChild);
-  for (const base of ['assets/', '../assets/']) { const src = document.createElement('source'); src.src = base + name; src.type = 'video/mp4'; vid.appendChild(src); }
-  vid.lastElementChild.addEventListener('error', () => endIntro());
-  try { vid.load(); } catch (e) { endIntro(); }
+  while (v.firstChild) v.removeChild(v.firstChild);
+  for (const base of ['assets/', '../assets/']) { const src = document.createElement('source'); src.src = base + name; src.type = 'video/mp4'; v.appendChild(src); }
+  v.lastElementChild.addEventListener('error', onFail);
+  try { v.load(); } catch (e) { onFail(); }
 }
+function playVideo(v, onFail) {
+  const p = v.play();
+  if (p && p.catch) p.catch(() => { v.muted = true; const q = v.play(); if (q && q.catch) q.catch(onFail); });
+}
+
+// ---------- theater ----------
+function theaterShow(i) {
+  T.i = (i + CLIPS.length) % CLIPS.length;
+  const token = ++T.token;
+  $('theaterCap').textContent = 'Now showing · Round ' + (T.i + 1) + ': ' + TITLES[T.i];
+  $('tPlay').textContent = 'Pause';
+  tvid.muted = S.muted;
+  setSources(tvid, CLIPS[T.i], () => theaterFail(token));
+  playVideo(tvid, () => theaterFail(token));
+}
+function theaterFail(token) {
+  if (S.mode !== 'theater' || token !== T.token) return;
+  T.fails++;
+  if (T.fails >= CLIPS.length) { $('theaterCap').textContent = 'The clips could not load. Check the assets folder.'; return; }
+  theaterShow(T.i + 1);
+}
+function theaterToggle() {
+  if (tvid.paused) { playVideo(tvid, () => theaterFail(T.token)); $('tPlay').textContent = 'Pause'; }
+  else { tvid.pause(); $('tPlay').textContent = 'Play'; }
+}
+function enterTheater() { sfx.unlock(); S.mode = 'theater'; $('menu').hidden = true; $('over').hidden = true; tview.hidden = false; T.fails = 0; setHint(); theaterShow(0); }
+function leaveTheater() { try { tvid.pause(); } catch (e) {} tview.hidden = true; toMenu(); }
+tvid.addEventListener('playing', () => { T.fails = 0; });
+tvid.addEventListener('ended', () => { if (S.mode === 'theater') theaterShow(T.i + 1); });
 function prefetchNext() {
   if (!clipBase || typeof fetch !== 'function') return;
   const url = clipBase + CLIPS[S.round % CLIPS.length];
@@ -435,12 +510,17 @@ function showOver() {
   if (S.players === 1) t += S.winner === 'smeep' ? ' You kept the pillow.' : ' The splorp bounced you off. Splorp gets a little craftier each round you win.';
   $('overText').textContent = t; $('over').hidden = false;
 }
-function toMenu() { S.mode = 'menu'; S.winner = null; S.roundState = 'end'; intro.hidden = true; try { vid.pause(); } catch (e) {} $('over').hidden = true; $('menu').hidden = false; placeFighters(); flakes.length = 0; hideBanner(); setHint(); }
+function toMenu() { S.mode = 'menu'; S.winner = null; S.roundState = 'end'; intro.hidden = true; tview.hidden = true; try { vid.pause(); tvid.pause(); } catch (e) {} $('over').hidden = true; $('menu').hidden = false; placeFighters(); flakes.length = 0; hideBanner(); setHint(); }
 $('one').addEventListener('click', e => { e.currentTarget.blur(); startMatch(1); });
 $('two').addEventListener('click', e => { e.currentTarget.blur(); startMatch(2); });
 $('again').addEventListener('click', e => { e.currentTarget.blur(); startMatch(S.players); });
 $('toMenu').addEventListener('click', e => { e.currentTarget.blur(); toMenu(); });
-$('mute').addEventListener('click', e => { e.currentTarget.blur(); S.muted = !S.muted; updateMute(); vid.muted = S.muted; if (!S.muted) sfx.unlock(); });
+$('theater').addEventListener('click', e => { e.currentTarget.blur(); enterTheater(); });
+$('tPrev').addEventListener('click', e => { e.currentTarget.blur(); theaterShow(T.i - 1); });
+$('tNext').addEventListener('click', e => { e.currentTarget.blur(); theaterShow(T.i + 1); });
+$('tPlay').addEventListener('click', e => { e.currentTarget.blur(); theaterToggle(); });
+$('tMenu').addEventListener('click', e => { e.currentTarget.blur(); leaveTheater(); });
+$('mute').addEventListener('click', e => { e.currentTarget.blur(); S.muted = !S.muted; updateMute(); vid.muted = S.muted; tvid.muted = S.muted; if (!S.muted) sfx.unlock(); });
 
 function update(dt) {
   pulse = Math.max(0, pulse - dt * 3);
