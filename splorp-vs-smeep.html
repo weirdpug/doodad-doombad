@@ -68,7 +68,7 @@ footer kbd{font:inherit;font-weight:700;color:var(--fg);background:var(--panel);
   <div class="overlay" id="menu">
     <div class="card">
       <h2>Pillow Fight</h2>
-      <p>Shove the other one off the pillow. First to three rounds keeps it. Tap shove for a quick push, hold it to charge a big one. Each round opens with a clip of the fight; tap it to skip.</p>
+      <p>Shove the other one off the pillow. First to three rounds keeps it. Tap shove for a quick push, hold it to charge a big one. Each round opens with the fight clip on loop; tap it or hit Skip when you're ready.</p>
       <div class="row"><button class="btn" id="one">1 Player</button><button class="btn alt" id="two">2 Players</button></div>
       <p id="menuNote">In 1 Player you are Smeep. Splorp plays itself.</p>
     </div>
@@ -76,11 +76,11 @@ footer kbd{font:inherit;font-weight:700;color:var(--fg);background:var(--panel);
   <div class="overlay" id="intro" hidden>
     <div class="intro">
       <div class="cap" id="introCap">Round 1</div>
-      <video id="introVideo" playsinline preload="auto">
+      <video id="introVideo" playsinline preload="auto" loop>
         <source src="assets/splorp-vs-smeep.mp4" type="video/mp4">
         <source src="../assets/splorp-vs-smeep.mp4" type="video/mp4" id="introSrcLast">
       </video>
-      <div class="row"><span class="sub">Tap anywhere or press Space to skip</span><button class="btn" id="skip">Skip</button></div>
+      <div class="row"><span class="sub">Loops until you skip. Tap anywhere or press Space.</span><button class="btn" id="skip">Skip</button></div>
     </div>
   </div>
   <div class="overlay" id="over" hidden>
@@ -407,7 +407,6 @@ function endIntro() {
   intro.hidden = true; try { vid.pause(); } catch (e) {}
   S.roundState = 'ready'; S.roundT = 0; banner('Round ' + S.round, 800);
 }
-vid.addEventListener('ended', endIntro);
 $('introSrcLast').addEventListener('error', () => endIntro());
 $('skip').addEventListener('click', e => e.currentTarget.blur());
 intro.addEventListener('click', () => endIntro());
@@ -433,7 +432,6 @@ function update(dt) {
   pulse = Math.max(0, pulse - dt * 3);
   if (S.mode === 'play') {
     S.roundT += dt;
-    if (S.roundState === 'intro' && S.roundT > 30) endIntro();
     if (S.roundState === 'ready' && S.roundT > 0.9) { S.roundState = 'play'; banner('Fight!', 500); }
     const live = S.roundState === 'play';
     const inS = live ? inputFor(smeep) : { x: 0, y: 0 };
