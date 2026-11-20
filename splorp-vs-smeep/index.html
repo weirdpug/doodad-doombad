@@ -47,8 +47,9 @@ canvas{display:block;border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.18);t
 #banner{position:absolute;left:0;right:0;top:12%;text-align:center;pointer-events:none;font-family:var(--display);font-weight:700;font-size:clamp(22px,4.5vw,44px);color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.35),0 8px 24px rgba(0,0,0,.35);opacity:0;transform:translateY(-10px);transition:opacity .25s,transform .25s}
 #banner.show{opacity:1;transform:none}
 footer{font-size:13px;color:var(--muted);text-align:center;line-height:1.5}
-footer kbd{font:inherit;font-weight:700;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
+footer kbd,.card kbd{font:inherit;font-weight:700;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
 #intro{pointer-events:auto;background:rgba(10,14,22,.62);cursor:pointer}
+#pause{pointer-events:auto;background:rgba(10,14,22,.45)}
 .intro{display:flex;flex-direction:column;align-items:center;gap:10px;width:min(92%,860px);max-height:100%}
 .intro video{display:block;width:100%;max-width:100%;max-height:min(66vh,480px);aspect-ratio:16/9;object-fit:contain;border-radius:16px;background:#000;box-shadow:0 16px 40px rgba(0,0,0,.45)}
 .intro .cap{font-family:var(--display);font-weight:700;color:#fff;font-size:clamp(18px,3vw,28px);text-shadow:0 2px 10px rgba(0,0,0,.5)}
@@ -81,6 +82,7 @@ footer kbd{font:inherit;font-weight:700;color:var(--fg);background:var(--panel);
   <div class="score">
     <div class="side"><span>Splorp</span><span class="pip splorp" id="p1a"></span><span class="pip splorp" id="p1b"></span><span class="pip splorp" id="p1c"></span></div>
     <div class="side"><span class="pip smeep" id="p2a"></span><span class="pip smeep" id="p2b"></span><span class="pip smeep" id="p2c"></span><span>Smeep</span></div>
+    <button class="icon" id="pauseBtn" aria-label="Pause" title="Pause (P)" hidden>&#10074;&#10074;</button>
     <button class="icon" id="mute" aria-label="Sound on" title="Sound">&#128266;</button>
   </div>
 </header>
@@ -121,6 +123,14 @@ footer kbd{font:inherit;font-weight:700;color:var(--fg);background:var(--panel);
       <div class="aisle"></div>
     </div>
   </div>
+  <div class="overlay" id="pause" hidden>
+    <div class="card">
+      <h2>Paused</h2>
+      <div class="row"><button class="btn" id="resume">Resume</button><button class="btn dim" id="pauseTheater">Theater</button></div>
+      <div class="row"><button class="btn alt" id="pauseRestart">Restart</button><button class="btn dim" id="pauseMenu">Menu</button></div>
+      <p>Press <kbd>P</kbd> or <kbd>Esc</kbd> to resume. The theater brings you back here when you leave it.</p>
+    </div>
+  </div>
   <div class="overlay" id="over" hidden>
     <div class="card">
       <h2 id="overTitle">Smeep wins the pillow!</h2>
@@ -143,11 +153,11 @@ const CLIPS = ['splorp-vs-smeep.mp4', 'splorp-vs-smeep-2.mp4', 'splorp-vs-smeep-
 let clipBase = null; const prefetched = new Set();
 const tview = $('theaterView'), tvid = $('theaterVideo');
 const TITLES = ['Morning Wrestle', 'Night Tumble', 'Headboard Dive', 'Pillow Tug of War', 'Slow-Motion Finale'];
-const T = { i: 0, fails: 0, token: 0 };
+const T = { i: 0, fails: 0, token: 0, returnTo: 'menu' };
 const NAME = { splorp: 'Splorp', smeep: 'Smeep' };
 const COLOR = { splorp: '#7bd03a', smeep: '#8d84ea' };
 const P = { x: 120, y: 112, w: 720, h: 386, r: 160 };
-const S = { mode: 'menu', players: 1, score: { splorp: 0, smeep: 0 }, round: 0, roundState: 'play', roundT: 0, time: 0, muted: false, winner: null };
+const S = { mode: 'menu', players: 1, score: { splorp: 0, smeep: 0 }, round: 0, roundState: 'play', roundT: 0, time: 0, muted: false, winner: null, paused: false };
 let pulse = 0;
 
 // ---------- sizing ----------
@@ -248,14 +258,15 @@ function inputFor(f) {
   return { x, y };
 }
 function handleShoveKey(code, down) {
-  if (S.mode !== 'play') return;
+  if (S.mode !== 'play' || S.paused) return;
   const sm = bindsFor(smeep);
   if (sm && sm.shove.includes(code)) { if (down) beginCharge(smeep); else release(smeep); }
   const sp = bindsFor(splorp);
   if (sp && sp.shove.includes(code)) { if (down) beginCharge(splorp); else release(splorp); }
 }
 window.addEventListener('keydown', e => {
-  if (e.code === 'Escape' && S.mode === 'play') { toMenu(); return; }
+  if (S.mode === 'play' && (e.code === 'KeyP' || e.code === 'Escape')) { e.preventDefault(); togglePause(); return; }
+  if (S.mode === 'play' && S.paused) return;
   if (S.mode === 'theater') {
     if (e.code === 'Escape') { leaveTheater(); return; }
     if (e.code === 'Space') { e.preventDefault(); theaterToggle(); return; }
@@ -439,10 +450,11 @@ function setHint() {
   const coarse = matchMedia('(pointer: coarse)').matches; let h;
   if (S.mode === 'menu') h = 'Pick a mode. Fall off the pillow and you lose the round.';
   else if (S.mode === 'theater') h = 'Theater: the five clips play in a row and repeat. <kbd>&larr;</kbd> <kbd>&rarr;</kbd> change clip, <kbd>Space</kbd> pauses, <kbd>Esc</kbd> returns to the menu.';
+  else if (S.mode === 'play' && S.paused) h = 'Paused. <kbd>P</kbd> or <kbd>Esc</kbd> resumes.';
   else if (S.players === 1) h = coarse
-    ? 'Drag on the left half to move Smeep. Tap the right half to shove, hold it to charge.'
-    : '<kbd>WASD</kbd> or arrow keys move Smeep. <kbd>Space</kbd> shoves; hold it to charge a big shove. <kbd>Esc</kbd> for the menu.';
-  else h = 'Smeep: <kbd>WASD</kbd> + <kbd>Space</kbd>. Splorp: arrow keys + <kbd>Enter</kbd>. Hold to charge. <kbd>Esc</kbd> for the menu.';
+    ? 'Drag on the left half to move Smeep. Tap the right half to shove, hold it to charge. The pause button is in the top corner.'
+    : '<kbd>WASD</kbd> or arrow keys move Smeep. <kbd>Space</kbd> shoves; hold it to charge a big shove. <kbd>P</kbd> pauses.';
+  else h = 'Smeep: <kbd>WASD</kbd> + <kbd>Space</kbd>. Splorp: arrow keys + <kbd>Enter</kbd>. Hold to charge. <kbd>P</kbd> pauses.';
   $('hint').innerHTML = h;
 }
 function startRound() {
@@ -490,8 +502,23 @@ function theaterToggle() {
   if (tvid.paused) { playVideo(tvid, () => theaterFail(T.token)); $('tPlay').textContent = 'Pause'; }
   else { tvid.pause(); $('tPlay').textContent = 'Play'; }
 }
-function enterTheater() { sfx.unlock(); S.mode = 'theater'; $('menu').hidden = true; $('over').hidden = true; tview.hidden = false; T.fails = 0; setHint(); theaterShow(0); }
-function leaveTheater() { try { tvid.pause(); } catch (e) {} tview.hidden = true; toMenu(); }
+function enterTheater() {
+  sfx.unlock(); T.returnTo = (S.mode === 'play' && S.paused) ? 'pause' : 'menu';
+  S.mode = 'theater'; $('menu').hidden = true; $('over').hidden = true; $('pause').hidden = true; tview.hidden = false; T.fails = 0; setHint(); theaterShow(0);
+}
+function leaveTheater() {
+  try { tvid.pause(); } catch (e) {} tview.hidden = true;
+  if (T.returnTo === 'pause') { S.mode = 'play'; S.paused = true; $('pause').hidden = false; setHint(); } else toMenu();
+}
+
+// ---------- pause ----------
+function setPaused(on) {
+  if (S.mode !== 'play') return;
+  S.paused = on; $('pause').hidden = !on; keys.clear();
+  if (S.roundState === 'intro') { if (on) { try { vid.pause(); } catch (e) {} } else playVideo(vid, () => endIntro()); }
+  setHint();
+}
+function togglePause() { setPaused(!S.paused); }
 tvid.addEventListener('playing', () => { T.fails = 0; });
 tvid.addEventListener('ended', () => { if (S.mode === 'theater') theaterShow(T.i + 1); });
 function prefetchNext() {
@@ -504,17 +531,17 @@ vid.addEventListener('loadedmetadata', () => { const i = vid.currentSrc.lastInde
 $('skip').addEventListener('click', e => e.currentTarget.blur());
 intro.addEventListener('click', () => endIntro());
 function startMatch(n) {
-  sfx.unlock(); S.players = n; S.score = { splorp: 0, smeep: 0 }; S.winner = null; S.round = 0; S.mode = 'play';
+  sfx.unlock(); S.players = n; S.score = { splorp: 0, smeep: 0 }; S.winner = null; S.round = 0; S.mode = 'play'; S.paused = false; $('pause').hidden = true; $('pauseBtn').hidden = false;
   $('menu').hidden = true; $('over').hidden = true; updatePips(); setHint(); startRound();
 }
 function showOver() {
-  S.mode = 'over';
+  S.mode = 'over'; $('pauseBtn').hidden = true;
   $('overTitle').textContent = NAME[S.winner] + ' wins the pillow!';
   let t = 'Splorp ' + S.score.splorp + ' – ' + S.score.smeep + ' Smeep.';
   if (S.players === 1) t += S.winner === 'smeep' ? ' You kept the pillow.' : ' The splorp bounced you off. Splorp gets a little craftier each round you win.';
   $('overText').textContent = t; $('over').hidden = false;
 }
-function toMenu() { S.mode = 'menu'; S.winner = null; S.roundState = 'end'; intro.hidden = true; tview.hidden = true; try { vid.pause(); tvid.pause(); } catch (e) {} $('over').hidden = true; $('menu').hidden = false; placeFighters(); flakes.length = 0; hideBanner(); setHint(); }
+function toMenu() { S.mode = 'menu'; S.winner = null; S.roundState = 'end'; S.paused = false; $('pause').hidden = true; $('pauseBtn').hidden = true; intro.hidden = true; tview.hidden = true; try { vid.pause(); tvid.pause(); } catch (e) {} $('over').hidden = true; $('menu').hidden = false; placeFighters(); flakes.length = 0; hideBanner(); setHint(); }
 $('one').addEventListener('click', e => { e.currentTarget.blur(); startMatch(1); });
 $('two').addEventListener('click', e => { e.currentTarget.blur(); startMatch(2); });
 $('again').addEventListener('click', e => { e.currentTarget.blur(); startMatch(S.players); });
@@ -524,11 +551,17 @@ $('tPrev').addEventListener('click', e => { e.currentTarget.blur(); theaterShow(
 $('tNext').addEventListener('click', e => { e.currentTarget.blur(); theaterShow(T.i + 1); });
 $('tPlay').addEventListener('click', e => { e.currentTarget.blur(); theaterToggle(); });
 $('tMenu').addEventListener('click', e => { e.currentTarget.blur(); leaveTheater(); });
+$('pauseBtn').addEventListener('click', e => { e.currentTarget.blur(); togglePause(); });
+$('resume').addEventListener('click', e => { e.currentTarget.blur(); setPaused(false); });
+$('pauseTheater').addEventListener('click', e => { e.currentTarget.blur(); enterTheater(); });
+$('pauseRestart').addEventListener('click', e => { e.currentTarget.blur(); startMatch(S.players); });
+$('pauseMenu').addEventListener('click', e => { e.currentTarget.blur(); toMenu(); });
 $('mute').addEventListener('click', e => { e.currentTarget.blur(); S.muted = !S.muted; updateMute(); vid.muted = S.muted; tvid.muted = S.muted; if (!S.muted) sfx.unlock(); });
 
 function update(dt) {
   pulse = Math.max(0, pulse - dt * 3);
   if (S.mode === 'play') {
+    if (S.paused) return;
     S.roundT += dt;
     if (S.roundState === 'ready' && S.roundT > 0.9) { S.roundState = 'play'; banner('Fight!', 500); }
     const live = S.roundState === 'play';
@@ -550,7 +583,7 @@ function update(dt) {
     } else if (S.roundState === 'end' && S.roundT > 1.7) {
       if (S.winner) showOver(); else startRound();
     }
-  } else {
+  } else if (S.mode === 'menu' || S.mode === 'over') {
     stepFighter(smeep, { x: 0, y: 0 }, dt); stepFighter(splorp, { x: 0, y: 0 }, dt);
   }
   stepFeathers(dt);
