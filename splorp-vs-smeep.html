@@ -44,6 +44,12 @@ canvas{display:block;border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.18);t
 #banner.show{opacity:1;transform:none}
 footer{font-size:13px;color:var(--muted);text-align:center;line-height:1.5}
 footer kbd{font:inherit;font-weight:700;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
+#intro{pointer-events:auto;background:rgba(10,14,22,.62);cursor:pointer}
+.intro{display:flex;flex-direction:column;align-items:center;gap:10px;width:min(92%,860px);max-height:100%}
+.intro video{display:block;width:100%;max-width:100%;max-height:min(66vh,480px);aspect-ratio:16/9;object-fit:contain;border-radius:16px;background:#000;box-shadow:0 16px 40px rgba(0,0,0,.45)}
+.intro .cap{font-family:var(--display);font-weight:700;color:#fff;font-size:clamp(18px,3vw,28px);text-shadow:0 2px 10px rgba(0,0,0,.5)}
+.intro .sub{color:rgba(255,255,255,.8);font-size:13px}
+.intro .row{width:100%;justify-content:space-between;align-items:center}
 @media (prefers-reduced-motion: reduce){ #banner,.pip{transition:none} }
 </style>
 
@@ -62,9 +68,19 @@ footer kbd{font:inherit;font-weight:700;color:var(--fg);background:var(--panel);
   <div class="overlay" id="menu">
     <div class="card">
       <h2>Pillow Fight</h2>
-      <p>Shove the other one off the pillow. First to three rounds keeps it. Tap shove for a quick push, hold it to charge a big one.</p>
+      <p>Shove the other one off the pillow. First to three rounds keeps it. Tap shove for a quick push, hold it to charge a big one. Each round opens with a clip of the fight; tap it to skip.</p>
       <div class="row"><button class="btn" id="one">1 Player</button><button class="btn alt" id="two">2 Players</button></div>
       <p id="menuNote">In 1 Player you are Smeep. Splorp plays itself.</p>
+    </div>
+  </div>
+  <div class="overlay" id="intro" hidden>
+    <div class="intro">
+      <div class="cap" id="introCap">Round 1</div>
+      <video id="introVideo" playsinline preload="auto">
+        <source src="assets/splorp-vs-smeep.mp4" type="video/mp4">
+        <source src="../assets/splorp-vs-smeep.mp4" type="video/mp4" id="introSrcLast">
+      </video>
+      <div class="row"><span class="sub">Tap anywhere or press Space to skip</span><button class="btn" id="skip">Skip</button></div>
     </div>
   </div>
   <div class="overlay" id="over" hidden>
@@ -83,6 +99,7 @@ footer kbd{font:inherit;font-weight:700;color:var(--fg);background:var(--panel);
 const W = 960, H = 600;
 const $ = id => document.getElementById(id);
 const canvas = $('c'), ctx = canvas.getContext('2d'), stage = $('stage');
+const intro = $('intro'), vid = $('introVideo');
 const NAME = { splorp: 'Splorp', smeep: 'Smeep' };
 const COLOR = { splorp: '#7bd03a', smeep: '#8d84ea' };
 const P = { x: 120, y: 112, w: 720, h: 386, r: 160 };
@@ -195,6 +212,7 @@ function handleShoveKey(code, down) {
 }
 window.addEventListener('keydown', e => {
   if (e.code === 'Escape' && S.mode === 'play') { toMenu(); return; }
+  if (S.mode === 'play' && S.roundState === 'intro' && (e.code === 'Space' || e.code === 'Enter')) { e.preventDefault(); endIntro(); return; }
   if (document.activeElement && document.activeElement.tagName === 'BUTTON') return;
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
   if (e.repeat) return;
@@ -377,9 +395,22 @@ function setHint() {
   $('hint').innerHTML = h;
 }
 function startRound() {
-  S.round++; S.roundState = 'ready'; S.roundT = 0; placeFighters(); flakes.length = 0; ai.think = 0;
-  banner('Round ' + S.round, 800);
+  S.round++; S.roundT = 0; placeFighters(); flakes.length = 0; ai.think = 0; hideBanner();
+  S.roundState = 'intro'; $('introCap').textContent = 'Round ' + S.round; intro.hidden = false;
+  try { vid.pause(); vid.currentTime = 0; } catch (e) {}
+  vid.muted = S.muted;
+  const p = vid.play();
+  if (p && p.catch) p.catch(() => { vid.muted = true; const q = vid.play(); if (q && q.catch) q.catch(() => endIntro()); });
 }
+function endIntro() {
+  if (S.roundState !== 'intro') return;
+  intro.hidden = true; try { vid.pause(); } catch (e) {}
+  S.roundState = 'ready'; S.roundT = 0; banner('Round ' + S.round, 800);
+}
+vid.addEventListener('ended', endIntro);
+$('introSrcLast').addEventListener('error', () => endIntro());
+$('skip').addEventListener('click', e => e.currentTarget.blur());
+intro.addEventListener('click', () => endIntro());
 function startMatch(n) {
   sfx.unlock(); S.players = n; S.score = { splorp: 0, smeep: 0 }; S.winner = null; S.round = 0; S.mode = 'play';
   $('menu').hidden = true; $('over').hidden = true; updatePips(); setHint(); startRound();
@@ -391,17 +422,18 @@ function showOver() {
   if (S.players === 1) t += S.winner === 'smeep' ? ' You kept the pillow.' : ' The splorp bounced you off. Splorp gets a little craftier each round you win.';
   $('overText').textContent = t; $('over').hidden = false;
 }
-function toMenu() { S.mode = 'menu'; S.winner = null; $('over').hidden = true; $('menu').hidden = false; placeFighters(); flakes.length = 0; hideBanner(); setHint(); }
+function toMenu() { S.mode = 'menu'; S.winner = null; S.roundState = 'end'; intro.hidden = true; try { vid.pause(); } catch (e) {} $('over').hidden = true; $('menu').hidden = false; placeFighters(); flakes.length = 0; hideBanner(); setHint(); }
 $('one').addEventListener('click', e => { e.currentTarget.blur(); startMatch(1); });
 $('two').addEventListener('click', e => { e.currentTarget.blur(); startMatch(2); });
 $('again').addEventListener('click', e => { e.currentTarget.blur(); startMatch(S.players); });
 $('toMenu').addEventListener('click', e => { e.currentTarget.blur(); toMenu(); });
-$('mute').addEventListener('click', e => { e.currentTarget.blur(); S.muted = !S.muted; updateMute(); if (!S.muted) sfx.unlock(); });
+$('mute').addEventListener('click', e => { e.currentTarget.blur(); S.muted = !S.muted; updateMute(); vid.muted = S.muted; if (!S.muted) sfx.unlock(); });
 
 function update(dt) {
   pulse = Math.max(0, pulse - dt * 3);
   if (S.mode === 'play') {
     S.roundT += dt;
+    if (S.roundState === 'intro' && S.roundT > 30) endIntro();
     if (S.roundState === 'ready' && S.roundT > 0.9) { S.roundState = 'play'; banner('Fight!', 500); }
     const live = S.roundState === 'play';
     const inS = live ? inputFor(smeep) : { x: 0, y: 0 };
