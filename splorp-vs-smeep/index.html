@@ -1,0 +1,612 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Splorp vs Smeep</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&family=Nunito:wght@400;600;700&display=swap">
+<style>
+/* Layout: one-screen arcade. Slim header with score pips, a letterboxed canvas filling the middle, a one-line controls strip at the bottom. */
+:root{
+  --bg:#d9e2ec; --fg:#1f2b38; --muted:#5c6c7e; --panel:#f6f8fb; --line:#bfcbd9;
+  --smeep:#8d84ea; --splorp:#6cc232; --accent:#ff7b5c;
+  --display:'Fredoka','Arial Rounded MT Bold',system-ui,sans-serif;
+  --body:'Nunito',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --bg:#131a26; --fg:#e9eef5; --muted:#98a7ba; --panel:#1c2534; --line:#2d3a4f; --splorp:#7bd03a; color-scheme:dark }
+}
+:root[data-theme="dark"]{ --bg:#131a26; --fg:#e9eef5; --muted:#98a7ba; --panel:#1c2534; --line:#2d3a4f; --splorp:#7bd03a; color-scheme:dark }
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;box-sizing:border-box;background:var(--bg);color:var(--fg);font-family:var(--body);
+  display:flex;flex-direction:column;gap:8px;overflow:hidden;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:8px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(20px,3.2vw,30px);margin:0;letter-spacing:.3px;text-wrap:balance}
+h1 .vs{color:var(--muted);font-weight:500;font-size:.7em;margin:0 .3em}
+h1 .a{color:var(--splorp)} h1 .b{color:var(--smeep)}
+.score{display:flex;align-items:center;gap:14px;font-family:var(--display);font-size:16px}
+.side{display:flex;align-items:center;gap:6px}
+.pip{width:14px;height:14px;border-radius:50%;border:2px solid var(--line);box-sizing:border-box;transition:background .2s,border-color .2s}
+.pip.on.splorp{background:var(--splorp);border-color:var(--splorp)}
+.pip.on.smeep{background:var(--smeep);border-color:var(--smeep)}
+button{font:inherit;cursor:pointer}
+.icon{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:999px;width:36px;height:36px;display:grid;place-items:center;font-size:16px}
+.icon:focus-visible,.btn:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+#stage{position:relative;flex:1;min-height:0;display:grid;place-items:center}
+canvas{display:block;border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.18);touch-action:none;user-select:none;-webkit-user-select:none}
+.overlay{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+.card{pointer-events:auto;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:20px;padding:22px 26px;max-width:min(92%,420px);box-sizing:border-box;text-align:center;box-shadow:0 16px 40px rgba(0,0,0,.25);display:flex;flex-direction:column;gap:14px}
+.card h2{font-family:var(--display);margin:0;font-size:26px;text-wrap:balance}
+.card p{margin:0;color:var(--muted);line-height:1.45}
+.row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.btn{font-family:var(--display);font-weight:600;font-size:17px;border:0;border-radius:999px;padding:11px 20px;color:#fff;background:var(--accent)}
+.btn.alt{background:var(--smeep)}
+.btn:active{transform:translateY(1px)}
+#banner{position:absolute;left:0;right:0;top:12%;text-align:center;pointer-events:none;font-family:var(--display);font-weight:700;font-size:clamp(22px,4.5vw,44px);color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.35),0 8px 24px rgba(0,0,0,.35);opacity:0;transform:translateY(-10px);transition:opacity .25s,transform .25s}
+#banner.show{opacity:1;transform:none}
+footer{font-size:13px;color:var(--muted);text-align:center;line-height:1.5}
+footer kbd{font:inherit;font-weight:700;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
+@media (prefers-reduced-motion: reduce){ #banner,.pip{transition:none} }
+</style>
+
+<header>
+  <h1><span class="a">Splorp</span><span class="vs">vs</span><span class="b">Smeep</span></h1>
+  <div class="score">
+    <div class="side"><span>Splorp</span><span class="pip splorp" id="p1a"></span><span class="pip splorp" id="p1b"></span><span class="pip splorp" id="p1c"></span></div>
+    <div class="side"><span class="pip smeep" id="p2a"></span><span class="pip smeep" id="p2b"></span><span class="pip smeep" id="p2c"></span><span>Smeep</span></div>
+    <button class="icon" id="mute" aria-label="Sound on" title="Sound">&#128266;</button>
+  </div>
+</header>
+
+<div id="stage">
+  <canvas id="c" width="960" height="600"></canvas>
+  <div id="banner" aria-live="polite"></div>
+  <div class="overlay" id="menu">
+    <div class="card">
+      <h2>Pillow Fight</h2>
+      <p>Shove the other one off the pillow. First to three rounds keeps it. Tap shove for a quick push, hold it to charge a big one.</p>
+      <div class="row"><button class="btn" id="one">1 Player</button><button class="btn alt" id="two">2 Players</button></div>
+      <p id="menuNote">In 1 Player you are Smeep. Splorp plays itself.</p>
+    </div>
+  </div>
+  <div class="overlay" id="over" hidden>
+    <div class="card">
+      <h2 id="overTitle">Smeep wins the pillow!</h2>
+      <p id="overText"></p>
+      <div class="row"><button class="btn" id="again">Play again</button><button class="btn alt" id="toMenu">Menu</button></div>
+    </div>
+  </div>
+</div>
+<footer id="hint">Pick a mode. Fall off the pillow and you lose the round.</footer>
+
+<script>
+(() => {
+'use strict';
+const W = 960, H = 600;
+const $ = id => document.getElementById(id);
+const canvas = $('c'), ctx = canvas.getContext('2d'), stage = $('stage');
+const NAME = { splorp: 'Splorp', smeep: 'Smeep' };
+const COLOR = { splorp: '#7bd03a', smeep: '#8d84ea' };
+const P = { x: 120, y: 112, w: 720, h: 386, r: 160 };
+const S = { mode: 'menu', players: 1, score: { splorp: 0, smeep: 0 }, round: 0, roundState: 'play', roundT: 0, time: 0, muted: false, winner: null };
+let pulse = 0;
+
+// ---------- sizing ----------
+function resize() {
+  const sw = stage.clientWidth || W, sh = stage.clientHeight || H;
+  const s = Math.max(0.1, Math.min(sw / W, sh / H));
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.style.width = Math.floor(W * s) + 'px';
+  canvas.style.height = Math.floor(H * s) + 'px';
+  canvas.width = Math.max(1, Math.floor(W * s * dpr));
+  canvas.height = Math.max(1, Math.floor(H * s * dpr));
+  ctx.setTransform(s * dpr, 0, 0, s * dpr, 0, 0);
+}
+new ResizeObserver(resize).observe(stage);
+resize();
+
+const mq = matchMedia('(prefers-color-scheme: dark)');
+function isDark() { const t = document.documentElement.dataset.theme; if (t === 'dark') return true; if (t === 'light') return false; return mq.matches; }
+
+// ---------- pillow geometry ----------
+function sdf(px, py) { // signed distance to the pillow edge, negative inside
+  const cx = P.x + P.w / 2, cy = P.y + P.h / 2;
+  const qx = Math.abs(px - cx) - (P.w / 2 - P.r), qy = Math.abs(py - cy) - (P.h / 2 - P.r);
+  return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - P.r;
+}
+function edgeNormal(x, y) {
+  const e = 1, dx = sdf(x + e, y) - sdf(x - e, y), dy = sdf(x, y + e) - sdf(x, y - e);
+  const m = Math.hypot(dx, dy) || 1; return { x: dx / m, y: dy / m };
+}
+
+// ---------- fighters ----------
+function resetFighter(f, x, y, fx, fy) {
+  Object.assign(f, { x, y, vx: 0, vy: 0, pvx: 0, fx, fy, charge: -1, power: 0.5, shove: 0, recover: 0, cd: 0, stun: 0, squash: 0,
+    fell: false, fallT: 0, fallVx: 0, fallVy: 0, spin: 0, walk: 0, ear: 0, earV: 0, ant: 0, antV: 0, jelly: 0 });
+}
+function fighter(kind) { const f = { kind, r: 36 }; resetFighter(f, 0, 0, 1, 0); return f; }
+const splorp = fighter('splorp'), smeep = fighter('smeep');
+const fighters = [splorp, smeep];
+function placeFighters() {
+  resetFighter(splorp, P.x + P.w * 0.3, P.y + P.h / 2, 1, 0);
+  resetFighter(smeep, P.x + P.w * 0.7, P.y + P.h / 2, -1, 0);
+}
+placeFighters();
+
+// ---------- sound ----------
+const sfx = (() => {
+  let ac = null;
+  function get() {
+    if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { ac = null; } }
+    if (ac && ac.state === 'suspended') ac.resume().catch(() => {});
+    return ac;
+  }
+  function tone(f1, f2, dur, type, vol) {
+    const a = get(); if (!a || S.muted) return;
+    const o = a.createOscillator(), g = a.createGain(), t = a.currentTime;
+    o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f2), t + dur);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + 0.05);
+  }
+  function puff(dur, vol, cutoff) {
+    const a = get(); if (!a || S.muted) return;
+    const n = Math.floor(a.sampleRate * dur), buf = a.createBuffer(1, n, a.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const src = a.createBufferSource(); src.buffer = buf;
+    const fl = a.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = cutoff;
+    const g = a.createGain(); g.gain.value = vol;
+    src.connect(fl).connect(g).connect(a.destination); src.start();
+  }
+  return {
+    unlock() { get(); },
+    whoosh(p) { puff(0.18 + 0.12 * p, 0.2 + 0.2 * p, 900 + 900 * p); },
+    hit(p) { tone(520 + 200 * p, 980 + 300 * p, 0.14, 'square', 0.07); puff(0.28, 0.4, 1600); },
+    clash() { tone(320, 110, 0.28, 'sawtooth', 0.08); puff(0.32, 0.45, 1200); },
+    bump() { puff(0.1, 0.15, 700); tone(190, 120, 0.1, 'triangle', 0.06); },
+    fall() { tone(720, 140, 0.65, 'sine', 0.12); },
+    win() { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, f, 0.3, 'triangle', 0.1), i * 110)); }
+  };
+})();
+
+// ---------- input ----------
+const keys = new Set();
+const BIND = {
+  smeep: { up: ['KeyW'], down: ['KeyS'], left: ['KeyA'], right: ['KeyD'], shove: ['Space', 'KeyF'] },
+  splorp: { up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'], shove: ['Enter', 'ShiftRight', 'ShiftLeft', 'Slash'] }
+};
+const MERGED = { up: ['KeyW', 'ArrowUp'], down: ['KeyS', 'ArrowDown'], left: ['KeyA', 'ArrowLeft'], right: ['KeyD', 'ArrowRight'],
+  shove: ['Space', 'KeyF', 'Enter', 'ShiftRight', 'ShiftLeft'] };
+function bindsFor(f) { if (f === smeep) return S.players === 1 ? MERGED : BIND.smeep; return S.players === 2 ? BIND.splorp : null; }
+const touch = { stick: { active: false, id: null, ox: 0, oy: 0, x: 0, y: 0 }, shoveId: null };
+function inputFor(f) {
+  const b = bindsFor(f); let x = 0, y = 0;
+  if (b) {
+    if (b.left.some(k => keys.has(k))) x -= 1; if (b.right.some(k => keys.has(k))) x += 1;
+    if (b.up.some(k => keys.has(k))) y -= 1; if (b.down.some(k => keys.has(k))) y += 1;
+  }
+  if (f === smeep && touch.stick.active) { x += touch.stick.x; y += touch.stick.y; }
+  const m = Math.hypot(x, y); if (m > 1) { x /= m; y /= m; }
+  return { x, y };
+}
+function handleShoveKey(code, down) {
+  if (S.mode !== 'play') return;
+  const sm = bindsFor(smeep);
+  if (sm && sm.shove.includes(code)) { if (down) beginCharge(smeep); else release(smeep); }
+  const sp = bindsFor(splorp);
+  if (sp && sp.shove.includes(code)) { if (down) beginCharge(splorp); else release(splorp); }
+}
+window.addEventListener('keydown', e => {
+  if (e.code === 'Escape' && S.mode === 'play') { toMenu(); return; }
+  if (document.activeElement && document.activeElement.tagName === 'BUTTON') return;
+  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+  if (e.repeat) return;
+  keys.add(e.code); handleShoveKey(e.code, true);
+});
+window.addEventListener('keyup', e => { keys.delete(e.code); handleShoveKey(e.code, false); });
+window.addEventListener('blur', () => { keys.clear(); release(smeep); release(splorp); });
+
+function canvasPos(e) { const r = canvas.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H }; }
+canvas.addEventListener('pointerdown', e => {
+  sfx.unlock();
+  if (S.mode !== 'play') return;
+  e.preventDefault();
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+  const p = canvasPos(e);
+  if (p.x < W / 2) { if (touch.stick.id === null) touch.stick = { active: true, id: e.pointerId, ox: p.x, oy: p.y, x: 0, y: 0 }; }
+  else if (touch.shoveId === null) { touch.shoveId = e.pointerId; beginCharge(smeep); }
+});
+canvas.addEventListener('pointermove', e => {
+  if (touch.stick.id !== e.pointerId) return;
+  const p = canvasPos(e), R = 55; let dx = p.x - touch.stick.ox, dy = p.y - touch.stick.oy; const m = Math.hypot(dx, dy);
+  if (m > R) { dx *= R / m; dy *= R / m; touch.stick.ox = p.x - dx; touch.stick.oy = p.y - dy; }
+  touch.stick.x = dx / R; touch.stick.y = dy / R;
+});
+function endPointer(e) {
+  if (touch.stick.id === e.pointerId) touch.stick = { active: false, id: null, ox: 0, oy: 0, x: 0, y: 0 };
+  if (touch.shoveId === e.pointerId) { touch.shoveId = null; release(smeep); }
+}
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', endPointer);
+
+// ---------- shoving ----------
+function beginCharge(f) {
+  if (S.mode !== 'play' || S.roundState !== 'play') return;
+  if (f.fell || f.stun > 0 || f.cd > 0 || f.shove > 0 || f.recover > 0 || f.charge >= 0) return;
+  f.charge = 0;
+}
+function release(f) {
+  if (f.charge < 0) return;
+  const power = 0.4 + 0.6 * Math.min(1, f.charge / 0.6);
+  f.charge = -1; f.power = power; f.shove = 0.16; f.cd = 0.5;
+  const sp = 380 + 340 * power; f.vx = f.fx * sp; f.vy = f.fy * sp; f.squash = -0.3;
+  sfx.whoosh(power);
+}
+
+// ---------- physics ----------
+function stepFighter(f, inp, dt) {
+  if (f.fell) { f.fallT += dt; f.x += f.fallVx * dt; f.y += f.fallVy * dt; f.fallVy += 420 * dt; f.spin += 5 * dt; return; }
+  f.stun = Math.max(0, f.stun - dt); f.cd = Math.max(0, f.cd - dt); f.recover = Math.max(0, f.recover - dt);
+  if (f.charge >= 0) f.charge = Math.min(1, f.charge + dt);
+  const canMove = f.stun <= 0 && f.shove <= 0 && f.recover <= 0;
+  const mag = Math.hypot(inp.x, inp.y);
+  if (canMove && mag > 0.05) {
+    const slow = f.charge >= 0 ? 0.35 : 1;
+    f.vx += inp.x * 1500 * slow * dt; f.vy += inp.y * 1500 * slow * dt;
+    const max = 270 * slow, sp = Math.hypot(f.vx, f.vy);
+    if (sp > max) { f.vx *= max / sp; f.vy *= max / sp; }
+    f.fx = inp.x / mag; f.fy = inp.y / mag;
+  }
+  if (f.shove > 0) { f.shove -= dt; if (f.shove <= 0) { f.shove = 0; f.recover = 0.16; f.vx *= 0.35; f.vy *= 0.35; } }
+  const fr = f.stun > 0 ? 2 : (f.shove > 0 ? 0.5 : 7);
+  const k = Math.max(0, 1 - fr * dt); f.vx *= k; f.vy *= k;
+  f.x += f.vx * dt; f.y += f.vy * dt;
+  f.walk += Math.hypot(f.vx, f.vy) * dt / 12;
+  f.squash += -f.squash * Math.min(1, dt * 9);
+  const ax = (f.vx - f.pvx) / Math.max(dt, 0.001); f.pvx = f.vx;
+  const earT = Math.max(-1, Math.min(1, -ax / 2500 - f.vx / 600));
+  f.earV += ((earT - f.ear) * 90 - f.earV * 7) * dt; f.ear += f.earV * dt;
+  const antT = Math.max(-1, Math.min(1, -f.vx / 350 - ax / 3000));
+  f.antV += ((antT - f.ant) * 120 - f.antV * 5) * dt; f.ant += f.antV * dt;
+  f.jelly = Math.max(0, f.jelly - dt * 2.5);
+  if (sdf(f.x, f.y) > 10) {
+    f.fell = true; f.fallT = 0; const n = edgeNormal(f.x, f.y);
+    f.fallVx = f.vx * 0.5 + n.x * 170; f.fallVy = f.vy * 0.5 + n.y * 170 + 60;
+    feathers(f.x, f.y, 10); sfx.fall(); pulse = Math.max(pulse, 0.8);
+  }
+}
+function knock(f, nx, ny, sp, stun) { f.vx = nx * sp; f.vy = ny * sp; f.stun = stun; f.charge = -1; f.squash = 0.45; f.jelly = 1; }
+function hit(att, vic, nx, ny, mx, my) {
+  const p = att.power;
+  knock(vic, nx, ny, 430 + 450 * p, 0.25 + 0.3 * p);
+  att.shove = 0; att.recover = 0.15; att.vx *= 0.15; att.vy *= 0.15; att.squash = 0.35; att.jelly = 1;
+  feathers(mx, my, 6 + Math.round(10 * p)); sfx.hit(p); pulse = Math.max(pulse, 0.5 + 0.5 * p);
+}
+function collide(a, b) {
+  if (a.fell || b.fell) return;
+  const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 0.001, min = a.r + b.r - 8;
+  if (d >= min) return;
+  const nx = dx / d, ny = dy / d, ov = (min - d) / 2;
+  a.x -= nx * ov; a.y -= ny * ov; b.x += nx * ov; b.y += ny * ov;
+  const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+  const aS = a.shove > 0, bS = b.shove > 0;
+  if (aS && bS) {
+    const p = (a.power + b.power) / 2;
+    knock(a, -nx, -ny, 320 + 220 * p, 0.3); knock(b, nx, ny, 320 + 220 * p, 0.3);
+    a.shove = b.shove = 0; a.recover = b.recover = 0.2;
+    feathers(mx, my, 16); sfx.clash(); pulse = 1;
+  } else if (aS) hit(a, b, nx, ny, mx, my);
+  else if (bS) hit(b, a, -nx, -ny, mx, my);
+  else {
+    const rv = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+    if (rv < 0) {
+      const j = -rv * 0.9; a.vx -= nx * j / 2; a.vy -= ny * j / 2; b.vx += nx * j / 2; b.vy += ny * j / 2;
+      a.squash = b.squash = Math.min(0.3, -rv / 600);
+      if (-rv > 140) { feathers(mx, my, 3); sfx.bump(); }
+    }
+  }
+}
+
+// ---------- feathers ----------
+const flakes = [];
+function feathers(x, y, n) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, sp = 60 + Math.random() * 160;
+    flakes.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 120, rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 6,
+      life: 0, max: 1.6 + Math.random() * 1.4, size: 7 + Math.random() * 7, ph: Math.random() * 6.28 });
+  }
+  if (flakes.length > 160) flakes.splice(0, flakes.length - 160);
+}
+function stepFeathers(dt) {
+  for (const f of flakes) {
+    f.life += dt; f.vy = Math.min(f.vy + 140 * dt, 55); f.vx *= Math.max(0, 1 - 2.5 * dt);
+    f.x += (f.vx + Math.sin(f.life * 5 + f.ph) * 30) * dt; f.y += f.vy * dt; f.rot += f.vr * dt;
+  }
+  for (let i = flakes.length - 1; i >= 0; i--) if (flakes[i].life > flakes[i].max) flakes.splice(i, 1);
+}
+
+// ---------- splorp brain ----------
+const ai = { think: 0, dx: 0, dy: 0, chargeT: 0 };
+function aiStep(dt) {
+  const me = splorp, you = smeep;
+  if (me.fell || you.fell) return { x: 0, y: 0 };
+  const lvl = Math.max(0.6, Math.min(1.8, 0.8 + 0.35 * S.score.smeep - 0.15 * S.score.splorp));
+  const dx = you.x - me.x, dy = you.y - me.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d;
+  const cx = P.x + P.w / 2, cy = P.y + P.h / 2, tcx = cx - me.x, tcy = cy - me.y, cm = Math.hypot(tcx, tcy) || 1;
+  const myEdge = -sdf(me.x, me.y), yourEdge = -sdf(you.x, you.y);
+  ai.think -= dt;
+  if (ai.think <= 0) {
+    ai.think = 0.1 + Math.random() * 0.3 / lvl;
+    let tx = ux, ty = uy;
+    if (d > 190) { const side = Math.sin(S.time * 0.6) > 0 ? 1 : -1; tx += -uy * 0.6 * side; ty += ux * 0.6 * side; }
+    if ((you.shove > 0 || you.charge > 0.2) && d < 210 && Math.random() < 0.7 * lvl) {
+      const side = Math.random() < 0.5 ? 1 : -1; tx = -uy * side * 1.3 + ux * 0.1; ty = ux * side * 1.3 + uy * 0.1;
+    }
+    if (yourEdge < 70 && d < 220) { const n = edgeNormal(you.x, you.y); tx = (you.x - n.x * 30) - me.x; ty = (you.y - n.y * 30) - me.y; }
+    if (myEdge < 75) { const w = (75 - myEdge) / 75 * 2.2; tx += tcx / cm * w; ty += tcy / cm * w; }
+    const m = Math.hypot(tx, ty) || 1; ai.dx = tx / m; ai.dy = ty / m;
+    if (me.charge < 0 && me.cd <= 0 && me.stun <= 0 && me.shove <= 0 && me.recover <= 0) {
+      const facing = me.fx * ux + me.fy * uy;
+      if (d < me.r + you.r + 55 && facing > 0.5 && Math.random() < 0.5 * lvl) { beginCharge(me); ai.chargeT = you.stun > 0 ? 0.55 : 0.04 + Math.random() * 0.2; }
+      else if (d > 110 && d < 240 && you.shove <= 0 && Math.random() < 0.14 * lvl) { beginCharge(me); ai.chargeT = 0.4 + Math.random() * 0.3; }
+    }
+  }
+  if (me.charge >= 0) {
+    ai.chargeT -= dt;
+    const close = d < me.r + you.r + 36;
+    if (ai.chargeT <= 0 || (close && me.charge > 0.12)) {
+      const err = (Math.random() - 0.5) * 0.5 / lvl, c = Math.cos(err), s = Math.sin(err);
+      me.fx = ux * c - uy * s; me.fy = ux * s + uy * c;
+      release(me);
+    }
+    return { x: ux * 0.5, y: uy * 0.5 };
+  }
+  return { x: ai.dx, y: ai.dy };
+}
+
+// ---------- rounds ----------
+let bannerTimer = 0;
+function banner(text, hold) { const b = $('banner'); b.textContent = text; b.classList.add('show'); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.classList.remove('show'), hold); }
+function hideBanner() { clearTimeout(bannerTimer); $('banner').classList.remove('show'); }
+function updatePips() { ['a', 'b', 'c'].forEach((k, i) => { $('p1' + k).classList.toggle('on', S.score.splorp > i); $('p2' + k).classList.toggle('on', S.score.smeep > i); }); }
+function updateMute() { const b = $('mute'); b.innerHTML = S.muted ? '&#128263;' : '&#128266;'; b.setAttribute('aria-label', S.muted ? 'Sound off' : 'Sound on'); }
+function setHint() {
+  const coarse = matchMedia('(pointer: coarse)').matches; let h;
+  if (S.mode === 'menu') h = 'Pick a mode. Fall off the pillow and you lose the round.';
+  else if (S.players === 1) h = coarse
+    ? 'Drag on the left half to move Smeep. Tap the right half to shove, hold it to charge.'
+    : '<kbd>WASD</kbd> or arrow keys move Smeep. <kbd>Space</kbd> shoves; hold it to charge a big shove. <kbd>Esc</kbd> for the menu.';
+  else h = 'Smeep: <kbd>WASD</kbd> + <kbd>Space</kbd>. Splorp: arrow keys + <kbd>Enter</kbd>. Hold to charge. <kbd>Esc</kbd> for the menu.';
+  $('hint').innerHTML = h;
+}
+function startRound() {
+  S.round++; S.roundState = 'ready'; S.roundT = 0; placeFighters(); flakes.length = 0; ai.think = 0;
+  banner('Round ' + S.round, 800);
+}
+function startMatch(n) {
+  sfx.unlock(); S.players = n; S.score = { splorp: 0, smeep: 0 }; S.winner = null; S.round = 0; S.mode = 'play';
+  $('menu').hidden = true; $('over').hidden = true; updatePips(); setHint(); startRound();
+}
+function showOver() {
+  S.mode = 'over';
+  $('overTitle').textContent = NAME[S.winner] + ' wins the pillow!';
+  let t = 'Splorp ' + S.score.splorp + ' – ' + S.score.smeep + ' Smeep.';
+  if (S.players === 1) t += S.winner === 'smeep' ? ' You kept the pillow.' : ' The splorp bounced you off. Splorp gets a little craftier each round you win.';
+  $('overText').textContent = t; $('over').hidden = false;
+}
+function toMenu() { S.mode = 'menu'; S.winner = null; $('over').hidden = true; $('menu').hidden = false; placeFighters(); flakes.length = 0; hideBanner(); setHint(); }
+$('one').addEventListener('click', e => { e.currentTarget.blur(); startMatch(1); });
+$('two').addEventListener('click', e => { e.currentTarget.blur(); startMatch(2); });
+$('again').addEventListener('click', e => { e.currentTarget.blur(); startMatch(S.players); });
+$('toMenu').addEventListener('click', e => { e.currentTarget.blur(); toMenu(); });
+$('mute').addEventListener('click', e => { e.currentTarget.blur(); S.muted = !S.muted; updateMute(); if (!S.muted) sfx.unlock(); });
+
+function update(dt) {
+  pulse = Math.max(0, pulse - dt * 3);
+  if (S.mode === 'play') {
+    S.roundT += dt;
+    if (S.roundState === 'ready' && S.roundT > 0.9) { S.roundState = 'play'; banner('Fight!', 500); }
+    const live = S.roundState === 'play';
+    const inS = live ? inputFor(smeep) : { x: 0, y: 0 };
+    const inP = live ? (S.players === 2 ? inputFor(splorp) : aiStep(dt)) : { x: 0, y: 0 };
+    stepFighter(smeep, inS, dt); stepFighter(splorp, inP, dt);
+    collide(splorp, smeep);
+    if (live) {
+      const sf = smeep.fell, pf = splorp.fell;
+      if (sf || pf) {
+        S.roundState = 'end'; S.roundT = 0;
+        if (sf && pf) banner('Both fell off!', 1500);
+        else {
+          const w = sf ? 'splorp' : 'smeep'; S.score[w]++; updatePips();
+          if (S.score[w] >= 3) { S.winner = w; banner(NAME[w] + ' wins the pillow!', 1800); sfx.win(); }
+          else banner(NAME[w] + ' takes the round!', 1400);
+        }
+      }
+    } else if (S.roundState === 'end' && S.roundT > 1.7) {
+      if (S.winner) showOver(); else startRound();
+    }
+  } else {
+    stepFighter(smeep, { x: 0, y: 0 }, dt); stepFighter(splorp, { x: 0, y: 0 }, dt);
+  }
+  stepFeathers(dt);
+}
+
+// ---------- drawing ----------
+function roundRectPath(x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+function drawScene(dark) {
+  const g = ctx.createLinearGradient(0, 0, W, H);
+  if (dark) { g.addColorStop(0, '#2a3550'); g.addColorStop(1, '#1b2338'); } else { g.addColorStop(0, '#c6d6e8'); g.addColorStop(1, '#a9bdd4'); }
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = dark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.35)'; ctx.lineWidth = 14; ctx.lineCap = 'round';
+  for (let i = 0; i < 6; i++) {
+    ctx.beginPath(); const y0 = 40 + i * 110;
+    for (let x = -20; x <= W + 20; x += 40) { const y = y0 + Math.sin(x * 0.012 + i) * 18 + Math.sin(x * 0.03 + i * 2) * 6; if (x === -20) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+    ctx.stroke();
+  }
+  if (!dark) { const lg = ctx.createLinearGradient(0, 0, W, H); lg.addColorStop(0, 'rgba(255,245,220,0.4)'); lg.addColorStop(0.55, 'rgba(255,245,220,0)'); ctx.fillStyle = lg; ctx.fillRect(0, 0, W, H); }
+}
+function drawPillow(dark) {
+  const cx = P.x + P.w / 2, cy = P.y + P.h / 2, s = 1 + pulse * 0.025;
+  ctx.save(); ctx.translate(cx, cy); ctx.scale(s, s); ctx.translate(-cx, -cy);
+  ctx.fillStyle = dark ? 'rgba(0,0,0,0.45)' : 'rgba(40,60,90,0.28)'; roundRectPath(P.x + 6, P.y + 16, P.w, P.h, P.r); ctx.fill();
+  const g = ctx.createRadialGradient(cx, cy - 40, 60, cx, cy, P.w * 0.62);
+  if (dark) { g.addColorStop(0, '#d9dde6'); g.addColorStop(1, '#9aa3b6'); } else { g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#dfe3ea'); }
+  ctx.fillStyle = g; roundRectPath(P.x, P.y, P.w, P.h, P.r); ctx.fill();
+  ctx.save(); roundRectPath(P.x, P.y, P.w, P.h, P.r); ctx.clip();
+  for (const f of fighters) {
+    if (f.fell) continue;
+    const dg = ctx.createRadialGradient(f.x, f.y + 10, 4, f.x, f.y + 10, f.r * 1.9);
+    dg.addColorStop(0, dark ? 'rgba(60,70,95,0.55)' : 'rgba(120,135,160,0.45)'); dg.addColorStop(1, 'rgba(120,135,160,0)');
+    ctx.fillStyle = dg; ctx.beginPath(); ctx.ellipse(f.x, f.y + 10, f.r * 1.9, f.r * 1.3, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+  ctx.setLineDash([6, 8]); ctx.lineWidth = 2; ctx.strokeStyle = dark ? 'rgba(80,90,110,0.6)' : 'rgba(170,180,195,0.9)';
+  roundRectPath(P.x + 22, P.y + 22, P.w - 44, P.h - 44, P.r - 22); ctx.stroke(); ctx.setLineDash([]);
+  ctx.lineWidth = 5; ctx.strokeStyle = dark ? '#7d879b' : '#c8ced9'; roundRectPath(P.x, P.y, P.w, P.h, P.r); ctx.stroke();
+  ctx.lineWidth = 3; ctx.strokeStyle = dark ? 'rgba(90,100,120,.7)' : 'rgba(190,198,210,1)';
+  const k = P.r * 0.45;
+  for (const [tx, ty] of [[P.x + k, P.y + k], [P.x + P.w - k, P.y + k], [P.x + k, P.y + P.h - k], [P.x + P.w - k, P.y + P.h - k]]) {
+    ctx.beginPath(); ctx.arc(tx, ty, 9, 0.4, 5.2); ctx.stroke(); ctx.beginPath(); ctx.arc(tx, ty, 4, 1.5, 6); ctx.stroke();
+  }
+  ctx.restore();
+}
+function enterFighter(f) {
+  ctx.save(); ctx.translate(f.x, f.y);
+  if (f.fell) { const k = Math.max(0, 1 - f.fallT / 0.9); ctx.globalAlpha = k; ctx.rotate(f.spin); ctx.scale(0.4 + 0.6 * k, 0.4 + 0.6 * k); }
+  const ch = f.charge >= 0 ? Math.min(1, f.charge / 0.6) : 0;
+  if (ch > 0) ctx.translate((Math.random() - 0.5) * 4 * ch, 0);
+  return ch;
+}
+function drawStars(f, r) {
+  if (f.stun <= 0) return;
+  ctx.fillStyle = '#ffd34d';
+  for (let i = 0; i < 3; i++) { const a = S.time * 8 + i * 2.1; ctx.beginPath(); ctx.arc(Math.cos(a) * 18, -r * 1.15 + Math.sin(a) * 5, 3, 0, Math.PI * 2); ctx.fill(); }
+}
+function drawSmeep(f) {
+  const t = S.time, r = f.r, ch = enterFighter(f);
+  const sx = 1 + f.squash * 0.5 + ch * 0.12, sy = 1 - f.squash * 0.5 + ch * 0.12;
+  ctx.transform(sx, 0, -(f.shove > 0 ? 0.25 : 0) * f.fx, sy, 0, 0);
+  const moving = Math.hypot(f.vx, f.vy) > 30 ? 1 : 0.3, flap = Math.sin(t * 18) * 0.6 * moving;
+  ctx.fillStyle = '#cfc9ff';
+  for (const s of [-1, 1]) { ctx.save(); ctx.translate(s * r * 0.55, -r * 0.5); ctx.rotate(s * (0.6 + flap)); ctx.beginPath(); ctx.ellipse(s * 10, 0, 16, 8, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
+  for (const s of [-1, 1]) {
+    ctx.save(); ctx.translate(s * r * 0.75, -r * 0.2); ctx.rotate(s * 0.35 + f.ear * 0.6);
+    ctx.fillStyle = '#7f76dc'; ctx.beginPath(); ctx.ellipse(0, r * 0.6, 11, r * 0.65, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#c3b4ff'; ctx.beginPath(); ctx.ellipse(0, r * 0.65, 6, r * 0.45, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  const g = ctx.createRadialGradient(-r * 0.3, -r * 0.35, r * 0.1, 0, 0, r * 1.15);
+  g.addColorStop(0, '#bcb4ff'); g.addColorStop(1, '#7f76dc'); ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(0, 0, r * 0.92, 0, Math.PI * 2); ctx.fill();
+  for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2 + 0.26, br = r * 0.26 + Math.sin(t * 4 + i) * 1.5; ctx.beginPath(); ctx.arc(Math.cos(a) * r * 0.82, Math.sin(a) * r * 0.82, br, 0, Math.PI * 2); ctx.fill(); }
+  const ex = f.fx * 4, ey = f.fy * 3;
+  for (const s of [-1, 1]) {
+    const cx = s * r * 0.36 + f.fx * 3, cy = -r * 0.1;
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(cx, cy, r * 0.3, r * 0.34, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2a2140'; ctx.beginPath(); ctx.arc(cx + ex, cy + ey + 2, f.stun > 0 ? r * 0.1 : r * 0.18, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx + ex - 3, cy + ey - 4, r * 0.07, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + ex + 3, cy + ey + 4, r * 0.035, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.strokeStyle = '#3a2d5c'; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.beginPath();
+  if (f.stun > 0) ctx.ellipse(f.fx * 2, r * 0.32, 6, 7, 0, 0, Math.PI * 2);
+  else if (f.shove > 0 || ch > 0) { ctx.moveTo(-8 + f.fx * 2, r * 0.3); ctx.lineTo(8 + f.fx * 2, r * 0.3); }
+  else ctx.arc(f.fx * 2, r * 0.26, 7, 0.2, Math.PI - 0.2);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(255,140,170,0.5)';
+  for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(s * r * 0.55, r * 0.2, 7, 4, 0, 0, Math.PI * 2); ctx.fill(); }
+  drawStars(f, r);
+  ctx.restore();
+}
+function drawSplorp(f) {
+  const t = S.time, r = f.r, ch = enterFighter(f);
+  const sx = 1 + f.squash * 0.5 + ch * 0.15, sy = 1 - f.squash * 0.5 - ch * 0.1;
+  ctx.transform(sx, 0, -(f.shove > 0 ? 0.25 : 0) * f.fx, sy, 0, 0);
+  const step = Math.sin(f.walk) * 5;
+  ctx.fillStyle = '#5da32a';
+  for (const [lx, ly] of [[-r * 0.55, step], [0, -step], [r * 0.55, step * 0.5]]) { ctx.beginPath(); ctx.ellipse(lx, r * 0.62 + ly, 9, 11, 0, 0, Math.PI * 2); ctx.fill(); }
+  const wob = a => 1 + 0.045 * Math.sin(a * 3 + t * 6) + 0.03 * Math.sin(a * 5 - t * 4) + f.jelly * 0.1 * Math.sin(a * 2 + t * 20);
+  const blob = (kx, ky) => {
+    ctx.beginPath();
+    for (let i = 0; i <= 40; i++) { const a = i / 40 * Math.PI * 2, k = wob(a); const x = Math.cos(a) * r * 1.15 * k * kx, y = Math.sin(a) * r * 0.85 * k * ky + (Math.sin(a) > 0 ? r * 0.08 : 0); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+    ctx.closePath();
+  };
+  ctx.fillStyle = 'rgba(140,230,70,0.78)'; blob(1, 1); ctx.fill();
+  const g = ctx.createRadialGradient(-r * 0.25, -r * 0.2, 4, 0, 0, r * 0.9); g.addColorStop(0, '#b7f26a'); g.addColorStop(1, 'rgba(90,170,40,0.9)');
+  ctx.fillStyle = g; blob(0.8, 0.8); ctx.fill();
+  ctx.strokeStyle = 'rgba(70,140,30,0.8)'; ctx.lineWidth = 2.5; blob(1, 1); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.beginPath(); ctx.ellipse(-r * 0.45, -r * 0.4, r * 0.28, r * 0.13, -0.5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#1f3312';
+  for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(s * r * 0.3 + f.fx * 4, -r * 0.3 + f.fy * 2, f.stun > 0 ? 3 : 4.5, 0, Math.PI * 2); ctx.fill(); }
+  const mx = f.fx * 3, my = r * 0.02;
+  ctx.fillStyle = '#5a1a2e'; ctx.beginPath();
+  if (f.stun > 0) ctx.ellipse(mx, r * 0.12, r * 0.3, r * 0.22, 0, 0, Math.PI * 2);
+  else { const open = (f.shove > 0 || ch > 0) ? r * 0.3 : r * 0.12 + Math.sin(t * 3) * 2; ctx.moveTo(-r * 0.6 + mx, my); ctx.quadraticCurveTo(mx, my + open * 2, r * 0.6 + mx, my); ctx.quadraticCurveTo(mx, my - open * 0.4, -r * 0.6 + mx, my); }
+  ctx.fill();
+  ctx.fillStyle = '#ff6f91'; ctx.beginPath(); ctx.ellipse(mx, r * 0.2, r * 0.2, r * 0.07, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#4e8f22'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  const ax = f.ant * 18, tipX = ax * 1.6, tipY = -r * 1.35;
+  ctx.beginPath(); ctx.moveTo(0, -r * 0.75); ctx.quadraticCurveTo(ax, -r * 1.1, tipX, tipY); ctx.stroke();
+  ctx.fillStyle = '#ffd34d'; ctx.beginPath(); ctx.arc(tipX, tipY, 6, 0, Math.PI * 2); ctx.fill();
+  drawStars(f, r);
+  ctx.restore();
+}
+function drawChargeRing(f) {
+  if (f.charge < 0 || f.fell) return;
+  const ch = Math.min(1, f.charge / 0.6), col = ch >= 1 ? '#ffd34d' : COLOR[f.kind];
+  ctx.save(); ctx.translate(f.x, f.y);
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(0, 0, f.r + 10, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = col; ctx.beginPath(); ctx.arc(0, 0, f.r + 10, -Math.PI / 2, -Math.PI / 2 + ch * Math.PI * 2); ctx.stroke();
+  ctx.rotate(Math.atan2(f.fy, f.fx)); ctx.fillStyle = col;
+  ctx.beginPath(); ctx.moveTo(f.r + 30, 0); ctx.lineTo(f.r + 17, -8); ctx.lineTo(f.r + 17, 8); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+function drawFeathers() {
+  for (const f of flakes) {
+    ctx.save(); ctx.globalAlpha = Math.max(0, 1 - f.life / f.max); ctx.translate(f.x, f.y); ctx.rotate(f.rot + Math.sin(f.life * 4 + f.ph) * 0.4);
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = 'rgba(120,130,150,0.6)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.ellipse(0, 0, f.size * 0.45, f.size, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, -f.size); ctx.lineTo(0, f.size * 1.2); ctx.stroke();
+    ctx.restore();
+  }
+}
+function drawStick() {
+  const s = touch.stick; if (!s.active) return;
+  ctx.save(); ctx.globalAlpha = 0.45; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(s.ox, s.oy, 55, 0, Math.PI * 2); ctx.fill();
+  ctx.globalAlpha = 0.85; ctx.fillStyle = COLOR.smeep; ctx.beginPath(); ctx.arc(s.ox + s.x * 55, s.oy + s.y * 55, 22, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+}
+function draw() {
+  const dark = isDark();
+  ctx.clearRect(0, 0, W, H); drawScene(dark); drawPillow(dark);
+  const order = fighters.slice().sort((a, b) => a.y - b.y);
+  for (const f of order) { if (f === smeep) drawSmeep(f); else drawSplorp(f); }
+  for (const f of fighters) drawChargeRing(f);
+  drawFeathers(); drawStick();
+}
+
+// ---------- loop ----------
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.033, Math.max(0.001, (now - last) / 1000)); last = now; S.time += dt;
+  update(dt); draw(); requestAnimationFrame(frame);
+}
+function snapshot() { return { players: S.players, score: { splorp: S.score.splorp, smeep: S.score.smeep }, muted: S.muted, mode: S.mode }; }
+function boot(data) {
+  try {
+    if (data && data.score && (data.mode === 'play' || data.mode === 'over')) {
+      S.players = data.players === 2 ? 2 : 1; S.muted = !!data.muted;
+      S.score = { splorp: data.score.splorp | 0, smeep: data.score.smeep | 0 };
+      if (S.score.splorp >= 3 || S.score.smeep >= 3) S.score = { splorp: 0, smeep: 0 };
+      S.mode = 'play'; S.round = 0; $('menu').hidden = true; updatePips(); startRound();
+    }
+  } catch (e) {}
+  updateMute(); setHint(); requestAnimationFrame(frame);
+}
+try { if (window.claude && window.claude.hot && typeof window.claude.hot.snapshot === 'function') window.claude.hot.snapshot(snapshot); } catch (e) {}
+const hot = window.claude && window.claude.hot;
+if (hot && typeof hot.ready === 'function') hot.ready(boot); else boot(hot && hot.data ? hot.data : {});
+})();
+</script>
