@@ -68,7 +68,7 @@ footer kbd{font:inherit;font-weight:700;color:var(--fg);background:var(--panel);
   <div class="overlay" id="menu">
     <div class="card">
       <h2>Pillow Fight</h2>
-      <p>Shove the other one off the pillow. First to three rounds keeps it. Tap shove for a quick push, hold it to charge a big one. Each round opens with the fight clip on loop; tap it or hit Skip when you're ready.</p>
+      <p>Shove the other one off the pillow. First to three rounds keeps it. Tap shove for a quick push, hold it to charge a big one. Each round opens with a different fight clip on loop; tap it or hit Skip when you're ready.</p>
       <div class="row"><button class="btn" id="one">1 Player</button><button class="btn alt" id="two">2 Players</button></div>
       <p id="menuNote">In 1 Player you are Smeep. Splorp plays itself.</p>
     </div>
@@ -76,10 +76,7 @@ footer kbd{font:inherit;font-weight:700;color:var(--fg);background:var(--panel);
   <div class="overlay" id="intro" hidden>
     <div class="intro">
       <div class="cap" id="introCap">Round 1</div>
-      <video id="introVideo" playsinline preload="auto" loop>
-        <source src="assets/splorp-vs-smeep.mp4" type="video/mp4">
-        <source src="../assets/splorp-vs-smeep.mp4" type="video/mp4" id="introSrcLast">
-      </video>
+      <video id="introVideo" playsinline preload="auto" loop></video>
       <div class="row"><span class="sub">Loops until you skip. Tap anywhere or press Space.</span><button class="btn" id="skip">Skip</button></div>
     </div>
   </div>
@@ -100,6 +97,9 @@ const W = 960, H = 600;
 const $ = id => document.getElementById(id);
 const canvas = $('c'), ctx = canvas.getContext('2d'), stage = $('stage');
 const intro = $('intro'), vid = $('introVideo');
+// One clip per round; round 6+ would wrap around, but a match ends by round 5.
+const CLIPS = ['splorp-vs-smeep.mp4', 'splorp-vs-smeep-2.mp4', 'splorp-vs-smeep-3.mp4', 'splorp-vs-smeep-4.mp4', 'splorp-vs-smeep-5.mp4'];
+let clipBase = null; const prefetched = new Set();
 const NAME = { splorp: 'Splorp', smeep: 'Smeep' };
 const COLOR = { splorp: '#7bd03a', smeep: '#8d84ea' };
 const P = { x: 120, y: 112, w: 720, h: 386, r: 160 };
@@ -397,7 +397,8 @@ function setHint() {
 function startRound() {
   S.round++; S.roundT = 0; placeFighters(); flakes.length = 0; ai.think = 0; hideBanner();
   S.roundState = 'intro'; $('introCap').textContent = 'Round ' + S.round; intro.hidden = false;
-  try { vid.pause(); vid.currentTime = 0; } catch (e) {}
+  try { vid.pause(); } catch (e) {}
+  loadClip(CLIPS[(S.round - 1) % CLIPS.length]);
   vid.muted = S.muted;
   const p = vid.play();
   if (p && p.catch) p.catch(() => { vid.muted = true; const q = vid.play(); if (q && q.catch) q.catch(() => endIntro()); });
@@ -407,7 +408,20 @@ function endIntro() {
   intro.hidden = true; try { vid.pause(); } catch (e) {}
   S.roundState = 'ready'; S.roundT = 0; banner('Round ' + S.round, 800);
 }
-$('introSrcLast').addEventListener('error', () => endIntro());
+function loadClip(name) {
+  // Two sources so the file is found both next to the page (artifact) and one folder up (GitHub Pages).
+  while (vid.firstChild) vid.removeChild(vid.firstChild);
+  for (const base of ['assets/', '../assets/']) { const src = document.createElement('source'); src.src = base + name; src.type = 'video/mp4'; vid.appendChild(src); }
+  vid.lastElementChild.addEventListener('error', () => endIntro());
+  try { vid.load(); } catch (e) { endIntro(); }
+}
+function prefetchNext() {
+  if (!clipBase || typeof fetch !== 'function') return;
+  const url = clipBase + CLIPS[S.round % CLIPS.length];
+  if (prefetched.has(url)) return; prefetched.add(url);
+  try { fetch(url, { cache: 'force-cache' }).then(r => r.blob()).catch(() => {}); } catch (e) {}
+}
+vid.addEventListener('loadedmetadata', () => { const i = vid.currentSrc.lastIndexOf('/'); if (i >= 0) clipBase = vid.currentSrc.slice(0, i + 1); prefetchNext(); });
 $('skip').addEventListener('click', e => e.currentTarget.blur());
 intro.addEventListener('click', () => endIntro());
 function startMatch(n) {
